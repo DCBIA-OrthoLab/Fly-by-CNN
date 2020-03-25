@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Testing</category>
+  <title>SurfaceFeaturesExtractor</title>
+  <description> Specific features are computed at each point of the 3D Model add added to the vtk file</description>
+  <version>1.0</version>
+  <contributor>Priscille de Dumast (University of Michigan)</contributor>
+  <acknowledgements>  </acknowledgements>
+    
+    <parameters>
+      <label>IO</label>
+      <description>Input/output parameters</description>
+
+      <geometry fileExtensions=".vtk" multiple="false">
+        <name>inputMesh</name>
+        <label>Input Mesh</label>
+        <channel>input</channel>
+        <index>0</index>
+        <description>Input Mesh</description>
+      </geometry>
+
+      <geometry fileExtensions=".vtk" multiple="false">
+        <name>outputMesh</name>
+        <label>Output Mesh</label>
+        <channel>output</channel>
+        <index>1</index>
+        <description>Output Mesh</description>
+      </geometry>
+    </parameters>
+
+
+    <parameters advanced="true">
+      <boolean>
+        <name>distMeshOn</name>
+        <default>false</default>
+        <label>Compute the distances to a list of mesh</label>
+        <longflag>distMeshOn</longflag>
+        <description>Compute the distances to a list of mesh</description> 
+      </boolean>
+
+      <string-vector>
+        <name>distMesh</name>
+        <label>List of mesh to compute distances</label>
+        <longflag>distMesh</longflag>
+        <channel>input</channel>
+        <description>List of mesh to compute distances</description>
+      </string-vector>
+
+      <boolean>
+        <name>landmarksOn</name>
+        <default>false</default>
+        <label>Get the landmarks from a fcsv file</label>
+        <longflag>landmarksOn</longflag>
+        <description>Get the landmarks from a fcsv file</description> 
+      </boolean>
+
+      <geometry fileExtensions=".fcsv" multiple="false">
+        <name>landmarks</name>
+        <label>fcsv files where are stored the landmarks</label>
+        <longflag>landmarks</longflag>
+        <channel>input</channel>
+        <description>fcsv files where are stored the landmarks</description>
+      </geometry>
+
+    </parameters>
+</executable>

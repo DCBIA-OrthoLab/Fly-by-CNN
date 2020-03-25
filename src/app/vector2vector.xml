@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>RGBToLum</category>
+  <title>Convert RGB to lum filter</title>
+  <version>1.0.0</version>
+  <description>
+    Convert an image from RGB to greyscale using RGB to luminance filter
+  </description>
+  <contributor>Juan Carlos Prieto</contributor>
+
+  <parameters>
+    <label>Input parameters</label>
+    <description>Input parameters</description>
+
+    <image>
+      <name>inputImageFilename</name>
+      <label>Input volume</label>
+      <channel>input</channel>
+      <description>Input image rgb</description>
+      <longflag>img</longflag>
+    </image>
+
+    <integer-vector>
+      <name>extractComponents</name>
+      <label>Component index</label>
+      <channel>input</channel>
+      <description>Components to extract from the vector image</description>
+      <longflag>extractComponents</longflag>
+    </integer-vector>
+
+    <integer>
+      <name>outputMinimum</name>
+      <label>Output min</label>
+      <channel>input</channel>
+      <description>Minimum value of output</description>
+      <longflag>outputMinimum</longflag>
+      <default>0</default>
+    </integer>
+
+    <integer>
+      <name>outputMaximum</name>
+      <label>Output max</label>
+      <channel>input</channel>
+      <description>Maximum value of output</description>
+      <longflag>outputMaximum</longflag>
+      <default>255</default>
+    </integer>    
+
+  </parameters>
+
+  <parameters>
+    <label>Ouput parameters</label>
+    <description>Output parameters</description>
+
+    <image>
+      <name>outputImageFilename</name>
+      <label>Output label image</label>
+      <channel>output</channel>
+      <description>Write the output of the image</description>
+      <longflag>out</longflag>
+      <default>out.nrrd</default>
+    </image>
+
+  </parameters>
+</executable>

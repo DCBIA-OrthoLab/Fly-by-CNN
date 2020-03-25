@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Transform</category>
+  <title></title>
+  <version>1.0.0</version>
+  <description>
+    Extracts features by flying around the object and probing the surfaces
+  </description>
+  <contributor>Juan Carlos Prieto</contributor>
+
+  <parameters>
+    <label>Input parameters</label>
+    <description>Input parameters</description>
+
+    <image>
+      <name>inputSurface</name>
+      <label>Input surface</label>
+      <channel>input</channel>
+      <description>Input surface to probe</description>
+      <longflag>surf</longflag>
+    </image>
+    <double>
+      <name>sphereRadius</name>
+      <label>Shpere radius</label>
+      <channel>input</channel>
+      <description>Sphere radius to take the snapshots of the object</description>
+      <longflag>radius</longflag>
+      <default>1.1</default>
+    </double>
+    <integer>
+      <name>numberOfSubdivisions</name>
+      <label>Sphere subdivisions</label>
+      <channel>input</channel>
+      <description>Number of recursive subdivisions for the sphere</description>
+      <longflag>subdivision</longflag>
+      <default>4</default>
+    </integer>
+    <integer>
+      <name>planeResolution</name>
+      <label>Resolution</label>
+      <channel>input</channel>
+      <description>Number of samples/size for the plane tanget to the sphere</description>
+      <longflag>resolution</longflag>
+      <default>512</default>
+    </integer>
+    <double>
+      <name>planeSpacing</name>
+      <label>Plane spacing</label>
+      <channel>input</channel>
+      <description>Spacing of the planes pixels</description>
+      <longflag>planeSpacing</longflag>
+      <default>0.5</default>
+    </double>
+    <string>
+      <name>regionLabels</name>
+      <label>Region labels</label>
+      <channel>input</channel>
+      <description>Array name that contains the labels for every point in the surface</description>
+      <longflag>regionLabels</longflag>
+    </string>
+    <boolean>
+      <name>flyByCompose</name>
+      <label>Compose image with sequence</label>
+      <channel>input</channel>
+      <description>Compose a volume with the fly-by extraction</description>
+      <longflag>flyByCompose</longflag>
+      <default>0</default>
+    </boolean>
+
+    <double>
+      <name>maxCoord</name>
+      <label>Max coordinate after centering</label>
+      <channel>input</channel>
+      <description>If you want to normalize a whole population of objects</description>
+      <longflag>maxCoord</longflag>
+      <default>-1</default>
+    </double>
+    
+  </parameters>
+
+  <parameters>
+    <label>Ouput parameters</label>
+    <description>Output parameters</description>
+
+    <string>
+      <name>outputName</name>
+      <label>Output directory or filename</label>
+      <channel>output</channel>
+      <description>Write the output images</description>
+      <longflag>out</longflag>
+      <default>out.nrrd</default>
+    </string>
+
+  </parameters>
+</executable>
