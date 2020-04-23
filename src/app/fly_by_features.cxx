@@ -32,6 +32,8 @@
 #include <itkImageRegionIterator.h>
 #include <itkComposeImageFilter.h>
 
+#include <math.h>
+
 typedef double VectorImagePixelType;
 typedef itk::VectorImage<VectorImagePixelType, 2> VectorImageType;  
 typedef VectorImageType::Pointer VectorImagePointerType;  
@@ -52,25 +54,64 @@ int main(int argc, char * argv[])
   int numFeatures = 4;
   bool createRegionLabels = regionLabels.compare("") != 0;
 
-  vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
-  icosahedron_source->SetSolidTypeToIcosahedron();
-  icosahedron_source->Update();
+  vtkSmartPointer<vtkPolyData> sphere;
 
-  vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
-  subdivision->SetInputData(icosahedron_source->GetOutput());
-  subdivision->SetNumberOfSubdivisions(numberOfSubdivisions);
-  subdivision->Update();
-  vtkSmartPointer<vtkPolyData> sphere = subdivision->GetOutput();
-  cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
+  if(numberOfSubdivisions > 0){
+    vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
+    icosahedron_source->SetSolidTypeToIcosahedron();
+    icosahedron_source->Update();
 
-  
-  for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
-    double point[3];
-    sphere->GetPoints()->GetPoint(i, point);
-    vnl_vector<double> v = vnl_vector<double>(point, 3);
-    v = v.normalize()*sphereRadius;
-    sphere->GetPoints()->SetPoint(i, v.data_block());
+    vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
+    subdivision->SetInputData(icosahedron_source->GetOutput());
+    subdivision->SetNumberOfSubdivisions(numberOfSubdivisions);
+    subdivision->Update();
+    sphere = subdivision->GetOutput();
+    cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
+
+    
+    for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
+      double point[3];
+      sphere->GetPoints()->GetPoint(i, point);
+      vnl_vector<double> v = vnl_vector<double>(point, 3);
+      v = v.normalize()*sphereRadius;
+      sphere->GetPoints()->SetPoint(i, v.data_block());
+    }  
+  }else if(numberOfSpiralSamples > 0){
+    sphere = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPoints> sphere_points = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+
+    double c = 2.0*numberOfSpiralTurns;
+    vtkIdType prevPid = -1;
+
+    for(int i = 0; i < numberOfSpiralSamples; i++){
+      double p[3];
+      //angle = i * 180.0/numberOfSpiralSamples * M_PI/180.0
+      double angle = i*M_PI/numberOfSpiralSamples;
+      p[0] = sphereRadius * sin(angle)*cos(c*angle);
+      p[1] = sphereRadius * sin(angle)*sin(c*angle);
+      p[2] = sphereRadius * cos(angle);
+
+      vtkIdType pid = sphere_points->InsertNextPoint(p);
+      
+      if(prevPid != -1){
+        vtkSmartPointer<vtkLine> line = vtkSmartPointer<vtkLine>::New();
+        line->GetPointIds()->SetId(0, prevPid);
+        line->GetPointIds()->SetId(1, pid);
+        lines->InsertNextCell(line);   
+      }
+
+      prevPid = pid;
+    }
+    
+    sphere->SetLines(lines);
+    sphere->SetPoints(sphere_points);
+
+  }else{
+    cerr<<"Please set subdivision or spiral to generate the samples on the sphere."<<endl;
+    return EXIT_FAILURE;
   }
+  
 
   cout<<"Reading: "<<inputSurface<<endl;
   vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
@@ -106,29 +147,30 @@ int main(int argc, char * argv[])
   tree->SetDataSet(input_mesh);
   tree->BuildLocator();
 
-  vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-  inputMapper->SetInputData(input_mesh);
-  vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
-  inputActor->SetMapper(inputMapper);
+  // vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+  // inputMapper->SetInputData(input_mesh);
+  // vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
+  // inputActor->SetMapper(inputMapper);
 
-  vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-  sphereMapper->SetInputData(sphere);
-  vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
-  sphereActor->SetMapper(sphereMapper);
-  sphereActor->GetProperty()->SetRepresentationToWireframe();
-  sphereActor->GetProperty()->SetColor(0.89,0.81,0.34);
+  // vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+  // sphereMapper->SetInputData(sphere);
+  // vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
+  // sphereActor->SetMapper(sphereMapper);
+  // sphereActor->GetProperty()->SetRepresentationToWireframe();
+  // sphereActor->GetProperty()->SetColor(0.89,0.81,0.34);
 
-  vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-  vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-  renderWindow->AddRenderer(renderer);
-  vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-  renderWindowInteractor->SetRenderWindow(renderWindow);
+  // vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
+  // vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+  // renderWindow->AddRenderer(renderer);
+  // vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+  // renderWindowInteractor->SetRenderWindow(renderWindow);
   
-  renderer->AddActor(sphereActor);
-  renderer->AddActor(inputActor);
+  // renderer->AddActor(sphereActor);
+  // renderer->AddActor(inputActor);
 
-  renderer->SetBackground(.4, .5, .6);
-  renderWindow->Render();
+  // renderer->SetBackground(.4, .5, .6);
+  // renderWindow->Render();
+  // renderWindowInteractor->Start();
 
   vector<VectorImageType::Pointer> compose_v;
 
@@ -154,11 +196,16 @@ int main(int argc, char * argv[])
 
     vnl_vector<double> plane_orient_x_v;
     vnl_vector<double> plane_orient_y_v;
-    if(sphere_point_normal_v.is_equal(sphere_north_v, 1e-8) || sphere_point_normal_v.is_equal(sphere_south_v, 1e-8)){
+    if(sphere_point_normal_v.is_equal(sphere_north_v, 1e-8)){
       plane_orient_x_v = vnl_vector<double>(3, 0);
       plane_orient_x_v[0] = 1;
       plane_orient_y_v = vnl_vector<double>(3, 0);  
       plane_orient_y_v[1] = 1;
+    }else if(sphere_point_normal_v.is_equal(sphere_south_v, 1e-8)){
+      plane_orient_x_v = vnl_vector<double>(3, 0);
+      plane_orient_x_v[0] = -1;
+      plane_orient_y_v = vnl_vector<double>(3, 0);  
+      plane_orient_y_v[1] = -1;
     }else{
       plane_orient_x_v = vnl_cross_3d(sphere_point_normal_v, sphere_north_v).normalize();
       plane_orient_y_v = vnl_cross_3d(sphere_point_normal_v, plane_orient_x_v).normalize();  
@@ -262,27 +309,27 @@ int main(int argc, char * argv[])
         ++out_it_label;  
       }
 
-      vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
-      lineSource->SetPoint1(point_plane_v.data_block());
-      lineSource->SetPoint2(point_end_v.data_block());
+      // vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
+      // lineSource->SetPoint1(point_plane_v.data_block());
+      // lineSource->SetPoint2(point_end_v.data_block());
 
-      vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-      lineMapper->SetInputConnection(lineSource->GetOutputPort());
-      vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
-      lineActor->SetMapper(lineMapper);
+      // vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+      // lineMapper->SetInputConnection(lineSource->GetOutputPort());
+      // vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
+      // lineActor->SetMapper(lineMapper);
 
-      vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-      planeMapper->SetInputData(planeMesh);
-      vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
-      planeActor->SetMapper(planeMapper);
-      planeActor->GetProperty()->SetRepresentationToWireframe();
+      // vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+      // planeMapper->SetInputData(planeMesh);
+      // vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
+      // planeActor->SetMapper(planeMapper);
+      // planeActor->GetProperty()->SetRepresentationToWireframe();
       
-      renderer->AddActor(lineActor);
-      renderer->AddActor(planeActor);
+      // renderer->AddActor(lineActor);
+      // renderer->AddActor(planeActor);
 
-      renderWindowInteractor->Start();
-      renderer->RemoveActor(planeActor);
-      renderer->RemoveActor(lineActor);
+      // renderWindowInteractor->Start();
+      // renderer->RemoveActor(planeActor);
+      // renderer->RemoveActor(lineActor);
     }
 
     if(flyByCompose){

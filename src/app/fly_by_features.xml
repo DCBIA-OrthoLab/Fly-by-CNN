@@ -33,6 +33,22 @@
       <channel>input</channel>
       <description>Number of recursive subdivisions for the sphere</description>
       <longflag>subdivision</longflag>
+      <default>0</default>
+    </integer>
+    <integer>
+      <name>numberOfSpiralSamples</name>
+      <label>Spiral path samples</label>
+      <channel>input</channel>
+      <description>Number of samples following a spiral path on the sphere</description>
+      <longflag>spiral</longflag>
+      <default>0</default>
+    </integer>
+    <integer>
+      <name>numberOfSpiralTurns</name>
+      <label>Spiral turns</label>
+      <channel>input</channel>
+      <description>Number of turns performed by the spiral</description>
+      <longflag>turns</longflag>
       <default>4</default>
     </integer>
     <integer>
@@ -49,7 +65,7 @@
       <channel>input</channel>
       <description>Spacing of the planes pixels</description>
       <longflag>planeSpacing</longflag>
-      <default>0.5</default>
+      <default>1</default>
     </double>
     <string>
       <name>regionLabels</name>
