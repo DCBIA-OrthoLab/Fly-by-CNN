@@ -78,20 +78,38 @@ int main(int argc, char * argv[])
   reader->Update();
   vtkSmartPointer<vtkPolyData> input_mesh = reader->GetOutput();
 
+  vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
+  normalGenerator->SetInputData(input_mesh);
+  normalGenerator->ComputePointNormalsOn();
+  normalGenerator->ComputeCellNormalsOn();
+  normalGenerator->Update();
+
+  input_mesh = normalGenerator->GetOutput();
   
   bool computeMax = maxCoord == -1;
 
   vnl_vector<double> mean_v = vnl_vector<double>(3, 0);
+  vnl_vector<double> max_p = vnl_vector<double>(3, 0);
+  max_p.fill(-1);
 
   for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
     double point[3];
     input_mesh->GetPoints()->GetPoint(i, point);
     vnl_vector<double> v = vnl_vector<double>(point, 3);
     mean_v += v;
-    maxCoord = computeMax? max(maxCoord, v.inf_norm()) : maxCoord;
+    if(computeMax){
+      for(unsigned j = 0; j < max_p.size(); j++){
+        max_p[j] = max(max_p[j], abs(v[j]));
+      }
+    }
   }
 
   mean_v /= input_mesh->GetNumberOfPoints();
+
+  if(computeMax){
+    max_p -= mean_v;
+    maxCoord = max_p.max_value();
+  }
 
   for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
     double point[3];
