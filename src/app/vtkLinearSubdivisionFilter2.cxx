@@ -9,6 +9,7 @@
 #include "vtkObjectFactory.h"
 #include "vtkPointData.h"
 #include "vtkPolyData.h"
+#include "vtkSmartPointer.h"
 #include <string>
 #include <sstream>
 
@@ -179,8 +180,6 @@ int vtkLinearSubdivisionFilter2::GenerateSubdivisionPoints (vtkPolyData *inputDS
                                                                vtkPointData *outputPD)
 {
 
-  vtkIdType *ptsIds = nullptr;
-
   int edgeId;
 
   vtkIdType npts, cellId, newId;
@@ -227,11 +226,8 @@ int vtkLinearSubdivisionFilter2::GenerateSubdivisionPoints (vtkPolyData *inputDS
 
   //for each cell
   for (cellId=0, inputPolys->InitTraversal();
-       inputPolys->GetNextCell(npts, ptsIds); cellId++)
+       inputPolys->GetNextCell(pointIds); cellId++)
   {
-    pointIds->SetId(0,ptsIds[0]);
-    pointIds->SetId(1,ptsIds[1]);
-    pointIds->SetId(2,ptsIds[2]);
 
     //interpolate the new points
     std::vector<int> newIds;

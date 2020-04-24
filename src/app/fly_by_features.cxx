@@ -106,29 +106,35 @@ int main(int argc, char * argv[])
   tree->SetDataSet(input_mesh);
   tree->BuildLocator();
 
-  // vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-  // inputMapper->SetInputData(input_mesh);
-  // vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
-  // inputActor->SetMapper(inputMapper);
+  vtkSmartPointer<vtkRenderer> renderer;
+  vtkSmartPointer<vtkRenderWindow> renderWindow;
+  vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor;
 
-  // vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-  // sphereMapper->SetInputData(sphere);
-  // vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
-  // sphereActor->SetMapper(sphereMapper);
-  // sphereActor->GetProperty()->SetRepresentationToWireframe();
-  // sphereActor->GetProperty()->SetColor(0.89,0.81,0.34);
+  if(visualize){
+    vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    inputMapper->SetInputData(input_mesh);
+    vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
+    inputActor->SetMapper(inputMapper);
 
-  // vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-  // vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-  // renderWindow->AddRenderer(renderer);
-  // vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-  // renderWindowInteractor->SetRenderWindow(renderWindow);
-  
-  // renderer->AddActor(sphereActor);
-  // renderer->AddActor(inputActor);
+    vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+    sphereMapper->SetInputData(sphere);
+    vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
+    sphereActor->SetMapper(sphereMapper);
+    sphereActor->GetProperty()->SetRepresentationToWireframe();
+    sphereActor->GetProperty()->SetColor(0.89,0.81,0.34);
 
-  // renderer->SetBackground(.4, .5, .6);
-  // renderWindow->Render();
+    renderer = vtkSmartPointer<vtkRenderer>::New();
+    renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+    renderWindow->AddRenderer(renderer);
+    renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+    renderWindowInteractor->SetRenderWindow(renderWindow);
+    
+    renderer->AddActor(sphereActor);
+    renderer->AddActor(inputActor);
+
+    renderer->SetBackground(.4, .5, .6);
+    renderWindow->Render();
+  }
 
   vector<VectorImageType::Pointer> compose_v;
 
@@ -262,27 +268,30 @@ int main(int argc, char * argv[])
         ++out_it_label;  
       }
 
-      // vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
-      // lineSource->SetPoint1(point_plane_v.data_block());
-      // lineSource->SetPoint2(point_end_v.data_block());
+      if(visualize){
+        vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
+        lineSource->SetPoint1(point_plane_v.data_block());
+        lineSource->SetPoint2(point_end_v.data_block());
 
-      // vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-      // lineMapper->SetInputConnection(lineSource->GetOutputPort());
-      // vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
-      // lineActor->SetMapper(lineMapper);
+        vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+        lineMapper->SetInputConnection(lineSource->GetOutputPort());
+        vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
+        lineActor->SetMapper(lineMapper);
 
-      // vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-      // planeMapper->SetInputData(planeMesh);
-      // vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
-      // planeActor->SetMapper(planeMapper);
-      // planeActor->GetProperty()->SetRepresentationToWireframe();
+        vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+        planeMapper->SetInputData(planeMesh);
+        vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
+        planeActor->SetMapper(planeMapper);
+        planeActor->GetProperty()->SetRepresentationToWireframe();
+        
+        renderer->AddActor(lineActor);
+        renderer->AddActor(planeActor);
+
+        renderWindowInteractor->Start();
+        renderer->RemoveActor(planeActor);
+        renderer->RemoveActor(lineActor);
+      }
       
-      // renderer->AddActor(lineActor);
-      // renderer->AddActor(planeActor);
-
-      // renderWindowInteractor->Start();
-      // renderer->RemoveActor(planeActor);
-      // renderer->RemoveActor(lineActor);
     }
 
     if(flyByCompose){
