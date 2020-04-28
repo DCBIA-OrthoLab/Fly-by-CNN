@@ -6,6 +6,7 @@ import time
 import LinearSubdivisionFilter as lsf
 import itk
 import tensorflow as tf
+import math
 
 import Run_Model
 import Set_Label
@@ -117,20 +118,46 @@ def GetCurvature(vtkdata):
 	vtkdata=curve_max.GetOutput()
 
 	curve_mean=vtk.vtkCurvatures()
-	curve_mean.SetCurvatureTypeToMean()
-	curve_mean.SetInputData(vtkdata)
-	curve_mean.Update()
-	vtkdata=curve_mean.GetOutput()
+	# curve_mean.SetCurvatureTypeToMean()
+	# curve_mean.SetInputData(vtkdata)
+	# curve_mean.Update()
+	# vtkdata=curve_mean.GetOutput()
 	
-	curve_Gauss=vtk.vtkCurvatures()
-	curve_Gauss.SetCurvatureTypeToGaussian()
-	curve_Gauss.SetInputData(vtkdata)
-	curve_Gauss.Update()
-	vtkdata=curve_Gauss.GetOutput()
+	# curve_Gauss=vtk.vtkCurvatures()
+	# curve_Gauss.SetCurvatureTypeToGaussian()
+	# curve_Gauss.SetInputData(vtkdata)
+	# curve_Gauss.Update()
+	# vtkdata=curve_Gauss.GetOutput()
 
 	return vtkdata,MinCurv_Array
 
 def CreateIcosahedron(radius):
+	
+	import vtk
+
+	# Create the geometry of a point (the coordinate)
+	points = vtk.vtkPoints()
+
+	for tetha in range(0,math.pi)
+		x = r*sin(theta)*cos(c*theta)
+		y = r*sin(theta)*sin(c*theta)
+		z = r*cos(theta)
+		p.append(x,y,z)
+
+	# Create the topology of the point (a vertex)
+	vertices = vtk.vtkCellArray()
+
+	id = points.InsertNextPoint(p)
+	vertices.InsertNextCell(1)
+	vertices.InsertCellPoint(id)
+
+	# Create a polydata object
+	point = vtk.vtkPolyData()
+
+	# Set the points and vertices we created as the geometry and topology of the polydata
+	point.SetPoints(points)
+	point.SetVerts(vertices)
+
 	icosahedronsource = vtk.vtkPlatonicSolidSource()
 	icosahedronsource.SetSolidTypeToIcosahedron()
 	icosahedronsource.Update()
@@ -146,7 +173,7 @@ def CreateIcosahedron(radius):
 	icosahedron = subdivfilter.GetOutput()
 	icosahedron = normalize_points(icosahedron, radius)
 
-	return icosahedron
+	return point
 
 
 # def CreatePlan(point,normal,Resolution, sphere_radius, PixelSpacing):
@@ -279,8 +306,8 @@ with tf.Session() as sess:
 				features[i][0] = np.linalg.norm(point_plane - point_surface)
 				features[i][1:4] = point_normal[0:3]
 
-		# 2. Run through model
-		# print('max id list : ', max(pointid_array), '\n mesh max id : ', vtkdata.GetNumberOfPoints(), '\n label array size : ', label_array.GetNumberOfTuples())
+		2. Run through model
+		print('max id list : ', max(pointid_array), '\n mesh max id : ', vtkdata.GetNumberOfPoints(), '\n label array size : ', label_array.GetNumberOfTuples())
 		features = np.reshape(features, [Resolution, Resolution, NumFeatures])
 		PixelDimension = NumFeatures
 		Dimension = 2
