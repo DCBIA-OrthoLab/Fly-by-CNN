@@ -75,6 +75,15 @@
       <longflag>maxCoord</longflag>
       <default>-1</default>
     </double>
+
+    <boolean>
+      <name>visualize</name>
+      <label>Render components</label>
+      <channel>input</channel>
+      <description></description>
+      <longflag>visualize</longflag>
+      <default>0</default>
+    </boolean>
     
   </parameters>
 
