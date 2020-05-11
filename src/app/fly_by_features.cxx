@@ -32,9 +32,10 @@
 #include <itkImageRegionIterator.h>
 #include <itkComposeImageFilter.h>
 
-#include <vtkAutoInit.h>
-VTK_MODULE_INIT(vtkRenderingOpenGL2) 
-VTK_MODULE_INIT(vtkInteractionStyle) 
+// #include <vtkAutoInit.h>
+// VTK_MODULE_INIT(vtkRenderingOpenGL2) 
+// VTK_MODULE_INIT(vtkInteractionStyle) 
+#include <math.h>
 
 typedef double VectorImagePixelType;
 typedef itk::VectorImage<VectorImagePixelType, 2> VectorImageType;  
@@ -58,35 +59,7 @@ int main(int argc, char * argv[])
 
   vtkSmartPointer<vtkPolyData> sphere;
 
-  if (Spiral) {
-
-    sphere = vtkSmartPointer<vtkPolyData>::New();
-    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-    // Create the topology of the point (a vertex)
-    vtkSmartPointer<vtkCellArray> vertices =
-      vtkSmartPointer<vtkCellArray>::New();
-
-    int r = 1;
-    int c = 8;
-    int numberOfPoints = 100;
-    float theta_min = 0;
-    float theta_max = 3.14;
-
-    for (double theta = theta_min; theta < theta_max; theta=theta+(theta_max-theta_min)/numberOfPoints){
-      float x = r*sin(theta)*cos(c*theta);
-      float y = r*sin(theta)*sin(c*theta);
-      float z = r*cos(theta);
-      double p[3] = {x,y,z} ;
-      vtkIdType pid[1];
-      pid[0] = points->InsertNextPoint(p);
-      vertices->InsertNextCell(1,pid);
-    }
-
-    sphere->SetPoints(points);
-    sphere->SetVerts(vertices);
-  }
-
-  else {
+  if(numberOfSubdivisions > 0){
     vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
     icosahedron_source->SetSolidTypeToIcosahedron();
     icosahedron_source->Update();
@@ -96,18 +69,52 @@ int main(int argc, char * argv[])
     subdivision->SetNumberOfSubdivisions(numberOfSubdivisions);
     subdivision->Update();
     sphere = subdivision->GetOutput();
-    cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;
-  }
+    cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
 
-  
-  
-  for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
-    double point[3];
-    sphere->GetPoints()->GetPoint(i, point);
-    vnl_vector<double> v = vnl_vector<double>(point, 3);
-    v = v.normalize()*sphereRadius;
-    sphere->GetPoints()->SetPoint(i, v.data_block());
+    
+    for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
+      double point[3];
+      sphere->GetPoints()->GetPoint(i, point);
+      vnl_vector<double> v = vnl_vector<double>(point, 3);
+      v = v.normalize()*sphereRadius;
+      sphere->GetPoints()->SetPoint(i, v.data_block());
+    }  
+  }else if(numberOfSpiralSamples > 0){
+    sphere = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPoints> sphere_points = vtkSmartPointer<vtkPoints>::New();
+    vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+
+    double c = 2.0*numberOfSpiralTurns;
+    vtkIdType prevPid = -1;
+
+    for(int i = 0; i < numberOfSpiralSamples; i++){
+      double p[3];
+      //angle = i * 180.0/numberOfSpiralSamples * M_PI/180.0
+      double angle = i*M_PI/numberOfSpiralSamples;
+      p[0] = sphereRadius * sin(angle)*cos(c*angle);
+      p[1] = sphereRadius * sin(angle)*sin(c*angle);
+      p[2] = sphereRadius * cos(angle);
+
+      vtkIdType pid = sphere_points->InsertNextPoint(p);
+      
+      if(prevPid != -1){
+        vtkSmartPointer<vtkLine> line = vtkSmartPointer<vtkLine>::New();
+        line->GetPointIds()->SetId(0, prevPid);
+        line->GetPointIds()->SetId(1, pid);
+        lines->InsertNextCell(line);   
+      }
+
+      prevPid = pid;
+    }
+    
+    sphere->SetLines(lines);
+    sphere->SetPoints(sphere_points);
+
+  }else{
+    cerr<<"Please set subdivision or spiral to generate the samples on the sphere."<<endl;
+    return EXIT_FAILURE;
   }
+  
 
   cout<<"Reading: "<<inputSurface<<endl;
   vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
@@ -122,38 +129,41 @@ int main(int argc, char * argv[])
   normalGenerator->Update();
 
   input_mesh = normalGenerator->GetOutput();
-  
-  bool computeMax = maxCoord == -1;
 
   vnl_vector<double> mean_v = vnl_vector<double>(3, 0);
-  vnl_vector<double> max_p = vnl_vector<double>(3, 0);
-  max_p.fill(-1);
 
   for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
     double point[3];
     input_mesh->GetPoints()->GetPoint(i, point);
     vnl_vector<double> v = vnl_vector<double>(point, 3);
     mean_v += v;
-    if(computeMax){
-      for(unsigned j = 0; j < max_p.size(); j++){
-        max_p[j] = max(max_p[j], abs(v[j]));
-      }
-    }
   }
 
   mean_v /= input_mesh->GetNumberOfPoints();
 
-  if(computeMax){
-    max_p -= mean_v;
-    maxCoord = max_p.max_value();
+  for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
+    double point[3];
+    input_mesh->GetPoints()->GetPoint(i, point);
+    vnl_vector<double> v = vnl_vector<double>(point, 3);
+    v -= mean_v;
+    input_mesh->GetPoints()->SetPoint(i, v.data_block());
+  }
+
+  if(maxMagnitude == -1){
+    maxMagnitude = 1;
+    for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
+      double point[3];
+      input_mesh->GetPoints()->GetPoint(i, point);
+      vnl_vector<double> v = vnl_vector<double>(point, 3);
+      maxMagnitude = max(maxMagnitude, v.magnitude());
+    }
   }
 
   for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
     double point[3];
     input_mesh->GetPoints()->GetPoint(i, point);
     vnl_vector<double> v = vnl_vector<double>(point, 3);
-    v -= mean_v; 
-    v /= maxCoord;
+    v /= maxMagnitude;
     input_mesh->GetPoints()->SetPoint(i, v.data_block());
   }
 
@@ -216,11 +226,16 @@ int main(int argc, char * argv[])
 
     vnl_vector<double> plane_orient_x_v;
     vnl_vector<double> plane_orient_y_v;
-    if(sphere_point_normal_v.is_equal(sphere_north_v, 1e-8) || sphere_point_normal_v.is_equal(sphere_south_v, 1e-8)){
+    if(sphere_point_normal_v.is_equal(sphere_north_v, 1e-8)){
       plane_orient_x_v = vnl_vector<double>(3, 0);
       plane_orient_x_v[0] = 1;
       plane_orient_y_v = vnl_vector<double>(3, 0);  
       plane_orient_y_v[1] = 1;
+    }else if(sphere_point_normal_v.is_equal(sphere_south_v, 1e-8)){
+      plane_orient_x_v = vnl_vector<double>(3, 0);
+      plane_orient_x_v[0] = -1;
+      plane_orient_y_v = vnl_vector<double>(3, 0);  
+      plane_orient_y_v[1] = -1;
     }else{
       plane_orient_x_v = vnl_cross_3d(sphere_point_normal_v, sphere_north_v).normalize();
       plane_orient_y_v = vnl_cross_3d(sphere_point_normal_v, plane_orient_x_v).normalize();  
