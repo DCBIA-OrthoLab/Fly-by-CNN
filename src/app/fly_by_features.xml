@@ -85,6 +85,15 @@
       <default>0</default>
     </boolean>
     
+    <boolean>
+      <name>Spiral</name>
+      <label>Fly around a spiral</label>
+      <channel>input</channel>
+      <description></description>
+      <longflag>spiral</longflag>
+      <default>0</default>
+    </boolean>
+
   </parameters>
 
   <parameters>
