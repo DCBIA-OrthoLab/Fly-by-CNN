@@ -56,36 +56,50 @@ int main(int argc, char * argv[])
   int numFeatures = 4;
   bool createRegionLabels = regionLabels.compare("") != 0;
 
-  vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
-  // Create the topology of the point (a vertex)
-  vtkSmartPointer<vtkCellArray> vertices =
-    vtkSmartPointer<vtkCellArray>::New();
+  vtkSmartPointer<vtkPolyData> sphere;
 
-  int r = 1;
-  int c = 8;
-  int numberOfPoints = 100;
-  float theta_min = 0;
-  float theta_max = 3.14;
+  if (Spiral) {
 
-  for (double theta = theta_min; theta < theta_max; theta=theta+(theta_max-theta_min)/numberOfPoints){
-    float x = r*sin(theta)*cos(c*theta);
-    float y = r*sin(theta)*sin(c*theta);
-    float z = r*cos(theta);
-    double p[3] = {x,y,z} ;
-    vtkIdType pid[1];
-    pid[0] = points->InsertNextPoint(p);
-    vertices->InsertNextCell(1,pid);
+    sphere = vtkSmartPointer<vtkPolyData>::New();
+    vtkSmartPointer<vtkPoints> points = vtkSmartPointer<vtkPoints>::New();
+    // Create the topology of the point (a vertex)
+    vtkSmartPointer<vtkCellArray> vertices =
+      vtkSmartPointer<vtkCellArray>::New();
+
+    int r = 1;
+    int c = 8;
+    int numberOfPoints = 100;
+    float theta_min = 0;
+    float theta_max = 3.14;
+
+    for (double theta = theta_min; theta < theta_max; theta=theta+(theta_max-theta_min)/numberOfPoints){
+      float x = r*sin(theta)*cos(c*theta);
+      float y = r*sin(theta)*sin(c*theta);
+      float z = r*cos(theta);
+      double p[3] = {x,y,z} ;
+      vtkIdType pid[1];
+      pid[0] = points->InsertNextPoint(p);
+      vertices->InsertNextCell(1,pid);
+    }
+
+    sphere->SetPoints(points);
+    sphere->SetVerts(vertices);
   }
 
+  else {
+    vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
+    icosahedron_source->SetSolidTypeToIcosahedron();
+    icosahedron_source->Update();
 
+    vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
+    subdivision->SetInputData(icosahedron_source->GetOutput());
+    subdivision->SetNumberOfSubdivisions(numberOfSubdivisions);
+    subdivision->Update();
+    sphere = subdivision->GetOutput();
+    cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;
+  }
 
-  vtkSmartPointer<vtkPolyData> sphere = 
-    vtkSmartPointer<vtkPolyData>::New();
-  sphere->SetPoints(points);
-  sphere->SetVerts(vertices);
-
-  cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
-
+  
   
   for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
     double point[3];
