@@ -8,6 +8,7 @@
 #include <vtkPolyData.h>
 #include <vtkPointData.h>
 #include <vtkLine.h>
+#include <vtkVertex.h>
 #include <vtkLineSource.h>
 #include <vtkExtractCells.h>
 #include <vtkOBBTree.h>
@@ -55,6 +56,9 @@ int main(int argc, char * argv[])
   PARSE_ARGS;
 
   int numFeatures = 4;
+  if(fiberBundle){
+    numFeatures = 1;
+  }
   bool createRegionLabels = regionLabels.compare("") != 0;
 
   vtkSmartPointer<vtkPolyData> sphere;
@@ -71,6 +75,7 @@ int main(int argc, char * argv[])
     sphere = subdivision->GetOutput();
     cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
 
+    vtkSmartPointer<vtkCellArray> vertices = vtkSmartPointer<vtkCellArray>::New();
     
     for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
       double point[3];
@@ -78,11 +83,17 @@ int main(int argc, char * argv[])
       vnl_vector<double> v = vnl_vector<double>(point, 3);
       v = v.normalize()*sphereRadius;
       sphere->GetPoints()->SetPoint(i, v.data_block());
-    }  
+
+      vtkSmartPointer<vtkVertex> vertex = vtkSmartPointer<vtkVertex>::New();
+      vertex->GetPointIds()->SetId(0, i);
+      vertices->InsertNextCell(vertex);
+    }
+    sphere->SetVerts(vertices);  
   }else if(numberOfSpiralSamples > 0){
     sphere = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkPoints> sphere_points = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
+    vtkSmartPointer<vtkCellArray> vertices = vtkSmartPointer<vtkCellArray>::New();
 
     double c = 2.0*numberOfSpiralTurns;
     vtkIdType prevPid = -1;
@@ -105,8 +116,14 @@ int main(int argc, char * argv[])
       }
 
       prevPid = pid;
+
+      vtkSmartPointer<vtkVertex> vertex = vtkSmartPointer<vtkVertex>::New();
+      vertex->GetPointIds()->SetId(0, pid);
+
+      vertices->InsertNextCell(vertex);
     }
     
+    sphere->SetVerts(vertices);
     sphere->SetLines(lines);
     sphere->SetPoints(sphere_points);
 
@@ -186,7 +203,14 @@ int main(int argc, char * argv[])
     vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
     sphereActor->SetMapper(sphereMapper);
     sphereActor->GetProperty()->SetRepresentationToWireframe();
-    sphereActor->GetProperty()->SetColor(0.89,0.81,0.34);
+    sphereActor->GetProperty()->SetColor(0.8,0,0.8);
+    sphereActor->GetProperty()->SetLineWidth(10.0);
+
+    vtkSmartPointer<vtkActor> spherePointsActor = vtkSmartPointer<vtkActor>::New();
+    spherePointsActor->SetMapper(sphereMapper);
+    spherePointsActor->GetProperty()->SetRepresentationToPoints();
+    spherePointsActor->GetProperty()->SetColor(1.0, 0, 1.0);
+    spherePointsActor->GetProperty()->SetPointSize(20);
 
     renderer = vtkSmartPointer<vtkRenderer>::New();
     renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
@@ -195,11 +219,11 @@ int main(int argc, char * argv[])
     renderWindowInteractor->SetRenderWindow(renderWindow);
     
     renderer->AddActor(sphereActor);
+    renderer->AddActor(spherePointsActor);
     renderer->AddActor(inputActor);
 
-    renderer->SetBackground(.4, .5, .6);
+    renderer->SetBackground(1, 1, 1);
     renderWindow->Render();
-    renderWindowInteractor->Start();
   }
 
   vector<VectorImageType::Pointer> compose_v;
@@ -300,6 +324,9 @@ int main(int argc, char * argv[])
       vnl_vector<double> point_end_v = point_plane_v - sphere_point_normal_v*sphereRadius*2.0;      
 
       double tol = 1.e-8;
+      if(fiberBundle){
+        tol = 1e-4;
+      }
       double t;
       double x[3];
       double pcoords[3];
@@ -318,12 +345,18 @@ int main(int argc, char * argv[])
         input_mesh->GetPoint(point0Id, point_mesh);
         vnl_vector<double> point_mesh_v(point_mesh, 3);
         
-        double* normal = input_mesh->GetPointData()->GetArray("Normals")->GetTuple(point0Id);
-        out_pix[0] = normal[0];
-        out_pix[1] = normal[1];
-        out_pix[2] = normal[2];
-        out_pix[3] = (point_plane_v - point_mesh_v).magnitude();
-        out_it.Set(out_pix);
+        if(!fiberBundle){
+          double* normal = input_mesh->GetPointData()->GetArray("Normals")->GetTuple(point0Id);
+          out_pix[0] = normal[0];
+          out_pix[1] = normal[1];
+          out_pix[2] = normal[2];
+          out_pix[3] = (point_plane_v - point_mesh_v).magnitude();
+          out_it.Set(out_pix);  
+        }else{
+          out_pix[0] = (point_plane_v - point_mesh_v).magnitude();
+          out_it.Set(out_pix);  
+        }
+        
 
         if(createRegionLabels){
           VectorImageType::PixelType out_pix_label = out_it_label.Get();
@@ -339,7 +372,7 @@ int main(int argc, char * argv[])
         ++out_it_label;  
       }
 
-      if(visualize){
+      if(visualize && (numberOfSpiralSamples == 0 || i > sphere->GetNumberOfPoints()/2.0)){
         vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
         lineSource->SetPoint1(point_plane_v.data_block());
         lineSource->SetPoint2(point_end_v.data_block());
@@ -348,19 +381,50 @@ int main(int argc, char * argv[])
         lineMapper->SetInputConnection(lineSource->GetOutputPort());
         vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
         lineActor->SetMapper(lineMapper);
+        lineActor->GetProperty()->SetLineWidth(8.0);
+        lineActor->GetProperty()->SetColor(0, 0.9, 1.0);
 
         vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
         planeMapper->SetInputData(planeMesh);
         vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
         planeActor->SetMapper(planeMapper);
         planeActor->GetProperty()->SetRepresentationToWireframe();
+        planeActor->GetProperty()->SetColor(0, 0.9, 1.0);
         
         renderer->AddActor(lineActor);
         renderer->AddActor(planeActor);
 
+        if(numberOfSpiralSamples > 0){
+          
+          vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
+          icosahedron_source->SetSolidTypeToIcosahedron();
+          icosahedron_source->Update();
+
+          vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
+          subdivision->SetInputData(icosahedron_source->GetOutput());
+          subdivision->SetNumberOfSubdivisions(10);
+          subdivision->Update();
+          sphere = subdivision->GetOutput();
+          
+          for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
+            double point[3];
+            sphere->GetPoints()->GetPoint(i, point);
+            vnl_vector<double> v = vnl_vector<double>(point, 3);
+            v = v.normalize()*sphereRadius;
+            sphere->GetPoints()->SetPoint(i, v.data_block());
+          }
+
+          vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+          sphereMapper->SetInputData(sphere);
+          vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
+          sphereActor->SetMapper(sphereMapper);
+          sphereActor->GetProperty()->SetRepresentationToWireframe();
+          sphereActor->GetProperty()->SetColor(0.8,0,0.8);
+          renderer->AddActor(sphereActor);
+    
+        }
+
         renderWindowInteractor->Start();
-        renderer->RemoveActor(planeActor);
-        renderer->RemoveActor(lineActor);
       }
       
     }
