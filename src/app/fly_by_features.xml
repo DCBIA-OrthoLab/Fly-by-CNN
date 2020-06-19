@@ -33,6 +33,22 @@
       <channel>input</channel>
       <description>Number of recursive subdivisions for the sphere</description>
       <longflag>subdivision</longflag>
+      <default>0</default>
+    </integer>
+    <integer>
+      <name>numberOfSpiralSamples</name>
+      <label>Spiral path samples</label>
+      <channel>input</channel>
+      <description>Number of samples following a spiral path on the sphere</description>
+      <longflag>spiral</longflag>
+      <default>0</default>
+    </integer>
+    <integer>
+      <name>numberOfSpiralTurns</name>
+      <label>Spiral turns</label>
+      <channel>input</channel>
+      <description>Number of turns performed by the spiral</description>
+      <longflag>turns</longflag>
       <default>4</default>
     </integer>
     <integer>
@@ -49,7 +65,7 @@
       <channel>input</channel>
       <description>Spacing of the planes pixels</description>
       <longflag>planeSpacing</longflag>
-      <default>0.5</default>
+      <default>1</default>
     </double>
     <string>
       <name>regionLabels</name>
@@ -68,14 +84,32 @@
     </boolean>
 
     <double>
-      <name>maxCoord</name>
-      <label>Max coordinate after centering</label>
+      <name>maxMagnitude</name>
+      <label>Scaling factor for the shape so it's inside the unit sphere</label>
       <channel>input</channel>
-      <description>If you want to normalize a whole population of objects</description>
-      <longflag>maxCoord</longflag>
+      <description>If you want to scale a whole population of objects by the same magnitude</description>
+      <longflag>maxMagnitude</longflag>
       <default>-1</default>
     </double>
-    
+
+    <boolean>
+      <name>fiberBundle</name>
+      <label>Fiber bundle</label>
+      <channel>input</channel>
+      <description>Set if it is a fiber bundle</description>
+      <longflag>fiber</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
+      <name>visualize</name>
+      <label>Render components</label>
+      <channel>input</channel>
+      <description></description>
+      <longflag>visualize</longflag>
+      <default>0</default>
+    </boolean>
+
   </parameters>
 
   <parameters>
