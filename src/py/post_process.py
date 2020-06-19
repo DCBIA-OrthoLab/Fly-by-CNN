@@ -2,10 +2,10 @@ import vtk
 import numpy as np
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--mesh', help='Insert mesh path')
-parser.add_argument('--out', help='Insert output path+name')
-arg = parser.parse_args()
+# parser = argparse.ArgumentParser()
+# parser.add_argument('--mesh', help='Insert mesh path')
+# parser.add_argument('--out', help='Insert output path+name')
+# arg = parser.parse_args()
 
 def ChangeLabel(vtkdata, label_array, label2change, change):
 	# Set all the label 'label2change' in 'change'
@@ -234,10 +234,10 @@ def Label_Teeth(vtkdata, label_array):
 	return vtkdata
 
 
-mesh, mesh_label = ReadFile(arg.mesh)
-mesh, mesh_label = Post_processing(mesh)
-mesh = Label_Teeth(mesh, mesh_label)
-Write(mesh, arg.out)
+# mesh, mesh_label = ReadFile(arg.mesh)
+# mesh, mesh_label = Post_processing(mesh)
+# mesh = Label_Teeth(mesh, mesh_label)
+# Write(mesh, arg.out)
 
 # python3 post_process.py --mesh /Users/mdumont/Downloads/scan2_test.vtk --out /Users/mdumont/Desktop/DCBIA-projects/Output/scan2_PP.vtk
 

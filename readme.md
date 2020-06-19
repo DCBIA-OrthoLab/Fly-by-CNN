@@ -1,4 +1,4 @@
-#Fly by CNN
+# Fly by CNN
 
 ## What is it?
 Fly by CNN is a C++ code that takes a 3D mesh and create 2D images of this one following the unit sphere and the number of subdivisions associated. The 2D images created contained the mesh features and labels.
