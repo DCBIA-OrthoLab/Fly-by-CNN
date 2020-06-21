@@ -98,10 +98,19 @@ print("numberOfSubdivisions", numberOfSubdivisions)
 print("outfilename", outfilename)
 
 print("Reading:", inputSurface)
-reader = vtk.vtkPolyDataReader()
-reader.SetFileName(inputSurface)
-reader.Update()
-original_surf = reader.GetOutput()
+path, extension = os.path.splitext(inputSurface)
+extension = extension.lower()
+if extension == ".vtk":
+	reader = vtk.vtkPolyDataReader()
+	reader.SetFileName(inputSurface)
+	reader.Update()
+	original_surf = reader.GetOutput()
+elif extension == ".stl":
+	reader = vtk.vtkSTLReader()
+	reader.SetFileName(inputSurface)
+	reader.Update()
+	original_surf = reader.GetOutput()
+
 
 print('Surf points : ', original_surf.GetNumberOfPoints())
 surf = Normalisation(original_surf)
