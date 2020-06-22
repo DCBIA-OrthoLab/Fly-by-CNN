@@ -76,7 +76,7 @@ parser.add_argument('--numberOfSubdivisions', type=int, help='Number of subdivis
 parser.add_argument('--sphereRadius', type=float, help='Radius of the surrounding sphere', default=1.1)
 parser.add_argument('--planeResolution', type=int, help='Radius of the surrounding sphere', default=512)
 parser.add_argument('--planeSpacing', type=float, help='Spacing of the plane', default=1.0)
-# parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
+parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
 args = parser.parse_args()
 
@@ -86,9 +86,7 @@ planeResolution = args.planeResolution
 savedModelPath = args.model
 sphereRadius = args.sphereRadius
 numberOfSubdivisions = args.numberOfSubdivisions
-[name, ext] = os.path.splitext(inputSurface)
-name = name + '_seg'
-outfilename = name + ext
+outfilename = args.out
 
 print("planeSpacing", planeSpacing)
 print("planeResolution", planeResolution)
@@ -98,10 +96,19 @@ print("numberOfSubdivisions", numberOfSubdivisions)
 print("outfilename", outfilename)
 
 print("Reading:", inputSurface)
-reader = vtk.vtkPolyDataReader()
-reader.SetFileName(inputSurface)
-reader.Update()
-original_surf = reader.GetOutput()
+path, extension = os.path.splitext(inputSurface)
+extension = extension.lower()
+if extension == ".vtk":
+	reader = vtk.vtkPolyDataReader()
+	reader.SetFileName(inputSurface)
+	reader.Update()
+	original_surf = reader.GetOutput()
+elif extension == ".stl":
+	reader = vtk.vtkSTLReader()
+	reader.SetFileName(inputSurface)
+	reader.Update()
+	original_surf = reader.GetOutput()
+
 
 print('Surf points : ', original_surf.GetNumberOfPoints())
 surf = Normalisation(original_surf)

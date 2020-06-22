@@ -220,7 +220,7 @@ def Write(vtkdata, output_name):
 def Label_Teeth(vtkdata, label_array):
 	vtkdata, label_array= ChangeLabel(vtkdata, label_array, 1, 3)
 	predict_teeth = Clip(vtkdata, 2.5, 'RegionId', 'off')
-	predict_mesh, predict_labels = ChangeLabel(predict_mesh, predict_labels, 3, 1)
+	vtkdata, label_array = ChangeLabel(vtkdata, label_array, 3, 1)
 
 	predict_teeth, predict_teeth_label = Connectivity(predict_teeth)
 	nb_predteeth = CountIDPoint(predict_teeth, predict_teeth_label)
@@ -229,7 +229,7 @@ def Label_Teeth(vtkdata, label_array):
 	predict_teeth = Clip(predict_teeth, -0.5, 'RegionId', 'off')
 	predict_teeth, predict_teeth_label = Connectivity(predict_teeth) 
 	for label in range(np.max(np.array(predict_teeth_label))+1):
-		predict_mesh = LocateLabels(vtkdata, label_array, predict_teeth, predict_teeth_label, label, label + 3) #Labels have to start at 3
+		vtkdata = LocateLabels(vtkdata, label_array, predict_teeth, predict_teeth_label, label, label + 3) #Labels have to start at 3
 		
 	return vtkdata
 
