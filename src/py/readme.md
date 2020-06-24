@@ -24,4 +24,4 @@ __python3 predict.py --help__
 This code does the sphere subdivion. For example : numberOfSubdivisions = 10 -> 1026 ids / numberOfSubdivisions = 5 -> 268 ids 
 
 ## post_process.py
-Post preocess is done after the prediction in order to correct the wrong labels. It takes the smallest components in the mesh (< 1000 ids) set their labels to -1 and apply a region growing on all the -1 label.
+Post process is done after the prediction in order to correct the wrong labels. It takes the smallest components in the mesh (< 1000 ids) set their labels to -1 and apply a region growing on all the -1 label.
