@@ -14,7 +14,7 @@ __--numberOfSubdivisions__ : Select the number of point you'll divide the sphere
 __--out__ : Output name
 
 
-To run the program, run the following command : 
+To run the program, run the following command :  
 python3 predict.py __--surf__ path/to/surf __--model__ /path/to/model/folder __--numberOfSubdivisions__ *integer* __--out__ /path/to/output.vtk
 
 Other flags are available by running python3 predict.py --help
