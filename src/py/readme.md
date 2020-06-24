@@ -1,12 +1,12 @@
 # Python source
 
 ## predict.py
-Does the prediction for the mesh label using the fly-by-cnn idea. It first creates the images with features, does the prediction on this images and projects it in the mesh. This code uses the *LinearSubdivisionFilter.py and *post_process.py* 
+Does the prediction for the mesh label using the fly-by-cnn idea. It first creates the images with features, does the prediction on this images and projects it in the mesh. This code uses the *LinearSubdivisionFilter.py* and *post_process.py* 
 You can select the model with the flag 
-_--model_ : Select the nodel
-_--numberOfSubdivisions_ : Select the number of point you'll divide the sphere --out
-_--surf_ : Select your mesh
-_--out_ : Output name
+__--model__ : Select the nodel
+__--numberOfSubdivisions__ : Select the number of point you'll divide the sphere --out
+__--surf__ : Select your mesh
+__--out__ : Output name
 
 To run the program, run the following command : 
 python3 predict.py --surf path/to/surf --model /path/to/model/folder --numberOfSubdivisions *integer* --out /path/to/output.vtk
