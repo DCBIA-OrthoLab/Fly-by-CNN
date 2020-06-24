@@ -15,10 +15,10 @@ __--out__ : Output name
 
 
 To run the program, run the following command :  
-python3 predict.py __--surf__ path/to/surf __--model__ /path/to/model/folder __--numberOfSubdivisions__ *integer* __--out__ /path/to/output.vtk
+__python3 predict.py --surf__ path/to/surf __--model__ /path/to/model/folder __--numberOfSubdivisions__ *integer* __--out__ /path/to/output.vtk
 
 Other flags are available by running :  
-python3 predict.py __--help__
+__python3 predict.py --help__
 
 ## LinearSubdivisionFilter.py
 This code does the sphere subdivion. For example : numberOfSubdivisions = 10 -> 1026 ids / numberOfSubdivisions = 5 -> 268 ids 
