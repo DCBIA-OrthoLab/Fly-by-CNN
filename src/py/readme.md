@@ -5,17 +5,17 @@ Does the prediction for the mesh label using the fly-by-cnn idea. It first creat
 
 You can select the model with the flag 
 
+__--surf__ : Select your mesh
+
 __--model__ : Select the model
 
-__--numberOfSubdivisions__ : Select the number of point you'll divide the sphere --out
-
-__--surf__ : Select your mesh
+__--numberOfSubdivisions__ : Select the number of point you'll divide the sphere 
 
 __--out__ : Output name
 
 
 To run the program, run the following command : 
-python3 predict.py --surf path/to/surf --model /path/to/model/folder --numberOfSubdivisions *integer* --out /path/to/output.vtk
+python3 predict.py __--surf__ path/to/surf __--model__ /path/to/model/folder __--numberOfSubdivisions__ *integer* __--out__ /path/to/output.vtk
 
 Other flags are available by running python3 predict.py --help
 
