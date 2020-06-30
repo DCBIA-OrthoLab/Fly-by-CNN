@@ -7,6 +7,7 @@ import itk
 import tensorflow as tf
 import argparse
 import os
+import post_process
 
 def Normalisation(vtkdata):
 	polypoints = vtkdata.GetPoints()
@@ -95,11 +96,23 @@ print("numberOfSubdivisions", numberOfSubdivisions)
 print("outfilename", outfilename)
 
 print("Reading:", inputSurface)
-reader = vtk.vtkPolyDataReader()
-reader.SetFileName(inputSurface)
-reader.Update()
-original_surf = reader.GetOutput()
+path, extension = os.path.splitext(inputSurface)
+extension = extension.lower()
+if extension == ".vtk":
+	reader = vtk.vtkPolyDataReader()
+	reader.SetFileName(inputSurface)
+	reader.Update()
+	original_surf = reader.GetOutput()
+elif extension == ".stl":
+	reader = vtk.vtkSTLReader()
+	reader.SetFileName(inputSurface)
+	reader.Update()
+	original_surf = reader.GetOutput()
+
+
+print('Surf points : ', original_surf.GetNumberOfPoints())
 surf = Normalisation(original_surf)
+print('Surf points : ', surf.GetNumberOfPoints())
 
 normals = vtk.vtkPolyDataNormals()
 normals.SetInputData(surf)
@@ -111,6 +124,7 @@ tree.SetDataSet(surf)
 tree.BuildLocator()
 
 label_array = np.zeros([surf.GetNumberOfPoints(), 3])
+
 icosahedron = CreateIcosahedron(sphereRadius, numberOfSubdivisions)
 
 with tf.Session() as sess:
@@ -187,7 +201,7 @@ with tf.Session() as sess:
 		)
 
 		prediction = np.reshape(np.array(prediction[0]), [planeResolution*planeResolution])
-
+    
 		for index in range(planeResolution*planeResolution):
 			pointId = pointid_array[index]
 			if(pointId != -1):
@@ -205,6 +219,9 @@ with tf.Session() as sess:
 		real_labels.SetTuple(pointId, (label,))
 
 	original_surf.GetPointData().AddArray(real_labels)
+
+	original_surf, surf_label = post_process.Post_processing(original_surf)
+	original_surf = post_process.Label_Teeth(original_surf, surf_label)
 
 	print("Writting:", outfilename)
 	polydatawriter = vtk.vtkPolyDataWriter()
