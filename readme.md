@@ -38,6 +38,8 @@ Here are the paths useful for the cmake configuration
  VTK_DIR                          
  /tools/VTK/VTK-8.1.1-opengl-gcc4.8.6/lib/cmake/vtk-8.1  
 ```
+
+
 ### Run the fly-by-features on one shape
 
 #### Using an icosahedron subdivision
@@ -77,6 +79,7 @@ Here are the paths useful for the cmake configuration
 	--visualize
 ```
 
+
 ### Run on a big dataset
 To run this code on a big dataset, you need to create a bash script to run the ./fly_by_features 
 Here is an example of the bash_script to use
@@ -108,6 +111,7 @@ do
 done
 ```
 
+
 ### Deep Learning with the new datas
 To learn with the new datasets, we recommend to use the code from the [US-famli repository](https://github.com/juanprietob/US-famli)
 
@@ -123,9 +127,8 @@ python3 tfRecords.py
 	--imageDimension 3
 ```
 
-### Train the model
+#### Train the model
 The best way to make your model have good results with this data is to use a LSTM Network, and the US-famli repository have a pre-made lstm network but you can also do your own and add it to the src/py/dl/nn_v2 folder
-
 ```
 python3 train_v2.py 
 	--json 				/path/fly_by_features_split_train.json 
@@ -146,8 +149,7 @@ python3 train_v2.py
 	--save_model /path/saved_model
 ```
 
-### Evaluate the model
-
+#### Evaluate the model
 ```
 python3 eval_v2.py 
 	--json 		/path/fly_by_features_split_train.json
