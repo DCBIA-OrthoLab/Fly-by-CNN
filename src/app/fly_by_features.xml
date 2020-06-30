@@ -93,6 +93,15 @@
     </double>
 
     <boolean>
+      <name>fiberBundle</name>
+      <label>Fiber bundle</label>
+      <channel>input</channel>
+      <description>Set if it is a fiber bundle</description>
+      <longflag>fiber</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
       <name>visualize</name>
       <label>Render components</label>
       <channel>input</channel>
