@@ -16,9 +16,9 @@ A tangent oriented plan is then created with a certain number of points. It then
 ![Sphere_and_plane](./docs/Sphere_and_plane.png?raw=true)
 
 ### Spherical spiral subivision
-<!-- ![Sphere_and_plane](https://github.com/MaximeDum/fly-by-cnn/tree/master/docs/Sphere_and_plane.png?raw=true) -->
+<!-- ![Spherical_spiral](https://github.com/lbumbolo/fly-by-cnn/tree/master/docs/Spherical_spiral.gif?raw=true) -->
 
-![Sphere_and_plane](./docs/Sphere_and_plane.png?raw=true)
+![Spherical_spiral](./docs/Spherical_spiral.gif?raw=true)
 
 ## Running the code
 To run the Fly-by-CNN, you mostly need to follow the following explanations but we will also explain here how to train and evaluate a model with the fly-by-cnn datas created.
@@ -28,7 +28,7 @@ To run the Fly-by-CNN, you mostly need to follow the following explanations but 
 ```
  ITK_DIR 
  /tools/ITK/ITKv4.13.0-gcc4.8.5/lib/cmake/ITK-4.13             
-     
+
  SlicerExecutionModel_DIR     
  /tools/devel/linux/SlicerExecutionModel/SlicerExecutionModel-build
 
