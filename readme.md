@@ -1,6 +1,6 @@
 # Fly by CNN
 
-## Contributors
+#### Contributors
 Juan Prieto, Maxime Dumont, Louis Bumbolo
 
 ## What is it?
