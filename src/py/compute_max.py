@@ -31,6 +31,7 @@ def main(args):
 		shape_points = shape_points - shape_mean
 		max_value = np.maximum(max_value, np.amax(np.linalg.norm(shape_points, axis=1)))
 
+	print(max_value)
 	with open(args.out, "w") as f:
 		f.write(str(max_value))
 
