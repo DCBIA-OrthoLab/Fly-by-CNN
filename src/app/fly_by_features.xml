@@ -102,6 +102,15 @@
     </boolean>
 
     <boolean>
+      <name>curvature</name>
+      <label>Compute curvatures filter</label>
+      <channel>input</channel>
+      <description>Compute curvatures filter on the input mesh, for visualization purposes only</description>
+      <longflag>curvature</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
       <name>visualize</name>
       <label>Render components</label>
       <channel>input</channel>
@@ -109,6 +118,16 @@
       <longflag>visualize</longflag>
       <default>0</default>
     </boolean>
+
+    <integer>
+      <name>visualizeIndexStopCriteria</name>
+      <label>Point index</label>
+      <channel>input</channel>
+      <description>Index of the point in the spiral or on the icosahedron sphere subdivision</description>
+      <longflag>visualizeIndexStopCriteria</longflag>
+      <default>0</default>
+    </integer>
+
 
   </parameters>
 
