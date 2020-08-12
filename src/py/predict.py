@@ -230,9 +230,6 @@ with tf.compat.v1.Session() as sess:
 	polydatawriter.SetInputData(original_surf)
 	polydatawriter.Write()
 
-	original_surf, surf_label = post_process.Post_processing(original_surf)
-	original_surf = post_process.Label_Teeth(original_surf, surf_label)
-
 	labels_range = np.zeros(2)
 	real_labels.GetRange(labels_range)
 	for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
