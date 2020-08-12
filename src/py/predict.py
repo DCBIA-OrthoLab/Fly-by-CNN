@@ -127,8 +127,9 @@ label_array = np.zeros([surf.GetNumberOfPoints(), 3])
 
 icosahedron = CreateIcosahedron(sphereRadius, numberOfSubdivisions)
 
-with tf.Session() as sess:
-	loaded = tf.saved_model.load(sess=sess, tags=[tf.saved_model.SERVING], export_dir=savedModelPath)
+with tf.compat.v1.Session() as sess:
+
+	loaded = tf.compat.v1.saved_model.load(sess=sess, tags=[tf.saved_model.SERVING], export_dir=savedModelPath)
 
 	print("Total number of points:", icosahedron.GetNumberOfPoints())
 	for icoid in range(icosahedron.GetNumberOfPoints()):
@@ -212,21 +213,63 @@ with tf.Session() as sess:
 	real_labels.SetNumberOfComponents(1)
 	real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
 	real_labels.SetName("RegionId")
-	real_labels.Fill(0)
+	real_labels.Fill(-1)
 
 	for pointId,labels in enumerate(label_array):
-		label = np.argmax(labels)
-		real_labels.SetTuple(pointId, (label,))
+		if np.max(labels) > 0:
+			label = np.argmax(labels)
+			real_labels.SetTuple(pointId, (label,))
 
 	original_surf.GetPointData().AddArray(real_labels)
 
+	outfilename_pre = outfilename
+	outfilename_pre = os.path.splitext(outfilename_pre)[0] + "_pre.vtk"
+	print("Writting:", outfilename_pre)
+	polydatawriter = vtk.vtkPolyDataWriter()
+	polydatawriter.SetFileName(outfilename_pre)
+	polydatawriter.SetInputData(original_surf)
+	polydatawriter.Write()
+
 	original_surf, surf_label = post_process.Post_processing(original_surf)
 	original_surf = post_process.Label_Teeth(original_surf, surf_label)
+
+	labels_range = np.zeros(2)
+	real_labels.GetRange(labels_range)
+	for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
+		print("Removing islands:", label)
+		post_process.RemoveIslands(original_surf, real_labels, label, args.min_count)
+	
+	print("Connectivity...")
+	post_process.ConnectivityLabeling(original_surf, real_labels, 2, 2)
+	
+	print("Eroding...")
+	ErodeLabel(original_surf, real_labels, 0)
 
 	print("Writting:", outfilename)
 	polydatawriter = vtk.vtkPolyDataWriter()
 	polydatawriter.SetFileName(outfilename)
 	polydatawriter.SetInputData(original_surf)
+	polydatawriter.Write()
+
+	labels_range = np.zeros(2)
+	labels.GetRange(labels_range)
+
+	gum_surf = post_process.Threshold(original_surf, real_labels, 0, 1)
+	outfilename_gum = outfilename
+	outfilename_gum = os.path.splitext(outfilename_pre)[0] + "_gum.vtk"
+	print("Writting:", outfilename_gum)
+	polydatawriter = vtk.vtkPolyDataWriter()
+	polydatawriter.SetFileName(outfilename_gum)
+	polydatawriter.SetInputData(gum_surf)
+	polydatawriter.Write()
+
+	teeth_surf = post_process.Threshold(original_surf, real_labels, 2, labels_range[1])
+	outfilename_teeth = outfilename
+	outfilename_teeth = os.path.splitext(outfilename_pre)[0] + "_teeth.vtk"
+	print("Writting:", outfilename_teeth)
+	polydatawriter = vtk.vtkPolyDataWriter()
+	polydatawriter.SetFileName(outfilename_teeth)
+	polydatawriter.SetInputData(teeth_surf)
 	polydatawriter.Write()
 
 		# Dimension = 2
