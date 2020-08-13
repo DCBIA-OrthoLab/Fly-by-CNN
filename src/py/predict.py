@@ -234,7 +234,7 @@ with tf.compat.v1.Session() as sess:
 	real_labels.GetRange(labels_range)
 	for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
 		print("Removing islands:", label)
-		post_process.RemoveIslands(original_surf, real_labels, label, args.min_count)
+		post_process.RemoveIslands(original_surf, real_labels, label, 500)
 	
 	print("Connectivity...")
 	post_process.ConnectivityLabeling(original_surf, real_labels, 2, 2)
