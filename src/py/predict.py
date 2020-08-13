@@ -9,7 +9,7 @@ import argparse
 import os
 import post_process
 
-def Normalisation(vtkdata):
+def Normalization(vtkdata):
 	polypoints = vtkdata.GetPoints()
 	
 	nppoints = []
@@ -18,13 +18,15 @@ def Normalisation(vtkdata):
 		nppoints.append(spoint)
 	nppoints=np.array(nppoints)
 
-	nppoints -= np.mean(nppoints)
-	nppoints /= np.max(np.abs(np.reshape(nppoints,-1)))
+	npmean = np.mean(nppoints)
+	nppoints -= npmean
+	npscale = np.max(np.abs(np.reshape(nppoints,-1)))
+	nppoints /= npscale
 
 	for pid in range(polypoints.GetNumberOfPoints()):
 		vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
 
-	return vtkdata
+	return vtkdata, npmean, npscale
 
 def normalize_points(poly, radius):
 	polypoints = poly.GetPoints()
@@ -110,14 +112,14 @@ elif extension == ".stl":
 	original_surf = reader.GetOutput()
 
 
-print('Surf points : ', original_surf.GetNumberOfPoints())
-surf = Normalisation(original_surf)
-print('Surf points : ', surf.GetNumberOfPoints())
+surf, surfmean, surfscale = Normalization(original_surf)
 
 normals = vtk.vtkPolyDataNormals()
 normals.SetInputData(surf)
 normals.Update()
 surf = normals.GetOutput()
+
+print('Surf points : ', surf.GetNumberOfPoints())
 
 tree = vtk.vtkCellLocator()
 tree.SetDataSet(surf) 
@@ -220,38 +222,45 @@ with tf.compat.v1.Session() as sess:
 			label = np.argmax(labels)
 			real_labels.SetTuple(pointId, (label,))
 
-	original_surf.GetPointData().AddArray(real_labels)
+	surf.GetPointData().AddArray(real_labels)
+
+	surf_points = surf.GetPoints()
+	for pid in range(surf_points.GetNumberOfPoints()):
+		spoint = np.array(surf_points.GetPoint(pid))
+		spoint *= surfscale
+		spoint += surfmean
+		surf_points.SetPoint(pid, spoint)
 
 	outfilename_pre = outfilename
 	outfilename_pre = os.path.splitext(outfilename_pre)[0] + "_pre.vtk"
 	print("Writting:", outfilename_pre)
 	polydatawriter = vtk.vtkPolyDataWriter()
 	polydatawriter.SetFileName(outfilename_pre)
-	polydatawriter.SetInputData(original_surf)
+	polydatawriter.SetInputData(surf)
 	polydatawriter.Write()
 
 	labels_range = np.zeros(2)
 	real_labels.GetRange(labels_range)
 	for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
 		print("Removing islands:", label)
-		post_process.RemoveIslands(original_surf, real_labels, label, 500)
+		post_process.RemoveIslands(surf, real_labels, label, 500)
 	
 	print("Connectivity...")
-	post_process.ConnectivityLabeling(original_surf, real_labels, 2, 2)
+	post_process.ConnectivityLabeling(surf, real_labels, 2, 2)
 	
 	print("Eroding...")
-	ErodeLabel(original_surf, real_labels, 0)
+	post_process.ErodeLabel(surf, real_labels, 0)
 
 	print("Writting:", outfilename)
 	polydatawriter = vtk.vtkPolyDataWriter()
 	polydatawriter.SetFileName(outfilename)
-	polydatawriter.SetInputData(original_surf)
+	polydatawriter.SetInputData(surf)
 	polydatawriter.Write()
 
 	labels_range = np.zeros(2)
-	labels.GetRange(labels_range)
+	real_labels.GetRange(labels_range)
 
-	gum_surf = post_process.Threshold(original_surf, real_labels, 0, 1)
+	gum_surf = post_process.Threshold(surf, real_labels, 0, 1)
 	outfilename_gum = outfilename
 	outfilename_gum = os.path.splitext(outfilename_pre)[0] + "_gum.vtk"
 	print("Writting:", outfilename_gum)
@@ -260,7 +269,7 @@ with tf.compat.v1.Session() as sess:
 	polydatawriter.SetInputData(gum_surf)
 	polydatawriter.Write()
 
-	teeth_surf = post_process.Threshold(original_surf, real_labels, 2, labels_range[1])
+	teeth_surf = post_process.Threshold(surf, real_labels, 2, labels_range[1])
 	outfilename_teeth = outfilename
 	outfilename_teeth = os.path.splitext(outfilename_pre)[0] + "_teeth.vtk"
 	print("Writting:", outfilename_teeth)
