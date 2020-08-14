@@ -1,6 +1,8 @@
 #include "fly_by_featuresCLP.h"
 #include "vtkLinearSubdivisionFilter2.h"
 
+#include "vtkOFFReader.h"
+
 #include <vtkSmartPointer.h>
 #include <vtkSphereSource.h>
 #include <vtkPoints.h>
@@ -137,10 +139,22 @@ int main(int argc, char * argv[])
   
 
   cout<<"Reading: "<<inputSurface<<endl;
-  vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
-  reader->SetFileName(inputSurface.c_str());
-  reader->Update();
-  vtkSmartPointer<vtkPolyData> input_mesh = reader->GetOutput();
+
+  string extension = inputSurface.substr(inputSurface.find_last_of("."));
+
+  vtkSmartPointer<vtkPolyData> input_mesh;
+
+  if(extension.compare(".off") == 0 || extension.compare(".OFF") == 0){
+    vtkSmartPointer<vtkOFFReader> reader = vtkSmartPointer<vtkOFFReader>::New();
+    reader->SetFileName(inputSurface.c_str());
+    reader->Update();
+    input_mesh = reader->GetOutput();  
+  }else{
+    vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
+    reader->SetFileName(inputSurface.c_str());
+    reader->Update();
+    input_mesh = reader->GetOutput();  
+  }
 
   vector<vtkSmartPointer<vtkPolyData>> input_mesh_v;
 

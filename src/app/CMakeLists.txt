@@ -16,7 +16,7 @@ include(${SlicerExecutionModel_USE_FILE})
 
 SET(EXE_NAME fly_by_features)
 SET(${EXE_NAME}_LIBRARIES  ${VTK_LIBRARIES} ${ITK_LIBRARIES})
-SET(${EXE_NAME}_ADDITIONAL_SRCS fly_by_features.cxx vtkLinearSubdivisionFilter2.cxx)
+SET(${EXE_NAME}_ADDITIONAL_SRCS fly_by_features.cxx vtkLinearSubdivisionFilter2.cxx vtkOFFReader.cxx)
 
 SEMMacroBuildCLI(
 NAME ${EXE_NAME}
