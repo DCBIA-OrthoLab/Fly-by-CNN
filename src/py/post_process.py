@@ -304,7 +304,7 @@ def NeighborLabel(vtkdata, labels, label, connected_pids):
 	
 	if len(neighbor_labels) > 0:
 		return max(neighbor_labels, key=neighbor_labels.count)
-	return label
+	return -1
 
 
 

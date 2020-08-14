@@ -112,7 +112,12 @@ elif extension == ".stl":
 	original_surf = reader.GetOutput()
 
 
-surf, surfmean, surfscale = Normalization(original_surf)
+clean = vtk.vtkCleanPolyData()
+clean.SetInputData(original_surf)
+clean.SetTolerance(0.0001)
+clean.Update()
+
+surf, surfmean, surfscale = Normalization(clean.GetOutput())
 
 normals = vtk.vtkPolyDataNormals()
 normals.SetInputData(surf)
@@ -257,9 +262,6 @@ with tf.compat.v1.Session() as sess:
 	polydatawriter.SetInputData(surf)
 	polydatawriter.Write()
 
-	labels_range = np.zeros(2)
-	real_labels.GetRange(labels_range)
-
 	gum_surf = post_process.Threshold(surf, real_labels, 0, 1)
 	outfilename_gum = outfilename
 	outfilename_gum = os.path.splitext(outfilename_pre)[0] + "_gum.vtk"
@@ -269,7 +271,7 @@ with tf.compat.v1.Session() as sess:
 	polydatawriter.SetInputData(gum_surf)
 	polydatawriter.Write()
 
-	teeth_surf = post_process.Threshold(surf, real_labels, 2, labels_range[1])
+	teeth_surf = post_process.Threshold(surf, real_labels, 2, 999999)
 	outfilename_teeth = outfilename
 	outfilename_teeth = os.path.splitext(outfilename_pre)[0] + "_teeth.vtk"
 	print("Writting:", outfilename_teeth)
