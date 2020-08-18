@@ -130,7 +130,7 @@ tree = vtk.vtkCellLocator()
 tree.SetDataSet(surf) 
 tree.BuildLocator()
 
-label_array = np.zeros([surf.GetNumberOfPoints(), 3])
+label_array = np.zeros([surf.GetNumberOfPoints(), 4])
 
 icosahedron = CreateIcosahedron(sphereRadius, numberOfSubdivisions)
 
@@ -249,12 +249,15 @@ with tf.compat.v1.Session() as sess:
 	for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
 		print("Removing islands:", label)
 		post_process.RemoveIslands(surf, real_labels, label, 500)
+
+	print("Relabel...")
+	post_process.ReLabel(surf, real_labels, 3, -2)
 	
 	print("Connectivity...")
 	post_process.ConnectivityLabeling(surf, real_labels, 2, 2)
 	
 	print("Eroding...")
-	post_process.ErodeLabel(surf, real_labels, 0)
+	post_process.ErodeLabel(surf, real_labels, -2)
 
 	print("Writting:", outfilename)
 	polydatawriter = vtk.vtkPolyDataWriter()

@@ -367,6 +367,11 @@ def ErodeLabel(vtkdata, labels, label):
 		else:
 			break
 
+def ReLabel(surf, labels, label, relabel):
+	for pid in range(labels.GetNumberOfTuples()):
+		if labels.GetTuple(pid)[0] == label:
+			labels.SetTuple(pid, (relabel,))
+
 def Threshold(vtkdata, labels, threshold_min, threshold_max):
 	
 	threshold = vtk.vtkThreshold()
