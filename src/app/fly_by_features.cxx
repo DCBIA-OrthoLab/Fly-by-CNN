@@ -19,6 +19,7 @@
 #include <vtkPlaneSource.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkPolyDataReader.h>
+#include <vtkOBJReader.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkDataSetMapper.h>
 #include <vtkActor.h>
@@ -146,6 +147,11 @@ int main(int argc, char * argv[])
 
   if(extension.compare(".off") == 0 || extension.compare(".OFF") == 0){
     vtkSmartPointer<vtkOFFReader> reader = vtkSmartPointer<vtkOFFReader>::New();
+    reader->SetFileName(inputSurface.c_str());
+    reader->Update();
+    input_mesh = reader->GetOutput();  
+  }else if(extension.compare(".obj") == 0 || extension.compare(".OBJ") == 0){
+    vtkSmartPointer<vtkOBJReader> reader = vtkSmartPointer<vtkOBJReader>::New();
     reader->SetFileName(inputSurface.c_str());
     reader->Update();
     input_mesh = reader->GetOutput();  
