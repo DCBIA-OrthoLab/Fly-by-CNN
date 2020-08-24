@@ -105,8 +105,6 @@ int vtkOFFReader::RequestData(
 
   std::string line;
 
-  getline(in, line); //throw the 1st line away, it always says "OFF"
-
   //Read until we get to the first line that is not a comment or a blank line.
   //This line second states the number of vertices, faces, and edges. 
   while(getline(in, line))
@@ -120,14 +118,37 @@ int vtkOFFReader::RequestData(
     //if we get to here, this is the info line
     break;
   }
-  //std::cout << "Found info line." << std::endl;
+
+  //If the first line is just the string OFF then continue until next line
+  int start = line.find_first_not_of(' ');
+  int end = line.find_last_not_of(' ');
+  line = line.substr(start, (end - start) + 1);
+
+  if(line.compare("OFF") == 0){
+    std::cout << "Found info line " << line << std::endl;  
+    while(getline(in, line))
+    {
+      std::cout << line << std::endl;
+      if(line.size() == 0)
+        continue;
+      if(line[0] == '#')
+        continue;
+
+      //if we get to here, this is the info line
+      break;
+    }
+  }else{
+    //Otherwise, remove the text OFF and parse it
+    line = line.substr(line.find("OFF") + 3);
+  }
+  std::cout << "Found info line " << line << std::endl;
   //At this point, the line were are interested in is stored in 'line'
   //We are only interested in vertices and faces.
   std::stringstream ss;
   ss << line;
   unsigned int NumberOfVertices, NumberOfFaces;
   ss >> NumberOfVertices >> NumberOfFaces;
-  //std::cout << "Vertices: " << NumberOfVertices << " Faces: " << NumberOfFaces << std::endl;
+  std::cout << "Vertices: " << NumberOfVertices << " Faces: " << NumberOfFaces << std::endl;
   //Now we can start to read the vertices
   unsigned int VertexCounter = 0;
 
@@ -141,7 +162,7 @@ int vtkOFFReader::RequestData(
     float x,y,z;
     ssVertex >> x >> y >> z;
     points->InsertNextPoint(x, y, z);
-    //std::cout << "adding vertex: " << x << " " << y << " " << z << std::endl;
+    // std::cout << "adding vertex: " << x << " " << y << " " << z << std::endl;
     VertexCounter++;
   } // (end of vertex while loop)
 
