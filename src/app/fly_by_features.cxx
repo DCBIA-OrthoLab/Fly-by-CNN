@@ -33,6 +33,7 @@
 #include <vtkSelection.h>
 #include <vtkExtractSelection.h>
 #include <vtkGeometryFilter.h>
+#include <vtkCenterOfMass.h>
 
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_cross.h>
@@ -224,14 +225,24 @@ int main(int argc, char * argv[])
 
     vnl_vector<double> mean_v = vnl_vector<double>(3, 0);
 
-    for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
-      double point[3];
-      input_mesh->GetPoints()->GetPoint(i, point);
-      vnl_vector<double> v = vnl_vector<double>(point, 3);
-      mean_v += v;
-    }
+    if(centerOfMass){
+      vtkSmartPointer<vtkCenterOfMass> centerOfMassFilter = vtkSmartPointer<vtkCenterOfMass>::New();
+      centerOfMassFilter->SetInputData(input_mesh);
+      centerOfMassFilter->SetUseScalarsAsWeights(false);
+      centerOfMassFilter->Update();
+      
+      centerOfMassFilter->GetCenter(mean_v.data_block());
 
-    mean_v /= input_mesh->GetNumberOfPoints();
+    }else{
+      for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
+        double point[3];
+        input_mesh->GetPoints()->GetPoint(i, point);
+        vnl_vector<double> v = vnl_vector<double>(point, 3);
+        mean_v += v;
+      }
+
+      mean_v /= input_mesh->GetNumberOfPoints();
+    }
 
     for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
       double point[3];
@@ -242,7 +253,7 @@ int main(int argc, char * argv[])
     }
 
     if(maxMagnitude == -1){
-      maxMagnitude = 1;
+      maxMagnitude = 0;
       for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
         double point[3];
         input_mesh->GetPoints()->GetPoint(i, point);

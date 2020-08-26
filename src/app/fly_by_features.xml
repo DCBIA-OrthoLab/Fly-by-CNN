@@ -93,6 +93,15 @@
     </double>
 
     <boolean>
+      <name>centerOfMass</name>
+      <label>Use Center of Mass</label>
+      <channel>input</channel>
+      <description>Use the center of mass of the object instead of the mean point</description>
+      <longflag>centerOfMass</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
       <name>fiberBundle</name>
       <label>Fiber bundle</label>
       <channel>input</channel>
