@@ -2,7 +2,7 @@
 <executable>
   <category>Transform</category>
   <title></title>
-  <version>1.0.1</version>
+  <version>1.0.2</version>
   <description>
     Extracts features by flying around the object and probing the surfaces
   </description>
