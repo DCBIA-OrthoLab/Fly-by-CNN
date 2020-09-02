@@ -34,9 +34,12 @@
 #include <vtkExtractSelection.h>
 #include <vtkGeometryFilter.h>
 #include <vtkCenterOfMass.h>
+#include <vtkTransform.h>
+#include <vtkTransformPolyDataFilter.h>
 
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_cross.h>
+#include <vnl/vnl_random.h>
 
 #include <itkVectorImage.h>
 #include <itkImageFileWriter.h>
@@ -47,6 +50,7 @@
 // VTK_MODULE_INIT(vtkRenderingOpenGL2) 
 // VTK_MODULE_INIT(vtkInteractionStyle) 
 #include <math.h>
+
 
 typedef double VectorImagePixelType;
 typedef itk::VectorImage<VectorImagePixelType, 2> VectorImageType;  
@@ -161,6 +165,32 @@ int main(int argc, char * argv[])
     reader->SetFileName(inputSurface.c_str());
     reader->Update();
     input_mesh = reader->GetOutput();  
+  }
+
+  if(randomRotation){
+    vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
+
+    vnl_random rand_gen = vnl_random();
+
+    vnl_vector<double> rot_vector = vnl_vector<double>(3, 0);
+    for(unsigned i = 0; i < rot_vector.size(); i++){
+      rot_vector[i] = rand_gen.normal();
+    }
+    
+    rot_vector.normalize();
+    
+
+    double angle = rand_gen.drand32()*360.0;
+
+    cout<<"Random rotation: "<<rot_vector<<", angle: "<<angle<<endl;
+
+    transform->RotateWXYZ(angle, rot_vector[0], rot_vector[1], rot_vector[2]);
+
+    vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
+    transformFilter->SetTransform(transform);
+    transformFilter->SetInputData(input_mesh);
+    transformFilter->Update();
+    input_mesh = transformFilter->GetOutput();
   }
 
   vector<vtkSmartPointer<vtkPolyData>> input_mesh_v;

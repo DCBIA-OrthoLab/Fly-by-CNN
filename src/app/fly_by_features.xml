@@ -102,6 +102,15 @@
     </boolean>
 
     <boolean>
+      <name>randomRotation</name>
+      <label>Random rotation</label>
+      <channel>input</channel>
+      <description>Apply a random rotation to the shape</description>
+      <longflag>randomRotation</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
       <name>fiberBundle</name>
       <label>Fiber bundle</label>
       <channel>input</channel>
