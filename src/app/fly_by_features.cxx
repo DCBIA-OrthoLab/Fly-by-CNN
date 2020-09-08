@@ -448,6 +448,8 @@ int main(int argc, char * argv[])
 
         if(tree->IntersectWithLine(point_plane_v.data_block(), point_end_v.data_block(), tol, t, x, pcoords, subId, cellId)){
 
+          writeImage = true;
+
           VectorImageType::PixelType out_pix = out_it.Get();
           vtkSmartPointer<vtkIdList> cellPointsIds = vtkSmartPointer<vtkIdList>::New();
           
@@ -475,7 +477,6 @@ int main(int argc, char * argv[])
             VectorImageType::PixelType out_pix_label = out_it_label.Get();
             out_pix_label[0] = input_mesh->GetPointData()->GetArray(regionLabels.c_str())->GetTuple(point0Id)[0] + 1;
             out_it_label.Set(out_pix_label);
-            writeImage = true;  
           }
           
         }
