@@ -451,31 +451,53 @@ int main(int argc, char * argv[])
           writeImage = true;
 
           VectorImageType::PixelType out_pix = out_it.Get();
+
+          vnl_vector<double> pcoords_v = vnl_vector<double>(pcoords, 3);
+
           vtkSmartPointer<vtkIdList> cellPointsIds = vtkSmartPointer<vtkIdList>::New();
           
           input_mesh->GetCellPoints(cellId, cellPointsIds);
-
-          double point_mesh[3];
-          vtkIdType point0Id = cellPointsIds->GetId(0);
-          input_mesh->GetPoint(point0Id, point_mesh);
-          vnl_vector<double> point_mesh_v(point_mesh, 3);
           
-          if(!fiberBundle){
-            double* normal = input_mesh->GetPointData()->GetArray("Normals")->GetTuple(point0Id);
-            out_pix[0] = normal[0];
-            out_pix[1] = normal[1];
-            out_pix[2] = normal[2];
-            out_pix[3] = (point_plane_v - point_mesh_v).magnitude();
-            out_it.Set(out_pix);  
-          }else{
-            out_pix[0] = (point_plane_v - point_mesh_v).magnitude();
-            out_it.Set(out_pix);  
+          vnl_vector<double> wavg_normal_v(3, 0);  
+          double w_distance = 0;
+          vtkIdType min_pointId = cellPointsIds->GetId(0);
+          double min_distance = 999999999;
+
+          for(unsigned npid = 0; npid < cellPointsIds->GetNumberOfIds(); npid++){
+            
+            double point_mesh[3];
+            vtkIdType pointId = cellPointsIds->GetId(npid);
+            input_mesh->GetPoint(pointId, point_mesh);
+            vnl_vector<double> point_mesh_v(point_mesh, 3);  
+
+            double* normal = input_mesh->GetPointData()->GetArray("Normals")->GetTuple(pointId);
+            vnl_vector<double> normal_v(normal, 3);
+
+            double distance = (point_mesh_v - pcoords_v).magnitude() + 1e-8;
+            double weight = 1.0/distance;
+            wavg_normal_v += normal_v*weight;
+            w_distance += weight;
+
+            if(distance < min_distance){
+              min_distance = distance;
+              min_pointId = cellPointsIds->GetId(pointId);
+            }
+
           }
           
+          wavg_normal_v /= w_distance;
+          wavg_normal_v = wavg_normal_v.normalize();
+          
+          out_pix[0] = wavg_normal_v[0];
+          out_pix[1] = wavg_normal_v[1];
+          out_pix[2] = wavg_normal_v[2];  
+          
+          out_pix[3] = (point_plane_v - pcoords_v).magnitude();
+          out_it.Set(out_pix);
 
           if(createRegionLabels){
             VectorImageType::PixelType out_pix_label = out_it_label.Get();
-            out_pix_label[0] = input_mesh->GetPointData()->GetArray(regionLabels.c_str())->GetTuple(point0Id)[0] + 1;
+            out_pix_label[0] = input_mesh->GetPointData()->GetArray(regionLabels.c_str())->GetTuple(min_pointId)[0] + 1;
             out_it_label.Set(out_pix_label);
           }
           
