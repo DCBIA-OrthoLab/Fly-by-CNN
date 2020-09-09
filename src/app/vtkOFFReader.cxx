@@ -109,33 +109,33 @@ int vtkOFFReader::RequestData(
   //This line second states the number of vertices, faces, and edges. 
   while(getline(in, line))
   {
-    //std::cout << line << std::endl;
+    std::cout << line << std::endl;
     if(line.size() == 0)
       continue;
-    if(line[0] == '#')
+    else if(line[0] == '#')
       continue;
-
-    //if we get to here, this is the info line
-    break;
+    else if(line.compare("\r") == 0 || line.compare("\n") == 0)
+      continue;
+    else
+      break;
   }
 
   //If the first line is just the string OFF then continue until next line
   int start = line.find_first_not_of(' ');
   int end = line.find_last_not_of(' ');
   line = line.substr(start, (end - start) + 1);
-
-  if(line.compare("OFF") == 0){
-    std::cout << "Found info line " << line << std::endl;  
+  
+  if(line.compare("OFF") == 0 || line.compare("OFF\r") == 0){
     while(getline(in, line))
     {
-      std::cout << line << std::endl;
       if(line.size() == 0)
         continue;
-      if(line[0] == '#')
+      else if(line[0] == '#')
         continue;
-
-      //if we get to here, this is the info line
-      break;
+      else if(line.compare("\r") == 0 || line.compare("\n") == 0)
+        continue;
+      else
+        break;
     }
   }else{
     //Otherwise, remove the text OFF and parse it
