@@ -435,7 +435,7 @@ int main(int argc, char * argv[])
       out_image_feat->SetVectorLength(numFeatures);
       out_image_feat->Allocate();
       VectorImageType::PixelType out_pix(numFeatures);
-      out_pix.Fill(-1);
+      out_pix.Fill(-2);
       out_image_feat->FillBuffer(out_pix);
 
       VectorImageIteratorType out_it = VectorImageIteratorType(out_image_feat, out_image_feat->GetLargestPossibleRegion());
