@@ -51,6 +51,7 @@
 // VTK_MODULE_INIT(vtkInteractionStyle) 
 #include <math.h>
 
+#include <chrono>
 
 typedef double VectorImagePixelType;
 typedef itk::VectorImage<VectorImagePixelType, 2> VectorImageType;  
@@ -71,6 +72,8 @@ int main(int argc, char * argv[])
 
   int numFeatures = 4;
   bool createRegionLabels = regionLabels.compare("") != 0;
+
+  chrono::steady_clock::time_point begin_fly_by = chrono::steady_clock::now();
 
   //Spherical sampling
   vtkSmartPointer<vtkPolyData> sphere;
@@ -251,7 +254,8 @@ int main(int argc, char * argv[])
     vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
     normalGenerator->SetInputData(input_mesh);
     normalGenerator->ComputePointNormalsOn();
-    normalGenerator->ComputeCellNormalsOn();
+    normalGenerator->SplittingOff();
+    normalGenerator->ComputeCellNormalsOff();
     normalGenerator->Update();
 
     input_mesh = normalGenerator->GetOutput();
@@ -696,5 +700,9 @@ int main(int argc, char * argv[])
       }
     }
   }
+
+  chrono::steady_clock::time_point end_fly_by = chrono::steady_clock::now();
+
+  cout << "FlyBy time: " << chrono::duration_cast<chrono::minutes>(end_fly_by - begin_fly_by).count() << "min" << endl;
   return EXIT_SUCCESS;
 }
