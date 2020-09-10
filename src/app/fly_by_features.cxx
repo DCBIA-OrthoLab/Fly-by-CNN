@@ -479,13 +479,14 @@ int main(int argc, char * argv[])
         vtkIdType cellId = -1;
 
         //Intersect line with OBB tree
+        //x is the intersection point at the cell
         if(tree->IntersectWithLine(point_plane_v.data_block(), point_end_v.data_block(), tol, t, x, pcoords, subId, cellId)){
 
           writeImage = true;
 
           VectorImageType::PixelType out_pix = out_it.Get();
 
-          vnl_vector<double> pcoords_v = vnl_vector<double>(pcoords, 3);
+          vnl_vector<double> x_v = vnl_vector<double>(x, 3);
 
           vtkSmartPointer<vtkIdList> cellPointsIds = vtkSmartPointer<vtkIdList>::New();
           
@@ -507,7 +508,7 @@ int main(int argc, char * argv[])
             double* normal = input_mesh->GetPointData()->GetArray("Normals")->GetTuple(pointId);
             vnl_vector<double> normal_v(normal, 3);
 
-            double distance = (point_mesh_v - pcoords_v).magnitude() + 1e-8;
+            double distance = (point_mesh_v - x_v).magnitude() + 1e-8;
             double weight = 1.0/distance;
             wavg_normal_v += normal_v*weight;
             w_distance += weight;
@@ -527,7 +528,7 @@ int main(int argc, char * argv[])
           out_pix[2] = wavg_normal_v[2];  
           
           //Distance from plane to mesh (depth map)
-          out_pix[3] = (point_plane_v - pcoords_v).magnitude();
+          out_pix[3] = (point_plane_v - x_v).magnitude();
           out_it.Set(out_pix);
 
           if(createRegionLabels){
@@ -609,7 +610,6 @@ int main(int argc, char * argv[])
         if(writeImage){
           char buf[50];
           sprintf(buf, "%d", i);
-          cout<<"Writing: "<<i<<endl;
 
           string outputFileName = outputName + "/" + string(buf) + ".nrrd";
           string outputFileNameLabel = outputName + "/" + string(buf) + "_label.nrrd";
@@ -621,6 +621,8 @@ int main(int argc, char * argv[])
             outputFileNameLabel = outputName + "/" + string(buf_fb) + "_" + string(buf) + "_label.nrrd";
           }
 
+          cout<<"Writing: "<<outputFileName<<endl;
+
           VectorImageFileWriterType::Pointer writer = VectorImageFileWriterType::New();
           writer->SetFileName(outputFileName);
           writer->SetInput(out_image_feat);
@@ -628,6 +630,7 @@ int main(int argc, char * argv[])
           writer->Update();
 
           if(createRegionLabels){
+            cout<<"Writing: "<<outputFileNameLabel<<endl;
             writer->SetFileName(outputFileNameLabel);
             writer->SetInput(out_image_label);
             writer->UseCompressionOn();
