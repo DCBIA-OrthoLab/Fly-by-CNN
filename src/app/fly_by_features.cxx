@@ -72,8 +72,10 @@ int main(int argc, char * argv[])
   int numFeatures = 4;
   bool createRegionLabels = regionLabels.compare("") != 0;
 
+  //Spherical sampling
   vtkSmartPointer<vtkPolyData> sphere;
 
+  //Icosahedron subdivision
   if(numberOfSubdivisions > 0){
     vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
     icosahedron_source->SetSolidTypeToIcosahedron();
@@ -101,6 +103,7 @@ int main(int argc, char * argv[])
     }
     sphere->SetVerts(vertices);  
   }else if(numberOfSpiralSamples > 0){
+    //Spiral sampling
     sphere = vtkSmartPointer<vtkPolyData>::New();
     vtkSmartPointer<vtkPoints> sphere_points = vtkSmartPointer<vtkPoints>::New();
     vtkSmartPointer<vtkCellArray> lines = vtkSmartPointer<vtkCellArray>::New();
@@ -142,8 +145,11 @@ int main(int argc, char * argv[])
     cerr<<"Please set subdivision or spiral to generate the samples on the sphere."<<endl;
     return EXIT_FAILURE;
   }
-  
 
+
+  //Spherical sampling finish
+  
+  //Read input mesh
   cout<<"Reading: "<<inputSurface<<endl;
 
   string extension = inputSurface.substr(inputSurface.find_last_of("."));
@@ -166,6 +172,10 @@ int main(int argc, char * argv[])
     reader->Update();
     input_mesh = reader->GetOutput();  
   }
+
+  //Finish reading
+
+  //Apply random rotation?
 
   if(randomRotation){
     vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
@@ -194,6 +204,9 @@ int main(int argc, char * argv[])
   }
 
   vector<vtkSmartPointer<vtkPolyData>> input_mesh_v;
+
+  //If the input mesh is a fiber bundle, generate fibers around it
+  //Each fiber is treated a seprate mesh
 
   if(fiberBundle){
     cout<<"Generating tubes around fibers..."<<endl;
@@ -234,6 +247,7 @@ int main(int argc, char * argv[])
 
     input_mesh = input_mesh_v[i_mesh];
 
+    //Generate normals from the polydata. These are features used. 
     vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
     normalGenerator->SetInputData(input_mesh);
     normalGenerator->ComputePointNormalsOn();
@@ -243,6 +257,7 @@ int main(int argc, char * argv[])
     input_mesh = normalGenerator->GetOutput();
 
     if(curvature){
+      //The curvature filter is not used as feature but may be used for visualization
       vtkSmartPointer<vtkCurvatures> curvaturesFilter = vtkSmartPointer<vtkCurvatures>::New();
       curvaturesFilter->SetInputData(input_mesh);
       curvaturesFilter->SetCurvatureTypeToMinimum();
@@ -255,6 +270,7 @@ int main(int argc, char * argv[])
 
     vnl_vector<double> mean_v = vnl_vector<double>(3, 0);
 
+    //Center the shape starts
     if(centerOfMass){
       vtkSmartPointer<vtkCenterOfMass> centerOfMassFilter = vtkSmartPointer<vtkCenterOfMass>::New();
       centerOfMassFilter->SetInputData(input_mesh);
@@ -282,6 +298,9 @@ int main(int argc, char * argv[])
       input_mesh->GetPoints()->SetPoint(i, v.data_block());
     }
 
+    //Center shape finishes
+
+    //Scaling the shape to unit sphere. This may also be a parameter if scaling for a population
     if(maxMagnitude == -1){
       maxMagnitude = 0;
       for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
@@ -300,6 +319,10 @@ int main(int argc, char * argv[])
       input_mesh->GetPoints()->SetPoint(i, v.data_block());
     }
 
+    //Scaling finishes
+
+
+    //Generate OBB tree to quickly locate cells from intersections
     vtkSmartPointer<vtkCellLocator> tree = vtkSmartPointer<vtkCellLocator>::New();
     tree->SetDataSet(input_mesh);
     tree->BuildLocator();
@@ -308,6 +331,7 @@ int main(int argc, char * argv[])
     vtkSmartPointer<vtkRenderWindow> renderWindow;
     vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor;
 
+    //Visualization stuff for screenshots
     if(visualize){
       vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
       inputMapper->SetInputData(input_mesh);
@@ -342,11 +366,15 @@ int main(int argc, char * argv[])
       renderWindow->Render();
     }
 
+    //Using the points calculated during the spherical sampling
+    //Either we are going to stack images or save one by one. 
     vector<VectorImageType::Pointer> compose_v;
 
     vtkSmartPointer<vtkPoints> spherePoints = sphere->GetPoints();
     for(unsigned i = 0; i < spherePoints->GetNumberOfPoints(); i++){
 
+      //Plane orientation. All planes are oriented using the north of the sphere. 
+      //We calculate the 3 points that span the plane to capture the image
       double sphere_point[3];
       spherePoints->GetPoint(i, sphere_point);
       vnl_vector<double> sphere_point_v = vnl_vector<double>(sphere_point, 3);
@@ -386,6 +414,7 @@ int main(int argc, char * argv[])
       vnl_vector<double> plane_point_1_v = plane_point_origin_v + plane_orient_x_v;
       vnl_vector<double> plane_point_2_v = plane_point_origin_v + plane_orient_y_v;
 
+      //Using the calculated points create the plane
       vtkSmartPointer<vtkPlaneSource> planeSource = vtkSmartPointer<vtkPlaneSource>::New();
       planeSource->SetOrigin(plane_point_origin_v.data_block());
       planeSource->SetPoint1(plane_point_1_v.data_block());
@@ -394,6 +423,7 @@ int main(int argc, char * argv[])
       planeSource->Update();
       vtkSmartPointer<vtkPolyData> planeMesh = planeSource->GetOutput();
 
+      //Create the image that will hold the features
       VectorImagePointerType out_image_feat = VectorImageType::New();
       VectorImageType::SizeType size;
       size[0] = planeResolution;
@@ -414,6 +444,7 @@ int main(int argc, char * argv[])
       VectorImagePointerType out_image_label;
       VectorImageIteratorType out_it_label; 
 
+      //Create the label image if we are extracting labeled regions
       if(createRegionLabels){
         out_image_label = VectorImageType::New();
 
@@ -430,6 +461,7 @@ int main(int argc, char * argv[])
       
       bool writeImage = false;
 
+      //For each point in the plane. Intersect with mesh centered at 0 and scaled to fit unit sphere
       for(unsigned j = 0; j < planeMesh->GetNumberOfPoints(); j++){
         double point_plane[3];
         planeMesh->GetPoints()->GetPoint(j, point_plane);
@@ -446,6 +478,7 @@ int main(int argc, char * argv[])
         int subId;
         vtkIdType cellId = -1;
 
+        //Intersect line with OBB tree
         if(tree->IntersectWithLine(point_plane_v.data_block(), point_end_v.data_block(), tol, t, x, pcoords, subId, cellId)){
 
           writeImage = true;
@@ -463,6 +496,7 @@ int main(int argc, char * argv[])
           vtkIdType min_pointId = cellPointsIds->GetId(0);
           double min_distance = 999999999;
 
+          //Weighted average of the normal
           for(unsigned npid = 0; npid < cellPointsIds->GetNumberOfIds(); npid++){
             
             double point_mesh[3];
@@ -492,6 +526,7 @@ int main(int argc, char * argv[])
           out_pix[1] = wavg_normal_v[1];
           out_pix[2] = wavg_normal_v[2];  
           
+          //Distance from plane to mesh (depth map)
           out_pix[3] = (point_plane_v - pcoords_v).magnitude();
           out_it.Set(out_pix);
 
@@ -508,6 +543,7 @@ int main(int argc, char * argv[])
           ++out_it_label;  
         }
 
+        //More visualization stuff
         if(visualize && i == visualizeIndexStopCriteria){
           vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
           lineSource->SetPoint1(point_plane_v.data_block());
@@ -565,9 +601,11 @@ int main(int argc, char * argv[])
         
       }
 
+      //If it's a composition then push the image into the compose vector
       if(flyByCompose){
         compose_v.push_back(out_image_feat);
       }else{
+        //If there was an intersection, write it
         if(writeImage){
           char buf[50];
           sprintf(buf, "%d", i);
@@ -599,6 +637,7 @@ int main(int argc, char * argv[])
       }
     }
 
+    //Process the stack of images to generate a single volume
     if(flyByCompose){
       
       VectorImageComposeType::Pointer out_compose = VectorImageComposeType::New();
