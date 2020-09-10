@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Transform</category>
+  <title></title>
+  <version>1.0.0</version>
+  <description>
+    Converts off file to VTK
+  </description>
+  <contributor>Juan Carlos Prieto</contributor>
+
+  <parameters>
+    <label>Input parameters</label>
+    <description>Input parameters</description>
+
+    <image>
+      <name>inputSurface</name>
+      <label>Input surface</label>
+      <channel>input</channel>
+      <description>Input surface to probe</description>
+      <longflag>surf</longflag>
+    </image>
+
+  </parameters>
+
+  <parameters>
+    <label>Ouput parameters</label>
+    <description>Output parameters</description>
+
+    <string>
+      <name>outputName</name>
+      <label>Output directory or filename</label>
+      <channel>output</channel>
+      <description>Write the output images</description>
+      <longflag>out</longflag>
+      <default>out.vtk</default>
+    </string>
+
+  </parameters>
+</executable>
+
