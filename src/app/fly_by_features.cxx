@@ -254,8 +254,8 @@ int main(int argc, char * argv[])
     vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
     normalGenerator->SetInputData(input_mesh);
     normalGenerator->ComputePointNormalsOn();
-    normalGenerator->SplittingOff();
     normalGenerator->ComputeCellNormalsOff();
+    normalGenerator->SplittingOff();
     normalGenerator->Update();
 
     input_mesh = normalGenerator->GetOutput();
@@ -497,35 +497,36 @@ int main(int argc, char * argv[])
           input_mesh->GetCellPoints(cellId, cellPointsIds);
           
           vnl_vector<double> wavg_normal_v(3, 0);  
-          double w_distance = 0;
+          
           vtkIdType min_pointId = cellPointsIds->GetId(0);
           double min_distance = 999999999;
 
+          double closestPoint[3];
+          double dist2;
+          double weights[3];
+          //Get the weights for each point in the cell. The weights add up to 1
+          input_mesh->GetCell(cellId)->EvaluatePosition(x, closestPoint, subId, pcoords, dist2, weights);
+
           //Weighted average of the normal
           for(unsigned npid = 0; npid < cellPointsIds->GetNumberOfIds(); npid++){
-            
-            double point_mesh[3];
+
             vtkIdType pointId = cellPointsIds->GetId(npid);
+
+            double point_mesh[3];
             input_mesh->GetPoint(pointId, point_mesh);
             vnl_vector<double> point_mesh_v(point_mesh, 3);  
 
+            //Here we extract the property we want. For example the normals
             double* normal = input_mesh->GetPointData()->GetArray("Normals")->GetTuple(pointId);
             vnl_vector<double> normal_v(normal, 3);
+            wavg_normal_v += normal_v*weights[npid];
 
-            double distance = (point_mesh_v - x_v).magnitude() + 1e-8;
-            double weight = 1.0/distance;
-            wavg_normal_v += normal_v*weight;
-            w_distance += weight;
-
+            double distance = (point_mesh_v - x_v).magnitude();
             if(distance < min_distance){
               min_distance = distance;
               min_pointId = cellPointsIds->GetId(pointId);
             }
-
           }
-          
-          wavg_normal_v /= w_distance;
-          wavg_normal_v = wavg_normal_v.normalize();
           
           out_pix[0] = wavg_normal_v[0];
           out_pix[1] = wavg_normal_v[1];
