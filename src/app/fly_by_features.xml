@@ -2,7 +2,7 @@
 <executable>
   <category>Transform</category>
   <title></title>
-  <version>1.4.0</version>
+  <version>1.5.0</version>
   <description>
     Extracts features by flying around the object and probing the surfaces
   </description>
@@ -109,6 +109,33 @@
       <longflag>randomRotation</longflag>
       <default>0</default>
     </boolean>
+
+    <boolean>
+      <name>applyRotation</name>
+      <label>Apply rotation</label>
+      <channel>input</channel>
+      <description>Apply the rotation specified by the rotationAngle and rotationVector</description>
+      <longflag>applyRotation</longflag>
+      <default>0</default>
+    </boolean>
+
+    <double>
+      <name>rotationAngle</name>
+      <label>Use this rotation angle</label>
+      <channel>input</channel>
+      <description>Apply this angle of rotation</description>
+      <longflag>rotationAngle</longflag>
+      <default>0</default>
+    </double>
+
+    <double-vector>
+      <name>rotationVector</name>
+      <label>Use this rotation vector</label>
+      <channel>input</channel>
+      <description>Apply this rotation vector</description>
+      <longflag>rotationVector</longflag>
+      <default>1,0,0</default>
+    </double-vector>
 
     <boolean>
       <name>fiberBundle</name>

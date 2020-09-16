@@ -12,9 +12,8 @@
 #include <vtkLine.h>
 #include <vtkVertex.h>
 #include <vtkLineSource.h>
-#include <vtkExtractCells.h>
-#include <vtkOBBTree.h>
 #include <vtkCellLocator.h>
+#include <vtkAdaptiveSubdivisionFilter.h>
 #include <vtkPlatonicSolidSource.h>
 #include <vtkPlaneSource.h>
 #include <vtkPolyDataNormals.h>
@@ -181,7 +180,6 @@ int main(int argc, char * argv[])
   //Apply random rotation?
 
   if(randomRotation){
-    vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
 
     vnl_random rand_gen = vnl_random();
 
@@ -189,15 +187,24 @@ int main(int argc, char * argv[])
     for(unsigned i = 0; i < rot_vector.size(); i++){
       rot_vector[i] = rand_gen.normal();
     }
-    
     rot_vector.normalize();
-    
 
-    double angle = rand_gen.drand32()*360.0;
+    rotationVector.clear();
+    for(unsigned i = 0; i < rot_vector.size(); i++){
+      rotationVector.push_back(rot_vector[i]);
+    }
+    rotationAngle = rand_gen.drand32()*360.0;
 
-    cout<<"Random rotation: "<<rot_vector<<", angle: "<<angle<<endl;
+    cout<<"Random rotation!"<<endl;
+  }
 
-    transform->RotateWXYZ(angle, rot_vector[0], rot_vector[1], rot_vector[2]);
+  if(applyRotation || randomRotation){
+
+    cout<<"Apply rotation: angle: "<<rotationAngle<<", vector: "<<rotationVector[0]<<","<<rotationVector[1]<<","<<rotationVector[2]<<endl;
+
+    vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
+
+    transform->RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2]);
 
     vtkSmartPointer<vtkTransformPolyDataFilter> transformFilter = vtkSmartPointer<vtkTransformPolyDataFilter>::New();
     transformFilter->SetTransform(transform);
@@ -249,28 +256,6 @@ int main(int argc, char * argv[])
   for(unsigned i_mesh = 0; i_mesh < input_mesh_v.size(); i_mesh++){
 
     input_mesh = input_mesh_v[i_mesh];
-
-    //Generate normals from the polydata. These are features used. 
-    vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
-    normalGenerator->SetInputData(input_mesh);
-    normalGenerator->ComputePointNormalsOn();
-    normalGenerator->ComputeCellNormalsOff();
-    normalGenerator->SplittingOff();
-    normalGenerator->Update();
-
-    input_mesh = normalGenerator->GetOutput();
-
-    if(curvature){
-      //The curvature filter is not used as feature but may be used for visualization
-      vtkSmartPointer<vtkCurvatures> curvaturesFilter = vtkSmartPointer<vtkCurvatures>::New();
-      curvaturesFilter->SetInputData(input_mesh);
-      curvaturesFilter->SetCurvatureTypeToMinimum();
-      curvaturesFilter->SetCurvatureTypeToMaximum();
-      curvaturesFilter->SetCurvatureTypeToGaussian();
-      curvaturesFilter->SetCurvatureTypeToMean();
-      curvaturesFilter->Update();
-      input_mesh = curvaturesFilter->GetOutput();
-    }
 
     vnl_vector<double> mean_v = vnl_vector<double>(3, 0);
 
@@ -325,6 +310,33 @@ int main(int argc, char * argv[])
 
     //Scaling finishes
 
+    vtkSmartPointer<vtkAdaptiveSubdivisionFilter> ada_subdiv = vtkSmartPointer<vtkAdaptiveSubdivisionFilter>::New();
+    ada_subdiv->SetInputData(input_mesh);
+    ada_subdiv->SetMaximumEdgeLength (0.1);
+    ada_subdiv->Update();
+    input_mesh = ada_subdiv->GetOutput();
+
+    //Generate normals from the polydata. These are features used. 
+    vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
+    normalGenerator->SetInputData(input_mesh);
+    normalGenerator->ComputeCellNormalsOff();
+    normalGenerator->ComputePointNormalsOn();
+    normalGenerator->SplittingOff();
+    normalGenerator->Update();
+
+    input_mesh = normalGenerator->GetOutput();
+
+    if(curvature){
+      //The curvature filter is not used as feature but may be used for visualization
+      vtkSmartPointer<vtkCurvatures> curvaturesFilter = vtkSmartPointer<vtkCurvatures>::New();
+      curvaturesFilter->SetInputData(input_mesh);
+      curvaturesFilter->SetCurvatureTypeToMinimum();
+      curvaturesFilter->SetCurvatureTypeToMaximum();
+      curvaturesFilter->SetCurvatureTypeToGaussian();
+      curvaturesFilter->SetCurvatureTypeToMean();
+      curvaturesFilter->Update();
+      input_mesh = curvaturesFilter->GetOutput();
+    }
 
     //Generate OBB tree to quickly locate cells from intersections
     vtkSmartPointer<vtkCellLocator> tree = vtkSmartPointer<vtkCellLocator>::New();
@@ -473,15 +485,14 @@ int main(int argc, char * argv[])
         point_plane_v = point_plane_v*planeSpacing + sphere_point_delta_v;
         planeMesh->GetPoints()->SetPoint(j, point_plane_v.data_block());
 
-        vnl_vector<double> point_end_v = point_plane_v - sphere_point_normal_v*sphereRadius*2.0;      
+        vnl_vector<double> point_end_v = point_plane_v - sphere_point_normal_v*sphereRadius*2.0;
 
-        double tol = 1.e-8;
+        double tol = 1.e-10;
         double t;
         double x[3];
         double pcoords[3];
         int subId;
         vtkIdType cellId = -1;
-
         //Intersect line with OBB tree
         //x is the intersection point at the cell
         if(tree->IntersectWithLine(point_plane_v.data_block(), point_end_v.data_block(), tol, t, x, pcoords, subId, cellId)){
@@ -493,7 +504,6 @@ int main(int argc, char * argv[])
           vnl_vector<double> x_v = vnl_vector<double>(x, 3);
 
           vtkSmartPointer<vtkIdList> cellPointsIds = vtkSmartPointer<vtkIdList>::New();
-          
           input_mesh->GetCellPoints(cellId, cellPointsIds);
           
           vnl_vector<double> wavg_normal_v(3, 0);  
