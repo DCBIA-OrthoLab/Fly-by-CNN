@@ -310,12 +310,21 @@ int main(int argc, char * argv[])
 
     //Scaling finishes
 
-    vtkSmartPointer<vtkAdaptiveSubdivisionFilter> ada_subdiv = vtkSmartPointer<vtkAdaptiveSubdivisionFilter>::New();
-    ada_subdiv->SetInputData(input_mesh);
-    ada_subdiv->SetMaximumEdgeLength (0.1);
-    ada_subdiv->Update();
-    input_mesh = ada_subdiv->GetOutput();
-
+    //Use an adaptive subdivision filter to further subdivide your shape. 
+    //When triangles are too big, the cell locator will have trouble finding the correct triangle/intersection
+    if(adaptiveSubdivision){
+      cout<<"Using adaptive subdivision: MaximumEdgeLength: "<<adaptiveSubdivisionParams[0]<<", MaximumTriangleArea: "<<adaptiveSubdivisionParams[1]<<endl;
+      vtkSmartPointer<vtkAdaptiveSubdivisionFilter> ada_subdiv = vtkSmartPointer<vtkAdaptiveSubdivisionFilter>::New();
+      ada_subdiv->SetInputData(input_mesh);
+      if(adaptiveSubdivisionParams[0] > 0){
+        ada_subdiv->SetMaximumEdgeLength(adaptiveSubdivisionParams[0]);
+      }
+      if(adaptiveSubdivisionParams[1] > 0){
+        ada_subdiv->SetMaximumTriangleArea(adaptiveSubdivisionParams[1]);
+      }
+      ada_subdiv->Update();
+      input_mesh = ada_subdiv->GetOutput();
+    }
     //Generate normals from the polydata. These are features used. 
     vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
     normalGenerator->SetInputData(input_mesh);
@@ -370,13 +379,79 @@ int main(int argc, char * argv[])
 
       renderer = vtkSmartPointer<vtkRenderer>::New();
       renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+      renderWindow->SetSize(1900, 1900);
       renderWindow->AddRenderer(renderer);
       renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
       renderWindowInteractor->SetRenderWindow(renderWindow);
-      
-      renderer->AddActor(sphereActor);
-      renderer->AddActor(spherePointsActor);
+
       renderer->AddActor(inputActor);
+
+      if(visualizeTree){
+
+        inputActor->GetProperty()->SetColor(1.0, 153/255.0, 51/255.0);
+
+        double color_0[3] = {0.0, 1.0, 0.0};
+        vnl_vector<double> v_color_0 = vnl_vector<double>(color_0, 3);
+
+        double color_1[3] = {0.0, 0.0, 1.0};
+        vnl_vector<double> v_color_1 = vnl_vector<double>(color_1, 3);
+
+        vnl_vector<double> v_step = (v_color_1 - v_color_0)/(visualizeTreeLevel + 1.0);
+
+        for(int level = 0; level < visualizeTreeLevel; level++){
+
+          vnl_vector<double> v_color = v_color_0 + v_step*level;
+
+          vtkSmartPointer<vtkPolyData> tree_poly = vtkSmartPointer<vtkPolyData>::New();
+          tree->GenerateRepresentation(level, tree_poly);
+
+          vtkSmartPointer<vtkPolyDataMapper> tree_mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+          tree_mapper->SetInputData(tree_poly);
+          vtkSmartPointer<vtkActor> tree_actor = vtkSmartPointer<vtkActor>::New();
+          tree_actor->SetMapper(tree_mapper);
+
+          tree_actor->GetProperty()->SetInterpolationToFlat();
+          tree_actor->GetProperty()->SetRepresentationToWireframe();
+          tree_actor->GetProperty()->SetLineWidth(16.0/(level + 1.0));
+          tree_actor->GetProperty()->SetColor(v_color.data_block());
+          tree_actor->GetProperty()->SetOpacity(0.5);
+          renderer->AddActor(tree_actor);
+        }
+        
+      }else{
+        renderer->AddActor(sphereActor);
+        renderer->AddActor(spherePointsActor);
+
+        if(numberOfSpiralSamples > 0){
+            
+            vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
+            icosahedron_source->SetSolidTypeToIcosahedron();
+            icosahedron_source->Update();
+
+            vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
+            subdivision->SetInputData(icosahedron_source->GetOutput());
+            subdivision->SetNumberOfSubdivisions(10);
+            subdivision->Update();
+            sphere = subdivision->GetOutput();
+            
+            for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
+              double point[3];
+              sphere->GetPoints()->GetPoint(i, point);
+              vnl_vector<double> v = vnl_vector<double>(point, 3);
+              v = v.normalize()*sphereRadius;
+              sphere->GetPoints()->SetPoint(i, v.data_block());
+            }
+
+            vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+            sphereMapper->SetInputData(sphere);
+            vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
+            sphereActor->SetMapper(sphereMapper);
+            sphereActor->GetProperty()->SetRepresentationToWireframe();
+            sphereActor->GetProperty()->SetColor(0.8,0,0.8);
+            renderer->AddActor(sphereActor);
+      
+          }
+      }
 
       renderer->SetBackground(1, 1, 1);
       renderWindow->Render();
@@ -426,9 +501,9 @@ int main(int argc, char * argv[])
       }
       
 
-      vnl_vector<double> plane_point_origin_v = sphere_point_v - plane_orient_x_v*0.5 - plane_orient_y_v*0.5;
-      vnl_vector<double> plane_point_1_v = plane_point_origin_v + plane_orient_x_v;
-      vnl_vector<double> plane_point_2_v = plane_point_origin_v + plane_orient_y_v;
+      vnl_vector<double> plane_point_origin_v = sphere_point_v - plane_orient_x_v*0.5*planeScaleFactor - plane_orient_y_v*0.5*planeScaleFactor;
+      vnl_vector<double> plane_point_1_v = plane_point_origin_v + plane_orient_x_v*planeScaleFactor;
+      vnl_vector<double> plane_point_2_v = plane_point_origin_v + plane_orient_y_v*planeScaleFactor;
 
       //Using the calculated points create the plane
       vtkSmartPointer<vtkPlaneSource> planeSource = vtkSmartPointer<vtkPlaneSource>::New();
@@ -483,7 +558,6 @@ int main(int argc, char * argv[])
         planeMesh->GetPoints()->GetPoint(j, point_plane);
         vnl_vector<double> point_plane_v = vnl_vector<double>(point_plane, 3);
         point_plane_v = point_plane_v*planeSpacing + sphere_point_delta_v;
-        planeMesh->GetPoints()->SetPoint(j, point_plane_v.data_block());
 
         vnl_vector<double> point_end_v = point_plane_v - sphere_point_normal_v*sphereRadius*2.0;
 
@@ -570,7 +644,7 @@ int main(int argc, char * argv[])
           vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
           lineActor->SetMapper(lineMapper);
           lineActor->GetProperty()->SetLineWidth(8.0);
-          lineActor->GetProperty()->SetColor(0, 0.9, 1.0);
+          lineActor->GetProperty()->SetColor(0.4, 0, 1.0);
 
           vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
           planeMapper->SetInputData(planeMesh);
@@ -581,36 +655,6 @@ int main(int argc, char * argv[])
           
           renderer->AddActor(lineActor);
           renderer->AddActor(planeActor);
-
-          if(numberOfSpiralSamples > 0){
-            
-            vtkSmartPointer<vtkPlatonicSolidSource> icosahedron_source = vtkSmartPointer<vtkPlatonicSolidSource>::New();
-            icosahedron_source->SetSolidTypeToIcosahedron();
-            icosahedron_source->Update();
-
-            vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
-            subdivision->SetInputData(icosahedron_source->GetOutput());
-            subdivision->SetNumberOfSubdivisions(10);
-            subdivision->Update();
-            sphere = subdivision->GetOutput();
-            
-            for(unsigned i = 0; i < sphere->GetNumberOfPoints(); i++){
-              double point[3];
-              sphere->GetPoints()->GetPoint(i, point);
-              vnl_vector<double> v = vnl_vector<double>(point, 3);
-              v = v.normalize()*sphereRadius;
-              sphere->GetPoints()->SetPoint(i, v.data_block());
-            }
-
-            vtkSmartPointer<vtkPolyDataMapper> sphereMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-            sphereMapper->SetInputData(sphere);
-            vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
-            sphereActor->SetMapper(sphereMapper);
-            sphereActor->GetProperty()->SetRepresentationToWireframe();
-            sphereActor->GetProperty()->SetColor(0.8,0,0.8);
-            renderer->AddActor(sphereActor);
-      
-          }
 
           renderWindowInteractor->Start();
         }
