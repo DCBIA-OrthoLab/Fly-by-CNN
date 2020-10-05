@@ -25,17 +25,28 @@ A tangent oriented plan is then created with a certain number of points. It then
 ## Running the code
 To run the Fly-by-CNN, you mostly need to follow the following explanations but we will also explain here how to train and evaluate a model with the fly-by-cnn datas created.
 
-### Build the code
+### Building VTK-9.0
+
+When building in linux use to enable offscreen rendering!
+
+```
+VTK_USE_X=OFF
+
+VTK_OPENGL_HAS_EGL=ON
+```
+
+
+### Build the code - You can use the already compiled versions when bulding in the system
 Here are the paths useful for the cmake configuration
 ```
  ITK_DIR 
- /tools/ITK/ITKv4.13.0-gcc4.8.5/lib/cmake/ITK-4.13             
+ /tools/ITK/ITKv5.1.1/lib/cmake/ITK-5.1
 
  SlicerExecutionModel_DIR     
- /tools/devel/linux/SlicerExecutionModel/SlicerExecutionModel-build
+ /tools/devel/linux/SlicerExecutionModel/SlicerExecutionModel-build_ITKv5.1.1
 
  VTK_DIR                          
- /tools/VTK/VTK-8.1.1-opengl-gcc4.8.6/lib/cmake/vtk-8.1  
+ /tools/VTK/VTK-9.0.1-gcc4.8.5/lib64/cmake/vtk-9.0
 ```
 
 
