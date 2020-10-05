@@ -14,6 +14,10 @@ include(${ITK_USE_FILE})
 find_package(SlicerExecutionModel)
 include(${SlicerExecutionModel_USE_FILE})
 
+if (UNIX AND NOT MACOS AND VTK_OPENGL_HAS_EGL)
+	add_definitions(-DVTK_OPENGL_HAS_EGL)
+endif()
+
 SET(EXE_NAME fly_by_features)
 SET(${EXE_NAME}_LIBRARIES  ${VTK_LIBRARIES} ${ITK_LIBRARIES})
 SET(${EXE_NAME}_ADDITIONAL_SRCS fly_by_features.cxx vtkLinearSubdivisionFilter2.cxx vtkOFFReader.cxx)

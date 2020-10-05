@@ -24,6 +24,9 @@
 #include <vtkActor.h>
 #include <vtkProperty.h>
 #include <vtkRenderWindow.h>
+#ifdef VTK_OPENGL_HAS_EGL
+  #include <vtkEGLRenderWindow.h>
+#endif
 #include <vtkRenderer.h>
 #include <vtkCamera.h>
 #include <vtkShaderProperty.h>
@@ -43,8 +46,6 @@
 #include <vtkCommand.h>
 #include <vtkImageShiftScale.h>
 #include <vtkAutoInit.h>
-#include <math.h>
-#include <chrono>
 
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_cross.h>
@@ -56,8 +57,13 @@
 #include <itkComposeImageFilter.h>
 #include <itkVTKImageToImageFilter.h>
 #include <itksys/SystemTools.hxx>
+#include <itkMath.h>
+
+#include <math.h>
+#include <chrono>
 
 VTK_MODULE_INIT(vtkRenderingOpenGL2) 
+VTK_MODULE_INIT(vtkRenderingFreeType) 
 VTK_MODULE_INIT(vtkInteractionStyle) 
 
 typedef double VectorImagePixelType;
@@ -806,21 +812,27 @@ int main(int argc, char * argv[])
       }
     }else{
       vtkSmartPointer<vtkRenderer> renderer = vtkSmartPointer<vtkRenderer>::New();
-      vtkSmartPointer<vtkRenderWindow> renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
-      vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+      vtkSmartPointer<vtkRenderWindow> renderWindow;
+
+#ifdef VTK_OPENGL_HAS_EGL
+      if(visualize){
+        renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+      }else{
+        renderWindow = vtkSmartPointer<vtkEGLRenderWindow>::New();
+      }
+#else
+      renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
+#endif
       
       renderWindow->SetSize(planeResolution, planeResolution);
-      if(!visualize){
-        renderWindow->OffScreenRenderingOn();  
-      }
+      renderer->SetBackground(0, 0, 0);
       renderWindow->AddRenderer(renderer);
-      
-      renderWindowInteractor->SetRenderWindow(renderWindow);
 
-      vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+      vtkSmartPointer<vtkOpenGLPolyDataMapper> inputMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
       inputMapper->SetInputData(input_mesh);
       vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
       inputActor->SetMapper(inputMapper);
+      inputActor->GetProperty()->SetInterpolationToPhong();
       renderer->AddActor(inputActor);
 
       vtkShaderProperty* sp = inputActor->GetShaderProperty();
@@ -863,32 +875,120 @@ int main(int argc, char * argv[])
           false                                          // only do it once
       );
 
-      renderWindowInteractor->Initialize();
-
       vtkSmartPointer<vtkCamera> camera = renderer->GetActiveCamera();
-
       vtkSmartPointer<vtkPoints> spherePoints = sphere->GetPoints();
       
-      vtkSmartPointer<vtkTimerCallback2> cb = vtkSmartPointer<vtkTimerCallback2>::New();
-      cb->camera = camera;
-      cb->spherePoints = spherePoints;
-      cb->planeResolution = planeResolution;
-      cb->renderer = renderer;
+      // vtkSmartPointer<vtkTimerCallback2> cb = vtkSmartPointer<vtkTimerCallback2>::New();
+      // cb->camera = camera;
+      // cb->spherePoints = spherePoints;
+      // cb->planeResolution = planeResolution;
+      // cb->renderer = renderer;
 
-      renderWindowInteractor->AddObserver(vtkCommand::TimerEvent, cb);
+      // renderWindowInteractor->AddObserver(vtkCommand::TimerEvent, cb);
 
-      int timerId;
+      // int timerId;
 
-      if(visualize){
-        timerId = renderWindowInteractor->CreateRepeatingTimer(100);  
-      }else{
-        timerId = renderWindowInteractor->CreateRepeatingTimer(1);
-      }
+      // if(visualize){
+      //   timerId = renderWindowInteractor->CreateRepeatingTimer(100);  
+      // }else{
+      //   timerId = renderWindowInteractor->CreateRepeatingTimer(1);
+      // }
       
-      cb->timerId = timerId;
+      // cb->timerId = timerId;
+      
+      // renderWindowInteractor->Start();
+      // compose_v = cb->compose_v;
 
-      renderWindowInteractor->Start();
-      compose_v = cb->compose_v;
+      for(int sphere_i = 0; sphere_i < spherePoints->GetNumberOfPoints(); sphere_i++){
+        double sphere_point[3];
+        spherePoints->GetPoint(sphere_i, sphere_point);
+        
+        vnl_vector<double> sphere_point_v = vnl_vector<double>(sphere_point, 3);
+        sphere_point_v = sphere_point_v.normalize();
+        if(abs(sphere_point_v[2]) != 1){
+          camera->SetViewUp(0, 0, -1);  
+        }else if(sphere_point_v[2] == 1){
+          camera->SetViewUp(1, 0, 0);
+        }else if(sphere_point_v[2] == -1){
+          camera->SetViewUp(-1, 0, 0);
+        }
+        camera->SetPosition(sphere_point[0], sphere_point[1], sphere_point[2]);
+        camera->SetFocalPoint(0, 0, 0);
+
+        renderer->ResetCameraClippingRange();
+
+        if(visualize){
+          vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+          renderWindowInteractor->SetRenderWindow(renderWindow);
+          renderWindowInteractor->Start();
+        }
+
+        vtkSmartPointer<vtkWindowToImageFilter> windowFilterNormals = vtkSmartPointer<vtkWindowToImageFilter>::New();
+        windowFilterNormals->SetInput(renderWindow);
+        windowFilterNormals->SetInputBufferTypeToRGB(); //also record the alpha (transparency) channel
+        windowFilterNormals->Update();
+
+        vtkSmartPointer<vtkWindowToImageFilter> windowFilterZ = vtkSmartPointer<vtkWindowToImageFilter>::New();
+        windowFilterZ->SetInput(renderWindow);
+        windowFilterZ->SetInputBufferTypeToZBuffer(); //also record the alpha (transparency) channel
+        windowFilterZ->Update();
+
+        vtkSmartPointer<vtkImageShiftScale> scale = vtkSmartPointer<vtkImageShiftScale>::New();
+        scale->SetOutputScalarTypeToUnsignedChar();
+        scale->SetInputData(windowFilterZ->GetOutput());
+        scale->SetShift(0);
+        scale->SetScale(-255);
+        scale->Update();
+
+        VTKImageToImageFilterType::Pointer convert_image = VTKImageToImageFilterType::New();
+        convert_image->SetInput(windowFilterNormals->GetOutput());
+        convert_image->Update();
+        ImageType::Pointer vtk_img = convert_image->GetOutput();
+
+        ZVTKImageToImageFilterType::Pointer convert_image_z = ZVTKImageToImageFilterType::New();
+        convert_image_z->SetInput(scale->GetOutput());
+        convert_image_z->Update();
+        ZImageType::Pointer z_img = convert_image_z->GetOutput();
+        
+
+        VectorImagePointerType out_image_feat = VectorImageType::New();
+        VectorImageType::SizeType size;
+        size[0] = planeResolution;
+        size[1] = planeResolution;
+        VectorImageType::RegionType region;
+        region.SetSize(size);
+        
+        out_image_feat->SetRegions(region);
+        out_image_feat->SetVectorLength(4);
+        out_image_feat->Allocate();
+        VectorImageType::PixelType out_pix(4);
+        out_pix.Fill(0);
+        out_image_feat->FillBuffer(out_pix);
+
+        VectorImageIteratorType out_it = VectorImageIteratorType(out_image_feat, out_image_feat->GetLargestPossibleRegion());
+        out_it.GoToBegin();
+
+        ImageIteratorType it = ImageIteratorType(vtk_img, vtk_img->GetLargestPossibleRegion());
+        it.GoToBegin();
+
+        ZImageIteratorType zit = ZImageIteratorType(z_img, z_img->GetLargestPossibleRegion());
+        zit.GoToBegin();
+
+        while(!out_it.IsAtEnd() && !it.IsAtEnd() && !zit.IsAtEnd()){
+
+          out_pix[0] = it.Get()[0];
+          out_pix[1] = it.Get()[1];
+          out_pix[2] = it.Get()[2];
+          out_pix[3] = zit.Get();
+          out_it.Set(out_pix);
+
+          ++out_it;
+          ++it;
+          ++zit;
+        }
+
+        compose_v.push_back(out_image_feat);
+      }
     }
 
     //Process the stack of images to generate a single volume
