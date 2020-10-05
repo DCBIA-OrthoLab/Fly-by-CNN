@@ -7,6 +7,7 @@
 #include "vtkInformation.h"
 #include "vtkInformationVector.h"
 #include <map>
+#include <vtkIncrementalOctreePointLocator.h>
 
 class vtkIntArray;
 class vtkPointData;
@@ -53,6 +54,12 @@ protected:
   int vtkSubdivisionFilterRequestData(vtkInformation *,
                                       vtkInformationVector **, 
                                       vtkInformationVector *);
+
+  vtkIdType InterpolatePosition(vtkPoints* inputPts, 
+                                vtkPoints* outputPts, 
+                                vtkIdList* stencil, 
+                                double* weights, 
+                                vtkIncrementalOctreePointLocator* incremental);
 
 private:
   vtkLinearSubdivisionFilter2(const vtkLinearSubdivisionFilter2&) = delete;

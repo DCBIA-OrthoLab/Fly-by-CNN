@@ -13,8 +13,6 @@
 #include <string>
 #include <sstream>
 
-#include "vtkCleanPolyData.h"
-
 vtkStandardNewMacro(vtkLinearSubdivisionFilter2);
 
 
@@ -46,11 +44,6 @@ int vtkLinearSubdivisionFilter2::RequestData(vtkInformation * request,
   vtkPointData *outputPD;
   vtkCellData *outputCD;
   vtkIntArray *edgeData;
-
-  vtkSmartPointer<vtkCleanPolyData> cleaner =
-      vtkSmartPointer<vtkCleanPolyData>::New();
-
-
 
   //
   // Initialize and check input
@@ -118,13 +111,10 @@ int vtkLinearSubdivisionFilter2::RequestData(vtkInformation * request,
   inputDS->GetCellData()->PassData(outputCD); outputCD->Delete();
   inputDS->Squeeze();
 
-  cleaner->SetInputData(inputDS);
-  cleaner->Update();
-
-  output->SetPoints(cleaner->GetOutput()->GetPoints());
-  output->SetPolys(cleaner->GetOutput()->GetPolys());
-  output->GetPointData()->PassData(cleaner->GetOutput()->GetPointData());
-  output->GetCellData()->PassData(cleaner->GetOutput()->GetCellData());
+  output->SetPoints(inputDS->GetPoints());
+  output->SetPolys(inputDS->GetPolys());
+  output->GetPointData()->PassData(inputDS->GetPointData());
+  output->GetCellData()->PassData(inputDS->GetCellData());
   inputDS->Delete();
 
   return 1;
@@ -201,6 +191,12 @@ int vtkLinearSubdivisionFilter2::GenerateSubdivisionPoints (vtkPolyData *inputDS
 
   int subdivisions = this->GetNumberOfSubdivisions();
 
+  vtkSmartPointer<vtkIncrementalOctreePointLocator> incremental = vtkSmartPointer<vtkIncrementalOctreePointLocator>::New();
+  incremental->SetDataSet(inputDS);
+  incremental->BuildLocator();
+
+  incremental->InitPointInsertion(outputPts, inputDS->GetBounds());
+
   // Create an edge table to keep track of which edges we've processed
   edgeTable->InitEdgeInsertion(inputDS->GetNumberOfPoints());
 
@@ -235,7 +231,7 @@ int vtkLinearSubdivisionFilter2::GenerateSubdivisionPoints (vtkPolyData *inputDS
       //get the weights
       double weights[3] = {weight_array[i][0],weight_array[i][1],weight_array[i][2]};
       //generate new point and his associated point data
-      newId = this->InterpolatePosition(inputPts,outputPts,pointIds,weights);
+      newId = this->InterpolatePosition(inputPts,outputPts,pointIds,weights, incremental);
       outputPD->InterpolatePoint(inputPD,newId,pointIds,weights);
       newIds.push_back(newId);
     }
@@ -274,7 +270,32 @@ int vtkLinearSubdivisionFilter2::GenerateSubdivisionPoints (vtkPolyData *inputDS
   return 1;
 }
 
+vtkIdType vtkLinearSubdivisionFilter2::InterpolatePosition(
+  vtkPoints* inputPts, vtkPoints* outputPts, vtkIdList* stencil, double* weights, vtkIncrementalOctreePointLocator* incremental)
+{
+  double xx[3], x[3];
+  int i, j;
 
+  for (j = 0; j < 3; j++)
+  {
+    x[j] = 0.0;
+  }
+
+  for (i = 0; i < stencil->GetNumberOfIds(); i++)
+  {
+    inputPts->GetPoint(stencil->GetId(i), xx);
+    for (j = 0; j < 3; j++)
+    {
+      x[j] += xx[j] * weights[i];
+    }
+  }
+
+  vtkIdType outId;
+
+  incremental->InsertUniquePoint(x, outId);
+
+  return outId;
+}
 
 
 int vtkLinearSubdivisionFilter2::vtkSubdivisionFilterRequestData(
