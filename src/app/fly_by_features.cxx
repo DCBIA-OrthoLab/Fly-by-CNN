@@ -46,6 +46,7 @@
 #include <vtkCommand.h>
 #include <vtkImageShiftScale.h>
 #include <vtkAutoInit.h>
+#include <vtkImageMathematics.h>
 
 #include <vnl/vnl_vector.h>
 #include <vnl/vnl_cross.h>
@@ -54,10 +55,12 @@
 #include <itkVectorImage.h>
 #include <itkImageFileWriter.h>
 #include <itkImageRegionIterator.h>
-#include <itkComposeImageFilter.h>
 #include <itkVTKImageToImageFilter.h>
 #include <itksys/SystemTools.hxx>
 #include <itkMath.h>
+#include <itkMultiplyImageFilter.h>
+#include <itkCastImageFilter.h>
+#include <itkAbsImageFilter.h>
 
 #include <math.h>
 #include <chrono>
@@ -66,25 +69,36 @@ VTK_MODULE_INIT(vtkRenderingOpenGL2)
 VTK_MODULE_INIT(vtkRenderingFreeType) 
 VTK_MODULE_INIT(vtkInteractionStyle) 
 
-typedef double VectorImagePixelType;
-typedef itk::VectorImage<VectorImagePixelType, 2> VectorImageType;  
-typedef VectorImageType::Pointer VectorImagePointerType;  
-typedef itk::ImageRegionIterator<VectorImageType> VectorImageIteratorType;
-typedef itk::ImageFileWriter<VectorImageType> VectorImageFileWriterType;
+// typedef double VectorImagePixelType;
+// typedef itk::VectorImage<VectorImagePixelType, 2> VectorImageType;  
+// typedef VectorImageType::Pointer VectorImagePointerType;  
+// typedef itk::ImageRegionIterator<VectorImageType> VectorImageIteratorType;
+// typedef itk::ImageFileWriter<VectorImageType> VectorImageFileWriterType;
 
-typedef itk::VectorImage<VectorImagePixelType, 3> VectorImageComposeType; 
-typedef itk::ImageRegionIterator<VectorImageComposeType> VectorImageComposeIteratorType;
-typedef itk::ImageFileWriter<VectorImageComposeType> VectorImageComposeFileWriterType; 
+// typedef itk::VectorImage<VectorImagePixelType, 3> VectorImageComposeType; 
+// typedef itk::ImageRegionIterator<VectorImageComposeType> VectorImageComposeIteratorType;
+// typedef itk::ImageFileWriter<VectorImageComposeType> VectorImageComposeFileWriterType; 
 
-typedef unsigned char PixelComponentType;
+typedef itk::Image<itk::RGBPixel<unsigned char>, 2> ImageUCType;
+
+typedef double PixelComponentType;
 typedef itk::RGBPixel<PixelComponentType> RGBPixelType;
 typedef itk::Image<RGBPixelType, 2> ImageType;
-typedef itk::VTKImageToImageFilter<ImageType> VTKImageToImageFilterType;
-typedef itk::ImageRegionIterator<ImageType> ImageIteratorType;
+typedef itk::Image<RGBPixelType, 3> ImageComposeType;
+typedef itk::ImageFileWriter<ImageType> ImageFileWriterType;
+typedef itk::ImageFileWriter<ImageComposeType> ImageComposeFileWriterType;
 
-typedef itk::Image<PixelComponentType, 2> ZImageType;
+typedef itk::VTKImageToImageFilter<ImageUCType> VTKImageToImageType;
+typedef itk::CastImageFilter<ImageUCType, ImageType> CastImageFilterType;
+typedef itk::ImageRegionIterator<ImageType> ImageIteratorType;
+typedef itk::ImageRegionIterator<ImageComposeType> ImageComposeIteratorType;
+
+
+typedef itk::Image<double, 2> ZImageType;
 typedef itk::VTKImageToImageFilter<ZImageType> ZVTKImageToImageFilterType;
-typedef itk::ImageRegionIterator<ZImageType> ZImageIteratorType;
+typedef itk::AbsImageFilter<ZImageType, ZImageType> ZAbsImageType;
+
+typedef itk::MultiplyImageFilter<ImageType, ZImageType, ImageType> MultiplyImageFilterType;
 
 using namespace std;
 using namespace itksys;
@@ -112,90 +126,6 @@ public:
     if (this->sphere_i < this->spherePoints->GetNumberOfPoints())
     {
 
-      vtkRenderWindowInteractor* iren = dynamic_cast<vtkRenderWindowInteractor*>(caller);
-      vtkRenderWindow* renderWindow = iren->GetRenderWindow();
-
-      double sphere_point[3];
-      this->spherePoints->GetPoint(this->sphere_i, sphere_point);
-
-      if(renderWindow->GetOffScreenRendering()){
-        this->camera->SetViewUp(0, 0, -1);  
-      }else{
-        this->camera->SetViewUp(0, 0, 1);
-      }
-      
-      this->camera->SetPosition(sphere_point[0], sphere_point[1], sphere_point[2]);
-      this->camera->SetFocalPoint(0, 0, 0);
-
-      this->renderer->ResetCameraClippingRange();
-
-      renderWindow->Render();
-
-      vtkSmartPointer<vtkWindowToImageFilter> windowFilterNormals = vtkSmartPointer<vtkWindowToImageFilter>::New();
-      windowFilterNormals->SetInput(renderWindow);
-      windowFilterNormals->SetInputBufferTypeToRGB(); //also record the alpha (transparency) channel
-      windowFilterNormals->Update();
-
-      vtkSmartPointer<vtkWindowToImageFilter> windowFilterZ = vtkSmartPointer<vtkWindowToImageFilter>::New();
-      windowFilterZ->SetInput(renderWindow);
-      windowFilterZ->SetInputBufferTypeToZBuffer(); //also record the alpha (transparency) channel
-      windowFilterZ->Update();
-
-      vtkSmartPointer<vtkImageShiftScale> scale = vtkSmartPointer<vtkImageShiftScale>::New();
-      scale->SetOutputScalarTypeToUnsignedChar();
-      scale->SetInputData(windowFilterZ->GetOutput());
-      scale->SetShift(0);
-      scale->SetScale(-255);
-      scale->Update();
-
-      VTKImageToImageFilterType::Pointer convert_image = VTKImageToImageFilterType::New();
-      convert_image->SetInput(windowFilterNormals->GetOutput());
-      convert_image->Update();
-      ImageType::Pointer vtk_img = convert_image->GetOutput();
-
-      ZVTKImageToImageFilterType::Pointer convert_image_z = ZVTKImageToImageFilterType::New();
-      convert_image_z->SetInput(scale->GetOutput());
-      convert_image_z->Update();
-      ZImageType::Pointer z_img = convert_image_z->GetOutput();
-      
-
-      VectorImagePointerType out_image_feat = VectorImageType::New();
-      VectorImageType::SizeType size;
-      size[0] = this->planeResolution;
-      size[1] = this->planeResolution;
-      VectorImageType::RegionType region;
-      region.SetSize(size);
-      
-      out_image_feat->SetRegions(region);
-      out_image_feat->SetVectorLength(4);
-      out_image_feat->Allocate();
-      VectorImageType::PixelType out_pix(4);
-      out_pix.Fill(0);
-      out_image_feat->FillBuffer(out_pix);
-
-      VectorImageIteratorType out_it = VectorImageIteratorType(out_image_feat, out_image_feat->GetLargestPossibleRegion());
-      out_it.GoToBegin();
-
-      ImageIteratorType it = ImageIteratorType(vtk_img, vtk_img->GetLargestPossibleRegion());
-      it.GoToBegin();
-
-      ZImageIteratorType zit = ZImageIteratorType(z_img, z_img->GetLargestPossibleRegion());
-      zit.GoToBegin();
-
-      while(!out_it.IsAtEnd() && !it.IsAtEnd() && !zit.IsAtEnd()){
-
-        out_pix[0] = it.Get()[0];
-        out_pix[1] = it.Get()[1];
-        out_pix[2] = it.Get()[2];
-        out_pix[3] = zit.Get();
-        out_it.Set(out_pix);
-
-        ++out_it;
-        ++it;
-        ++zit;
-      }
-
-      this->compose_v.push_back(out_image_feat);
     }
     else
     {
@@ -214,7 +144,7 @@ public:
   int sphere_i = -1;
   vtkPoints* spherePoints = nullptr;
   int planeResolution = 0;
-  vector<VectorImageType::Pointer> compose_v;
+  vector<ImageType::Pointer> compose_v;
   int timerId = 0;
 };
 
@@ -467,7 +397,7 @@ int main(int argc, char * argv[])
     //Use an adaptive subdivision filter to further subdivide your shape. 
     //When triangles are too big, the cell locator will have trouble finding the correct triangle/intersection
     
-    vector<VectorImageType::Pointer> compose_v;
+    vector<ImageType::Pointer> compose_v;
     
     //Generate normals from the polydata. These are features used.
     if(curvature){
@@ -660,39 +590,38 @@ int main(int argc, char * argv[])
         vtkSmartPointer<vtkPolyData> planeMesh = planeSource->GetOutput();
 
         //Create the image that will hold the features
-        VectorImagePointerType out_image_feat = VectorImageType::New();
-        VectorImageType::SizeType size;
+        ImageType::Pointer out_image_feat = ImageType::New();
+        ImageType::SizeType size;
         size[0] = planeResolution;
         size[1] = planeResolution;
-        VectorImageType::RegionType region;
+        ImageType::RegionType region;
         region.SetSize(size);
         
         out_image_feat->SetRegions(region);
-        out_image_feat->SetVectorLength(numFeatures);
         out_image_feat->Allocate();
-        VectorImageType::PixelType out_pix(numFeatures);
-        out_pix.Fill(-2);
+        ImageType::PixelType out_pix;
+        out_pix.Fill(0);
         out_image_feat->FillBuffer(out_pix);
 
-        VectorImageIteratorType out_it = VectorImageIteratorType(out_image_feat, out_image_feat->GetLargestPossibleRegion());
+        ImageIteratorType out_it = ImageIteratorType(out_image_feat, out_image_feat->GetLargestPossibleRegion());
         out_it.GoToBegin();
 
-        VectorImagePointerType out_image_label;
-        VectorImageIteratorType out_it_label; 
+        ImageType::Pointer out_image_label;
+        ImageIteratorType out_it_label; 
 
         //Create the label image if we are extracting labeled regions
         if(createRegionLabels){
-          out_image_label = VectorImageType::New();
+          // out_image_label = VectorImageType::New();
 
-          out_image_label->SetRegions(region);
-          out_image_label->SetVectorLength(1);
-          out_image_label->Allocate();
-          VectorImageType::PixelType out_pix_label(1);
-          out_pix_label.Fill(0);
-          out_image_label->FillBuffer(out_pix_label);
+          // out_image_label->SetRegions(region);
+          // out_image_label->SetVectorLength(1);
+          // out_image_label->Allocate();
+          // VectorImageType::PixelType out_pix_label(1);
+          // out_pix_label.Fill(0);
+          // out_image_label->FillBuffer(out_pix_label);
 
-          out_it_label = VectorImageIteratorType(out_image_label, out_image_label->GetLargestPossibleRegion());
-          out_it_label.GoToBegin();  
+          // out_it_label = VectorImageIteratorType(out_image_label, out_image_label->GetLargestPossibleRegion());
+          // out_it_label.GoToBegin();  
         }
         
         bool writeImage = false;
@@ -718,7 +647,7 @@ int main(int argc, char * argv[])
 
             writeImage = true;
 
-            VectorImageType::PixelType out_pix = out_it.Get();
+            ImageType::PixelType out_pix = out_it.Get();
 
             vnl_vector<double> x_v = vnl_vector<double>(x, 3);
 
@@ -757,18 +686,18 @@ int main(int argc, char * argv[])
               }
             }
             
-            out_pix[0] = wavg_normal_v[0];
-            out_pix[1] = wavg_normal_v[1];
-            out_pix[2] = wavg_normal_v[2];  
+            double z = (point_plane_v - x_v).magnitude();
+            out_pix[0] = (wavg_normal_v[0]*0.5 + 0.5)*z;
+            out_pix[1] = (wavg_normal_v[1]*0.5 + 0.5)*z;
+            out_pix[2] = (wavg_normal_v[2]*0.5 + 0.5)*z;  
             
             //Distance from plane to mesh (depth map)
-            out_pix[3] = (point_plane_v - x_v).magnitude();
             out_it.Set(out_pix);
 
             if(createRegionLabels){
-              VectorImageType::PixelType out_pix_label = out_it_label.Get();
-              out_pix_label[0] = input_mesh->GetPointData()->GetArray(regionLabels.c_str())->GetTuple(min_pointId)[0] + 1;
-              out_it_label.Set(out_pix_label);
+              // VectorImageType::PixelType out_pix_label = out_it_label.Get();
+              // out_pix_label[0] = input_mesh->GetPointData()->GetArray(regionLabels.c_str())->GetTuple(min_pointId)[0] + 1;
+              // out_it_label.Set(out_pix_label);
             }
             
           }
@@ -828,7 +757,7 @@ int main(int argc, char * argv[])
       renderer->SetBackground(0, 0, 0);
       renderWindow->AddRenderer(renderer);
 
-      vtkSmartPointer<vtkOpenGLPolyDataMapper> inputMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
+      vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
       inputMapper->SetInputData(input_mesh);
       vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
       inputActor->SetMapper(inputMapper);
@@ -871,12 +800,9 @@ int main(int argc, char * argv[])
           "//VTK::Normal::Impl",  // replace the normal block
           true,                   // before the standard replacements
           "//VTK::Normal::Impl\n" // we still want the default calc
-          "  diffuseColor = myNormalMCVSOutput*0.5f + 1.0f;\n", // but we add this
+          "  diffuseColor = myNormalMCVSOutput*0.5f + 0.5f;\n", // but we add this
           false                                          // only do it once
       );
-
-      vtkSmartPointer<vtkCamera> camera = renderer->GetActiveCamera();
-      vtkSmartPointer<vtkPoints> spherePoints = sphere->GetPoints();
       
       // vtkSmartPointer<vtkTimerCallback2> cb = vtkSmartPointer<vtkTimerCallback2>::New();
       // cb->camera = camera;
@@ -898,13 +824,14 @@ int main(int argc, char * argv[])
       
       // renderWindowInteractor->Start();
       // compose_v = cb->compose_v;
+      vtkSmartPointer<vtkCamera> camera = renderer->GetActiveCamera();
+      vtkSmartPointer<vtkPoints> spherePoints = sphere->GetPoints();
 
       for(int sphere_i = 0; sphere_i < spherePoints->GetNumberOfPoints(); sphere_i++){
         double sphere_point[3];
         spherePoints->GetPoint(sphere_i, sphere_point);
+        vnl_vector<double> sphere_point_v = vnl_vector<double>(sphere_point, 3).normalize();
         
-        vnl_vector<double> sphere_point_v = vnl_vector<double>(sphere_point, 3);
-        sphere_point_v = sphere_point_v.normalize();
         if(abs(sphere_point_v[2]) != 1){
           camera->SetViewUp(0, 0, -1);  
         }else if(sphere_point_v[2] == 1){
@@ -913,9 +840,11 @@ int main(int argc, char * argv[])
           camera->SetViewUp(-1, 0, 0);
         }
         camera->SetPosition(sphere_point[0], sphere_point[1], sphere_point[2]);
-        camera->SetFocalPoint(0, 0, 0);
+        camera->SetFocalPoint(0, 0, 0);  
+        
 
         renderer->ResetCameraClippingRange();
+        renderWindow->Render();
 
         if(visualize){
           vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
@@ -925,69 +854,43 @@ int main(int argc, char * argv[])
 
         vtkSmartPointer<vtkWindowToImageFilter> windowFilterNormals = vtkSmartPointer<vtkWindowToImageFilter>::New();
         windowFilterNormals->SetInput(renderWindow);
-        windowFilterNormals->SetInputBufferTypeToRGB(); //also record the alpha (transparency) channel
+        windowFilterNormals->SetInputBufferTypeToRGB();
         windowFilterNormals->Update();
+
+        VTKImageToImageType::Pointer convert_image = VTKImageToImageType::New();
+        convert_image->SetInput(windowFilterNormals->GetOutput());
+        convert_image->Update();
+
+        CastImageFilterType::Pointer cast = CastImageFilterType::New();
+        cast->SetInput(convert_image->GetOutput());
+        cast->Update();
 
         vtkSmartPointer<vtkWindowToImageFilter> windowFilterZ = vtkSmartPointer<vtkWindowToImageFilter>::New();
         windowFilterZ->SetInput(renderWindow);
-        windowFilterZ->SetInputBufferTypeToZBuffer(); //also record the alpha (transparency) channel
+        windowFilterZ->SetInputBufferTypeToZBuffer();
         windowFilterZ->Update();
 
         vtkSmartPointer<vtkImageShiftScale> scale = vtkSmartPointer<vtkImageShiftScale>::New();
-        scale->SetOutputScalarTypeToUnsignedChar();
-        scale->SetInputData(windowFilterZ->GetOutput());
+        scale->SetOutputScalarTypeToDouble();
+        scale->SetInputConnection(windowFilterZ->GetOutputPort());
         scale->SetShift(0);
-        scale->SetScale(-255);
+        scale->SetScale(-1.0);
         scale->Update();
 
-        VTKImageToImageFilterType::Pointer convert_image = VTKImageToImageFilterType::New();
-        convert_image->SetInput(windowFilterNormals->GetOutput());
-        convert_image->Update();
-        ImageType::Pointer vtk_img = convert_image->GetOutput();
+        ZVTKImageToImageFilterType::Pointer convert_zimage = ZVTKImageToImageFilterType::New();
+        convert_zimage->SetInput(scale->GetOutput());
+        convert_zimage->Update();
 
-        ZVTKImageToImageFilterType::Pointer convert_image_z = ZVTKImageToImageFilterType::New();
-        convert_image_z->SetInput(scale->GetOutput());
-        convert_image_z->Update();
-        ZImageType::Pointer z_img = convert_image_z->GetOutput();
+        ZAbsImageType::Pointer zabs = ZAbsImageType::New();
+        zabs->SetInput(convert_zimage->GetOutput());
+        zabs->Update();
+
+        MultiplyImageFilterType::Pointer multiply = MultiplyImageFilterType::New();
+        multiply->SetInput1(cast->GetOutput());
+        multiply->SetInput2(zabs->GetOutput());
+        multiply->Update();
         
-
-        VectorImagePointerType out_image_feat = VectorImageType::New();
-        VectorImageType::SizeType size;
-        size[0] = planeResolution;
-        size[1] = planeResolution;
-        VectorImageType::RegionType region;
-        region.SetSize(size);
-        
-        out_image_feat->SetRegions(region);
-        out_image_feat->SetVectorLength(4);
-        out_image_feat->Allocate();
-        VectorImageType::PixelType out_pix(4);
-        out_pix.Fill(0);
-        out_image_feat->FillBuffer(out_pix);
-
-        VectorImageIteratorType out_it = VectorImageIteratorType(out_image_feat, out_image_feat->GetLargestPossibleRegion());
-        out_it.GoToBegin();
-
-        ImageIteratorType it = ImageIteratorType(vtk_img, vtk_img->GetLargestPossibleRegion());
-        it.GoToBegin();
-
-        ZImageIteratorType zit = ZImageIteratorType(z_img, z_img->GetLargestPossibleRegion());
-        zit.GoToBegin();
-
-        while(!out_it.IsAtEnd() && !it.IsAtEnd() && !zit.IsAtEnd()){
-
-          out_pix[0] = it.Get()[0];
-          out_pix[1] = it.Get()[1];
-          out_pix[2] = it.Get()[2];
-          out_pix[3] = zit.Get();
-          out_it.Set(out_pix);
-
-          ++out_it;
-          ++it;
-          ++zit;
-        }
-
-        compose_v.push_back(out_image_feat);
+        compose_v.push_back(multiply->GetOutput());
       }
     }
 
@@ -996,30 +899,29 @@ int main(int argc, char * argv[])
 
       if(flyByCompose){
 
-        VectorImageComposeType::Pointer out_compose = VectorImageComposeType::New();
-        VectorImageComposeType::SizeType size;
+        ImageComposeType::Pointer out_compose = ImageComposeType::New();
+        ImageComposeType::SizeType size;
         size[0] = planeResolution;
         size[1] = planeResolution;
         size[2] = compose_v.size();
 
-        VectorImageComposeType::RegionType region;
+        ImageComposeType::RegionType region;
         region.SetSize(size);
         
         out_compose->SetRegions(region);
-        out_compose->SetVectorLength(numFeatures);
         out_compose->Allocate();
-        VectorImageType::PixelType out_pix(numFeatures);
-        out_pix.Fill(-1);
+        ImageComposeType::PixelType out_pix;
+        out_pix.Fill(0);
         out_compose->FillBuffer(out_pix);
 
         double out_spacing[3] = {planeSpacing, planeSpacing, 1};
         out_compose->SetSpacing(out_spacing);
 
-        VectorImageComposeIteratorType out_c_it = VectorImageComposeIteratorType(out_compose, out_compose->GetLargestPossibleRegion());
+        ImageComposeIteratorType out_c_it = ImageComposeIteratorType(out_compose, out_compose->GetLargestPossibleRegion());
         out_c_it.GoToBegin();
 
         for(unsigned i = 0; i < compose_v.size(); i++){
-          VectorImageIteratorType out_it = VectorImageIteratorType(compose_v[i], compose_v[i]->GetLargestPossibleRegion());
+          ImageIteratorType out_it = ImageIteratorType(compose_v[i], compose_v[i]->GetLargestPossibleRegion());
           out_it.GoToBegin();
 
           while(!out_it.IsAtEnd()){
@@ -1029,24 +931,12 @@ int main(int argc, char * argv[])
           }
         }
 
-        if(fiberBundle){
-          char buf[50];
-          sprintf(buf, "%d", i_mesh);
-          string outputFileName = outputName + "/" + string(buf) + ".nrrd";
-          cout<<"Writing: "<<outputFileName<<endl;
-          VectorImageComposeFileWriterType::Pointer writer = VectorImageComposeFileWriterType::New();
-          writer->SetFileName(outputFileName);
-          writer->SetInput(out_compose);
-          writer->UseCompressionOn();
-          writer->Update();
-        }else{
-          cout<<"Writing: "<<outputName<<endl;
-          VectorImageComposeFileWriterType::Pointer writer = VectorImageComposeFileWriterType::New();
-          writer->SetFileName(outputName);
-          writer->SetInput(out_compose);
-          writer->UseCompressionOn();
-          writer->Update();
-        }
+        cout<<"Writing: "<<outputName<<endl;
+        ImageComposeFileWriterType::Pointer writer = ImageComposeFileWriterType::New();
+        writer->SetFileName(outputName);
+        writer->SetInput(out_compose);
+        writer->UseCompressionOn();
+        writer->Update(); 
 
       }else{
 
@@ -1070,7 +960,7 @@ int main(int argc, char * argv[])
 
           cout<<"Writing: "<<outputFileName<<endl;
 
-          VectorImageFileWriterType::Pointer writer = VectorImageFileWriterType::New();
+          ImageFileWriterType::Pointer writer = ImageFileWriterType::New();
           writer->SetFileName(outputFileName);
           writer->SetInput(compose_v[i]);
           writer->UseCompressionOn();
