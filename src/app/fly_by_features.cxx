@@ -17,6 +17,9 @@
 #include <vtkPlaneSource.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkPolyDataReader.h>
+//vtkOBJPolyDataProcessor
+#include <vtkOBJImporterInternals.h>
+#include <vtkAppendPolyData.h>
 #include <vtkOBJReader.h>
 #include <vtkPolyDataMapper.h>
 #include <vtkOpenGLPolyDataMapper.h>
@@ -122,14 +125,28 @@ public:
     {
       this->sphere_i++;
     }
-    
+    vtkRenderWindowInteractor* iren = dynamic_cast<vtkRenderWindowInteractor*>(caller);
+
     if (this->sphere_i < this->spherePoints->GetNumberOfPoints())
     {
+      double sphere_point[3];
+      spherePoints->GetPoint(this->sphere_i, sphere_point);
+      vnl_vector<double> sphere_point_v = vnl_vector<double>(sphere_point, 3).normalize();
+      
+      if(abs(sphere_point_v[2]) != 1){
+        this->camera->SetViewUp(0, 0, 1);  
+      }else if(sphere_point_v[2] == 1){
+        this->camera->SetViewUp(-1, 0, 0);
+      }else if(sphere_point_v[2] == -1){
+        this->camera->SetViewUp(1, 0, 0);
+      }
+      this->camera->SetPosition(sphere_point[0], sphere_point[1], sphere_point[2]);
+      this->camera->SetFocalPoint(0, 0, 0);  
 
+      iren->GetRenderWindow()->Render();
     }
     else
     {
-      vtkRenderWindowInteractor* iren = dynamic_cast<vtkRenderWindowInteractor*>(caller);
       if (this->timerId > -1)
       {
         iren->DestroyTimer(this->timerId);
@@ -139,12 +156,9 @@ public:
   }
 
 public:
-  vtkRenderer* renderer;
   vtkCamera* camera = nullptr;
   int sphere_i = -1;
   vtkPoints* spherePoints = nullptr;
-  int planeResolution = 0;
-  vector<ImageType::Pointer> compose_v;
   int timerId = 0;
 };
 
@@ -224,7 +238,7 @@ int main(int argc, char * argv[])
     }
     
     sphere->SetVerts(vertices);
-    sphere->SetLines(lines);
+    sphere->SetPolys(lines);
     sphere->SetPoints(sphere_points);
 
   }else{
@@ -248,10 +262,31 @@ int main(int argc, char * argv[])
     reader->Update();
     input_mesh = reader->GetOutput();  
   }else if(extension.compare(".obj") == 0 || extension.compare(".OBJ") == 0){
-    vtkSmartPointer<vtkOBJReader> reader = vtkSmartPointer<vtkOBJReader>::New();
-    reader->SetFileName(inputSurface.c_str());
-    reader->Update();
-    input_mesh = reader->GetOutput();  
+    string mtl = inputSurface;
+    mtl.replace(inputSurface.length() - 4, 4, ".mtl");
+    if(SystemTools::PathExists(mtl)){
+      vtkSmartPointer<vtkOBJPolyDataProcessor> reader = vtkSmartPointer<vtkOBJPolyDataProcessor>::New();
+      reader->SetFileName(inputSurface.c_str());
+      reader->SetMTLfileName(mtl.c_str());
+      cout<<SystemTools::GetParentDirectory(mtl) + "/images"<<endl;
+      string textures = SystemTools::GetParentDirectory(mtl) + "/../images";
+      reader->SetTexturePath(textures.c_str());
+      reader->Update();
+
+      vtkSmartPointer<vtkAppendPolyData> append = vtkSmartPointer<vtkAppendPolyData>::New();
+      for(unsigned i = 0; i < reader->GetNumberOfOutputPorts(); i++){
+        append->AddInputData(reader->GetOutput(i));  
+      }
+      append->Update();
+      input_mesh = append->GetOutput();
+      
+    }else{
+      vtkSmartPointer<vtkOBJReader> reader = vtkSmartPointer<vtkOBJReader>::New();
+      reader->SetFileName(inputSurface.c_str());
+      reader->Update();
+      cout<<"WTF!!"<<reader->GetNumberOfOutputPorts()<<endl;
+      input_mesh = reader->GetOutput();
+    }
   }else{
     vtkSmartPointer<vtkPolyDataReader> reader = vtkSmartPointer<vtkPolyDataReader>::New();
     reader->SetFileName(inputSurface.c_str());
@@ -342,9 +377,10 @@ int main(int argc, char * argv[])
     input_mesh = input_mesh_v[i_mesh];
 
     vnl_vector<double> mean_v = vnl_vector<double>(3, 0);
+    vnl_vector<double> bounds_max_v = vnl_vector<double>(3, -9999999999);
 
     //Center the shape starts
-    if(centerOfMass){
+    if(useCenterOfMass){
       vtkSmartPointer<vtkCenterOfMass> centerOfMassFilter = vtkSmartPointer<vtkCenterOfMass>::New();
       centerOfMassFilter->SetInputData(input_mesh);
       centerOfMassFilter->SetUseScalarsAsWeights(false);
@@ -353,14 +389,15 @@ int main(int argc, char * argv[])
       centerOfMassFilter->GetCenter(mean_v.data_block());
 
     }else{
-      for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
-        double point[3];
-        input_mesh->GetPoints()->GetPoint(i, point);
-        vnl_vector<double> v = vnl_vector<double>(point, 3);
-        mean_v += v;
-      }
-
-      mean_v /= input_mesh->GetNumberOfPoints();
+      double bounds[6];
+      input_mesh->GetBounds(bounds);
+      vnl_vector<double> bounds_v = vnl_vector<double>(bounds, 6);
+      mean_v[0] = (bounds[0] + bounds[1])/2.0;
+      mean_v[1] = (bounds[2] + bounds[3])/2.0;
+      mean_v[2] = (bounds[4] + bounds[5])/2.0;
+      bounds_max_v[0] = max(bounds[0], bounds[1]);
+      bounds_max_v[1] = max(bounds[2], bounds[3]);
+      bounds_max_v[2] = max(bounds[4], bounds[5]);
     }
 
     for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
@@ -374,21 +411,27 @@ int main(int argc, char * argv[])
     //Center shape finishes
 
     //Scaling the shape to unit sphere. This may also be a parameter if scaling for a population
-    if(maxMagnitude == -1){
-      maxMagnitude = 0;
-      for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
-        double point[3];
-        input_mesh->GetPoints()->GetPoint(i, point);
-        vnl_vector<double> v = vnl_vector<double>(point, 3);
-        maxMagnitude = max(maxMagnitude, v.magnitude());
+    if(scaleFactor == -1){
+      if(useMagnitude){
+        for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
+          double point[3];
+          input_mesh->GetPoints()->GetPoint(i, point);
+          vnl_vector<double> v = vnl_vector<double>(point, 3);
+          scaleFactor = max(scaleFactor, v.magnitude());
+        }  
+      }else{
+        scaleFactor = (bounds_max_v - mean_v).magnitude();
       }
     }
+
+    cout<<"mean:"<<mean_v<<endl;
+    cout<<"scale:"<<scaleFactor<<endl;;
 
     for(unsigned i = 0; i < input_mesh->GetNumberOfPoints(); i++){
       double point[3];
       input_mesh->GetPoints()->GetPoint(i, point);
       vnl_vector<double> v = vnl_vector<double>(point, 3);
-      v /= maxMagnitude;
+      v /= scaleFactor;
       input_mesh->GetPoints()->SetPoint(i, v.data_block());
     }
 
@@ -414,7 +457,6 @@ int main(int argc, char * argv[])
 
     vtkSmartPointer<vtkPolyDataNormals> normalGenerator = vtkSmartPointer<vtkPolyDataNormals>::New();
     normalGenerator->SetInputData(input_mesh);
-    normalGenerator->ComputeCellNormalsOff();
     normalGenerator->ComputePointNormalsOn();
     normalGenerator->SplittingOff();
     normalGenerator->Update();
@@ -445,14 +487,15 @@ int main(int argc, char * argv[])
         vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
         sphereActor->SetMapper(sphereMapper);
         sphereActor->GetProperty()->SetRepresentationToWireframe();
-        sphereActor->GetProperty()->SetColor(0.8,0,0.8);
-        sphereActor->GetProperty()->SetLineWidth(10.0);
+        sphereActor->GetProperty()->SetColor(1.0, 69.0/255.0, 0.0);
+        sphereActor->GetProperty()->SetLineWidth(20.0);
+        
 
         vtkSmartPointer<vtkActor> spherePointsActor = vtkSmartPointer<vtkActor>::New();
         spherePointsActor->SetMapper(sphereMapper);
         spherePointsActor->GetProperty()->SetRepresentationToPoints();
-        spherePointsActor->GetProperty()->SetColor(1.0, 0, 1.0);
-        spherePointsActor->GetProperty()->SetPointSize(20);
+        spherePointsActor->GetProperty()->SetColor(223.0/255.0, 54.0/255.0, 45.0/255.0);
+        spherePointsActor->GetProperty()->SetPointSize(25);
 
         renderer = vtkSmartPointer<vtkRenderer>::New();
         renderWindow = vtkSmartPointer<vtkRenderWindow>::New();
@@ -461,9 +504,54 @@ int main(int argc, char * argv[])
         renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
         renderWindowInteractor->SetRenderWindow(renderWindow);
 
+        vtkShaderProperty* sp = inputActor->GetShaderProperty();
+
+        sp->AddVertexShaderReplacement(
+            "//VTK::Normal::Dec",  // replace the normal block
+            true,                  // before the standard replacements
+            "//VTK::Normal::Dec\n" // we still want the default
+            "  varying vec3 myNormalMCVSOutput;\n", // but we add this
+            false                                   // only do it once
+        );
+
+        sp->AddVertexShaderReplacement(
+            "//VTK::Normal::Impl",                // replace the normal block
+            true,                                 // before the standard replacements
+            "//VTK::Normal::Impl\n"               // we still want the default
+            "  myNormalMCVSOutput = normalMC;\n", // but we add this
+            false                                 // only do it once
+        );
+
+        sp->AddVertexShaderReplacement(
+            "//VTK::Color::Impl", // dummy replacement for testing clear method
+            true, "VTK::Color::Impl\n", false);
+
+        sp->ClearVertexShaderReplacement("//VTK::Color::Impl", true);
+
+        sp->AddFragmentShaderReplacement(
+            "//VTK::Normal::Dec",  // replace the normal block
+            true,                  // before the standard replacements
+            "//VTK::Normal::Dec\n" // we still want the default
+            "  varying vec3 myNormalMCVSOutput;\n", // but we add this
+            false                                   // only do it once
+        );
+
+        sp->AddFragmentShaderReplacement(
+            "//VTK::Normal::Impl",  // replace the normal block
+            true,                   // before the standard replacements
+            "//VTK::Normal::Impl\n" // we still want the default calc
+            "  diffuseColor = myNormalMCVSOutput*0.5f + 0.5f;\n", // but we add this
+            false                                          // only do it once
+        );
+
+        renderer->AddActor(sphereActor);
+        renderer->AddActor(spherePointsActor);  
         renderer->AddActor(inputActor);
 
         if(visualizeTree){
+
+          renderer->RemoveActor(sphereActor);
+          renderer->RemoveActor(spherePointsActor);  
 
           inputActor->GetProperty()->SetColor(1.0, 153/255.0, 51/255.0);
 
@@ -496,9 +584,6 @@ int main(int argc, char * argv[])
           }
           
         }else{
-          
-          renderer->AddActor(sphereActor);
-          renderer->AddActor(spherePointsActor);  
 
           if(numberOfSpiralSamples > 0){
               
@@ -508,7 +593,7 @@ int main(int argc, char * argv[])
 
               vtkSmartPointer<vtkLinearSubdivisionFilter2> subdivision = vtkSmartPointer<vtkLinearSubdivisionFilter2>::New();
               subdivision->SetInputData(icosahedron_source->GetOutput());
-              subdivision->SetNumberOfSubdivisions(10);
+              subdivision->SetNumberOfSubdivisions(5);
               subdivision->Update();
               sphere = subdivision->GetOutput();
               
@@ -525,7 +610,8 @@ int main(int argc, char * argv[])
               vtkSmartPointer<vtkActor> sphereActor = vtkSmartPointer<vtkActor>::New();
               sphereActor->SetMapper(sphereMapper);
               sphereActor->GetProperty()->SetRepresentationToWireframe();
-              sphereActor->GetProperty()->SetColor(0.8,0,0.8);
+              sphereActor->GetProperty()->SetColor(1.0,0.647,0.0);
+              sphereActor->GetProperty()->SetLineWidth(2.0);
               renderer->AddActor(sphereActor);
         
             }
@@ -709,27 +795,26 @@ int main(int argc, char * argv[])
 
           //More visualization stuff
           if(visualize && i == visualizeIndexStopCriteria){
-            vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
-            lineSource->SetPoint1(point_plane_v.data_block());
-            lineSource->SetPoint2(point_end_v.data_block());
+            // vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
+            // lineSource->SetPoint1(point_plane_v.data_block());
+            // lineSource->SetPoint2(point_end_v.data_block());
 
-            vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-            lineMapper->SetInputConnection(lineSource->GetOutputPort());
-            vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
-            lineActor->SetMapper(lineMapper);
-            lineActor->GetProperty()->SetLineWidth(8.0);
-            lineActor->GetProperty()->SetColor(0.4, 0, 1.0);
+            // vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+            // lineMapper->SetInputConnection(lineSource->GetOutputPort());
+            // vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
+            // lineActor->SetMapper(lineMapper);
+            // lineActor->GetProperty()->SetLineWidth(8.0);
+            // lineActor->GetProperty()->SetColor(0.4, 0, 1.0);
 
-            vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-            planeMapper->SetInputData(planeMesh);
-            vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
-            planeActor->SetMapper(planeMapper);
-            planeActor->GetProperty()->SetRepresentationToWireframe();
-            planeActor->GetProperty()->SetColor(0, 0.9, 1.0);
+            // vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+            // planeMapper->SetInputData(planeMesh);
+            // vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
+            // planeActor->SetMapper(planeMapper);
+            // planeActor->GetProperty()->SetRepresentationToWireframe();
+            // planeActor->GetProperty()->SetColor(0, 0.9, 1.0);
             
-            renderer->AddActor(lineActor);
-            renderer->AddActor(planeActor);
-
+            // renderer->AddActor(lineActor);
+            // renderer->AddActor(planeActor);
             renderWindowInteractor->Start();
           }
           
@@ -804,28 +889,29 @@ int main(int argc, char * argv[])
           false                                          // only do it once
       );
       
-      // vtkSmartPointer<vtkTimerCallback2> cb = vtkSmartPointer<vtkTimerCallback2>::New();
-      // cb->camera = camera;
-      // cb->spherePoints = spherePoints;
-      // cb->planeResolution = planeResolution;
-      // cb->renderer = renderer;
-
-      // renderWindowInteractor->AddObserver(vtkCommand::TimerEvent, cb);
-
-      // int timerId;
-
-      // if(visualize){
-      //   timerId = renderWindowInteractor->CreateRepeatingTimer(100);  
-      // }else{
-      //   timerId = renderWindowInteractor->CreateRepeatingTimer(1);
-      // }
-      
-      // cb->timerId = timerId;
-      
-      // renderWindowInteractor->Start();
-      // compose_v = cb->compose_v;
       vtkSmartPointer<vtkCamera> camera = renderer->GetActiveCamera();
       vtkSmartPointer<vtkPoints> spherePoints = sphere->GetPoints();
+
+      if(visualize){
+
+        renderer->SetBackground(1, 1, 1);
+
+        vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
+        renderWindowInteractor->SetRenderWindow(renderWindow);
+
+        vtkSmartPointer<vtkTimerCallback2> cb = vtkSmartPointer<vtkTimerCallback2>::New();
+        cb->camera = camera;
+        cb->spherePoints = spherePoints;
+
+        renderWindowInteractor->AddObserver(vtkCommand::TimerEvent, cb);
+
+        int timerId = renderWindowInteractor->CreateRepeatingTimer(100);
+        cb->timerId = timerId;
+        
+        renderWindowInteractor->Start();
+
+        renderer->SetBackground(0, 0, 0);
+      }
 
       for(int sphere_i = 0; sphere_i < spherePoints->GetNumberOfPoints(); sphere_i++){
         double sphere_point[3];
@@ -845,13 +931,7 @@ int main(int argc, char * argv[])
 
         renderer->ResetCameraClippingRange();
         renderWindow->Render();
-
-        if(visualize){
-          vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
-          renderWindowInteractor->SetRenderWindow(renderWindow);
-          renderWindowInteractor->Start();
-        }
-
+      
         vtkSmartPointer<vtkWindowToImageFilter> windowFilterNormals = vtkSmartPointer<vtkWindowToImageFilter>::New();
         windowFilterNormals->SetInput(renderWindow);
         windowFilterNormals->SetInputBufferTypeToRGB();
@@ -891,6 +971,7 @@ int main(int argc, char * argv[])
         multiply->Update();
         
         compose_v.push_back(multiply->GetOutput());
+
       }
     }
 
