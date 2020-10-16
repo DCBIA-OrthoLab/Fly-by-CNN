@@ -1,0 +1,83 @@
+!_TAG_FILE_FORMAT	2	/extended format; --format=1 will not append ;" to lines/
+!_TAG_FILE_SORTED	1	/0=unsorted, 1=sorted, 2=foldcase/
+!_TAG_PROGRAM_AUTHOR	Darren Hiebert	/dhiebert@users.sourceforge.net/
+!_TAG_PROGRAM_NAME	Exuberant Ctags	//
+!_TAG_PROGRAM_URL	http://ctags.sourceforge.net	/official site/
+!_TAG_PROGRAM_VERSION	5.8	//
+CastImageFilterType	fly_by_features.cxx	/^typedef itk::CastImageFilter<ImageUCType, ImageType> CastImageFilterType;$/;"	t	file:
+Execute	fly_by_features.cxx	/^  virtual void Execute(vtkObject* caller, unsigned long eventId,$/;"	f	class:vtkTimerCallback2
+FileName	vtkOFFReader.h	/^  char *FileName;$/;"	m	class:vtkOFFReader
+GenerateSubdivisionCells	vtkLinearSubdivisionFilter2.cxx	/^void vtkLinearSubdivisionFilter2::GenerateSubdivisionCells (vtkPolyData *inputDS,$/;"	f	class:vtkLinearSubdivisionFilter2
+GenerateSubdivisionPoints	vtkLinearSubdivisionFilter2.cxx	/^int vtkLinearSubdivisionFilter2::GenerateSubdivisionPoints (vtkPolyData *inputDS, $/;"	f	class:vtkLinearSubdivisionFilter2
+GetOutput	surfacefeaturesextractor.hxx	/^vtkSmartPointer<vtkPolyData> SurfaceFeaturesExtractor::GetOutput()$/;"	f	class:SurfaceFeaturesExtractor
+ImageComposeFileWriterType	fly_by_features.cxx	/^typedef itk::ImageFileWriter<ImageComposeType> ImageComposeFileWriterType;$/;"	t	file:
+ImageComposeIteratorType	fly_by_features.cxx	/^typedef itk::ImageRegionIterator<ImageComposeType> ImageComposeIteratorType;$/;"	t	file:
+ImageComposeType	fly_by_features.cxx	/^typedef itk::Image<RGBPixelType, 3> ImageComposeType;$/;"	t	file:
+ImageFileWriterType	fly_by_features.cxx	/^typedef itk::ImageFileWriter<ImageType> ImageFileWriterType;$/;"	t	file:
+ImageIteratorType	fly_by_features.cxx	/^typedef itk::ImageRegionIterator<ImageType> ImageIteratorType;$/;"	t	file:
+ImageType	fly_by_features.cxx	/^typedef itk::Image<RGBPixelType, 2> ImageType;$/;"	t	file:
+ImageUCType	fly_by_features.cxx	/^typedef itk::Image<itk::RGBPixel<unsigned char>, 2> ImageUCType;$/;"	t	file:
+InterpolatePosition	vtkLinearSubdivisionFilter2.cxx	/^vtkIdType vtkLinearSubdivisionFilter2::InterpolatePosition($/;"	f	class:vtkLinearSubdivisionFilter2
+M_PI	surfacefeaturesextractor.hxx	7;"	d
+MultiplyImageFilterType	fly_by_features.cxx	/^typedef itk::MultiplyImageFilter<ImageType, ZImageType, ImageType> MultiplyImageFilterType;$/;"	t	file:
+NB_LINES	surfacefeaturesextractor.hxx	270;"	d
+NB_WORDS	surfacefeaturesextractor.hxx	271;"	d
+New	fly_by_features.cxx	/^  static vtkTimerCallback2* New()$/;"	f	class:vtkTimerCallback2
+PixelComponentType	fly_by_features.cxx	/^typedef double PixelComponentType;$/;"	t	file:
+PrintSelf	vtkOFFReader.cxx	/^void vtkOFFReader::PrintSelf(ostream& os, vtkIndent indent)$/;"	f	class:vtkOFFReader
+RGBPixelType	fly_by_features.cxx	/^typedef itk::RGBPixel<PixelComponentType> RGBPixelType;$/;"	t	file:
+RequestData	vtkLinearSubdivisionFilter2.cxx	/^int vtkLinearSubdivisionFilter2::RequestData(vtkInformation * request, $/;"	f	class:vtkLinearSubdivisionFilter2
+SURFACEFEATURESEXTRACTOR_H	surfacefeaturesextractor.h	2;"	d
+SetInput	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::SetInput(vtkSmartPointer<vtkPolyData> input, std::vector< vtkSmartPointer<vtkPolyData> > list, std::vector<std::string> landmarkFile)$/;"	f	class:SurfaceFeaturesExtractor
+SurfaceFeaturesExtractor	surfacefeaturesextractor.h	/^class SurfaceFeaturesExtractor : public vtkPolyDataAlgorithm$/;"	c
+SurfaceFeaturesExtractor	surfacefeaturesextractor.hxx	/^SurfaceFeaturesExtractor::SurfaceFeaturesExtractor(){$/;"	f	class:SurfaceFeaturesExtractor
+SurfaceFeaturesExtractor	surfacefeaturesextractor.hxx	/^vtkStandardNewMacro(SurfaceFeaturesExtractor);$/;"	v
+Update	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::Update()$/;"	f	class:SurfaceFeaturesExtractor
+VTKImageToImageType	fly_by_features.cxx	/^typedef itk::VTKImageToImageFilter<ImageUCType> VTKImageToImageType;$/;"	t	file:
+ZAbsImageType	fly_by_features.cxx	/^typedef itk::AbsImageFilter<ZImageType, ZImageType> ZAbsImageType;$/;"	t	file:
+ZImageType	fly_by_features.cxx	/^typedef itk::Image<double, 2> ZImageType;$/;"	t	file:
+ZVTKImageToImageFilterType	fly_by_features.cxx	/^typedef itk::VTKImageToImageFilter<ZImageType> ZVTKImageToImageFilterType;$/;"	t	file:
+__vtkOFFReader_h	vtkOFFReader.h	22;"	d
+camera	fly_by_features.cxx	/^  vtkCamera* camera = nullptr;$/;"	m	class:vtkTimerCallback2	file:
+compose_v	fly_by_features.cxx	/^  vector<ImageType::Pointer> compose_v;$/;"	m	class:vtkTimerCallback2	file:
+compute_curvedness	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_curvedness()			\/\/ C$/;"	f	class:SurfaceFeaturesExtractor
+compute_distances	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_distances()$/;"	f	class:SurfaceFeaturesExtractor
+compute_gaussiancurvatures	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_gaussiancurvatures()	\/\/ G$/;"	f	class:SurfaceFeaturesExtractor
+compute_maxcurvatures	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_maxcurvatures()		\/\/ Kappa2$/;"	f	class:SurfaceFeaturesExtractor
+compute_meancurvatures	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_meancurvatures()		\/\/ H$/;"	f	class:SurfaceFeaturesExtractor
+compute_mincurvatures	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_mincurvatures()		\/\/ Kappa1$/;"	f	class:SurfaceFeaturesExtractor
+compute_normals	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_normals()$/;"	f	class:SurfaceFeaturesExtractor
+compute_positions	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_positions()$/;"	f	class:SurfaceFeaturesExtractor
+compute_shapeindex	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_shapeindex()			\/\/ S$/;"	f	class:SurfaceFeaturesExtractor
+init_output	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::init_output()$/;"	f	class:SurfaceFeaturesExtractor
+inputSurface	surfacefeaturesextractor.h	/^    vtkSmartPointer<vtkPolyData> inputSurface;$/;"	m	class:SurfaceFeaturesExtractor
+inputVector	vtkLinearSubdivisionFilter2.cxx	/^  vtkInformationVector **inputVector,$/;"	v
+intermediateSurface	surfacefeaturesextractor.h	/^    vtkSmartPointer<vtkPolyData> intermediateSurface;$/;"	m	class:SurfaceFeaturesExtractor
+is_whitespace	vtkOFFReader.cxx	/^int is_whitespace(char c)$/;"	f
+landmarkFile	surfacefeaturesextractor.h	/^    std::vector<std::string> landmarkFile;$/;"	m	class:SurfaceFeaturesExtractor
+main	convert_off.cxx	/^int main (int argc, char *argv[])$/;"	f
+main	fly_by_features.cxx	/^int main(int argc, char * argv[])$/;"	f
+main	surfacefeaturesextractor.cxx	/^int main (int argc, char *argv[])$/;"	f
+main	vector2vector.cxx	/^int main (int argc, char * argv[]){$/;"	f
+meanShapesList	surfacefeaturesextractor.h	/^    std::vector< vtkSmartPointer<vtkPolyData> > meanShapesList;$/;"	m	class:SurfaceFeaturesExtractor
+outputSurface	surfacefeaturesextractor.h	/^    vtkSmartPointer<vtkPolyData> outputSurface;$/;"	m	class:SurfaceFeaturesExtractor
+override	vtkLinearSubdivisionFilter2.h	/^                                 vtkPointData *outputPD) override;$/;"	m	class:vtkLinearSubdivisionFilter2
+override	vtkLinearSubdivisionFilter2.h	/^                  vtkInformationVector *) override;$/;"	m	class:vtkLinearSubdivisionFilter2
+planeResolution	fly_by_features.cxx	/^  int planeResolution = 0;$/;"	m	class:vtkTimerCallback2	file:
+renderer	fly_by_features.cxx	/^  vtkRenderer* renderer;$/;"	m	class:vtkTimerCallback2	file:
+scalar_indexPoint	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::scalar_indexPoint()$/;"	f	class:SurfaceFeaturesExtractor
+spherePoints	fly_by_features.cxx	/^  vtkPoints* spherePoints = nullptr;$/;"	m	class:vtkTimerCallback2	file:
+sphere_i	fly_by_features.cxx	/^  int sphere_i = -1;$/;"	m	class:vtkTimerCallback2	file:
+store_landmarks_vtk	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::store_landmarks_vtk()$/;"	f	class:SurfaceFeaturesExtractor
+timerId	fly_by_features.cxx	/^  int timerId = 0;$/;"	m	class:vtkTimerCallback2	file:
+vtkLinearSubdivisionFilter2	vtkLinearSubdivisionFilter2.cxx	/^vtkStandardNewMacro(vtkLinearSubdivisionFilter2);$/;"	v
+vtkLinearSubdivisionFilter2	vtkLinearSubdivisionFilter2.h	/^  vtkLinearSubdivisionFilter2 () {}$/;"	f	class:vtkLinearSubdivisionFilter2
+vtkLinearSubdivisionFilter2	vtkLinearSubdivisionFilter2.h	/^class VTKFILTERSMODELING_EXPORT vtkLinearSubdivisionFilter2 : public vtkInterpolatingSubdivisionFilter$/;"	c
+vtkLinearSubdivisionFilter2_h	vtkLinearSubdivisionFilter2.h	3;"	d
+vtkNotUsed	vtkLinearSubdivisionFilter2.cxx	/^  vtkInformationVector *vtkNotUsed(outputVector))$/;"	f
+vtkOFFReader	vtkOFFReader.cxx	/^vtkOFFReader::vtkOFFReader()$/;"	f	class:vtkOFFReader
+vtkOFFReader	vtkOFFReader.cxx	/^vtkStandardNewMacro(vtkOFFReader);$/;"	v
+vtkOFFReader	vtkOFFReader.h	/^class vtkOFFReader : public vtkPolyDataAlgorithm$/;"	c
+vtkTimerCallback2	fly_by_features.cxx	/^class vtkTimerCallback2 : public vtkCommand$/;"	c	file:
+~SurfaceFeaturesExtractor	surfacefeaturesextractor.hxx	/^SurfaceFeaturesExtractor::~SurfaceFeaturesExtractor(){}$/;"	f	class:SurfaceFeaturesExtractor
+~vtkOFFReader	vtkOFFReader.cxx	/^vtkOFFReader::~vtkOFFReader()$/;"	f	class:vtkOFFReader

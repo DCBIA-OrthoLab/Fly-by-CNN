@@ -151,6 +151,7 @@ public:
 int main(int argc, char * argv[])
 {
   
+
   PARSE_ARGS;
 
   int numFeatures = 4;
@@ -172,6 +173,7 @@ int main(int argc, char * argv[])
     subdivision->SetNumberOfSubdivisions(numberOfSubdivisions);
     subdivision->Update();
     sphere = subdivision->GetOutput();
+    cout<<"Mansi Version";
     cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
 
     vtkSmartPointer<vtkCellArray> vertices = vtkSmartPointer<vtkCellArray>::New();
