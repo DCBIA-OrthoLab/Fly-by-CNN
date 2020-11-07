@@ -1,4 +1,3 @@
-
 import os
 import tensorflow as tf
 import numpy as np
@@ -197,13 +196,18 @@ def main(args):
 
 			if model is not None:
 				out_np = model.predict(out_np)
+			
+			#print("out_np.ndim: "+str(out_np.ndim))
+			for i in range(out_np.ndim):
+				out_img = GetImage(out_np[i])
 
-			out_img = GetImage(out_np)
-
-			print("Writing:", fobj["out"])
-			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
-			writer.UseCompressionOn()
-			writer.Update()
+				#write better parsing mechanism to support more than just .nrrd files - regex is needed
+				filename=fobj["out"][0:-5]+str(i)+fobj["out"][-5:]
+				print("Writing:", filename)
+			
+				writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
+				writer.UseCompressionOn()
+				writer.Update()
 
 		flyby.removeActors()
 
