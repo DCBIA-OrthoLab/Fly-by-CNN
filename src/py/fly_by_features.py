@@ -1,4 +1,5 @@
 import os
+import re
 import tensorflow as tf
 import numpy as np
 import itk
@@ -197,12 +198,17 @@ def main(args):
 			if model is not None:
 				out_np = model.predict(out_np)
 			
-			#print("out_np.ndim: "+str(out_np.ndim))
+			#Write's new file for each angle:	
 			for i in range(out_np.ndim):
 				out_img = GetImage(out_np[i])
 
-				#write better parsing mechanism to support more than just .nrrd files - regex is needed
-				filename=fobj["out"][0:-5]+str(i)+fobj["out"][-5:]
+				p = ".*(?=\.)"
+				prefix = re.findall(p, fobj["out"])
+					
+				s ="([^\.]+$)" 
+				suffix = re.findall(s, fobj["out"])
+	
+				filename=prefix[0]+str(i)+"."+suffix[0]
 				print("Writing:", filename)
 			
 				writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
