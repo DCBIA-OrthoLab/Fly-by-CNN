@@ -159,6 +159,25 @@ def GetActor(surf):
 	surfMapper = vtk.vtkPolyDataMapper()
 	surfMapper.SetInputData(surf)
 
+	############
+	surfMapper.SetScalarRange(0.0,1.0)
+	
+	#build lookup table
+	lut = vtk.vtkLookupTable()
+	lut.SetTableRange(0.0, 1.0)
+
+	lut.SetNumberOfColors(3)
+	lut.SetTableValue(0, 1.0, 0.0, 0.0) # Red
+	lut.SetTableValue(1, 1.0, 0.75, 0.0) # Amber
+	lut.SetTableValue(2, 0.0, 1.0, 0.0) # Green
+
+	lut.Build()
+
+	#QUESTION: How do we get lut to reference region ids (from vtk file)
+	surfMapper.SetLookupTable(lut)
+	surfMapper.SetScalarModeToUseCellData()
+	###########
+
 	surfActor = vtk.vtkActor()
 	surfActor.SetMapper(surfMapper)
 
