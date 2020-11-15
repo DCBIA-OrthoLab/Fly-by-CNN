@@ -138,6 +138,7 @@ def main(args):
 		fobj = {}
 		fobj["surf"] = args.surf
 		fobj["out"] = args.out
+		fobj["amt"] = args.amt
 		filenames.append(fobj)
 			
 	else:
@@ -198,22 +199,30 @@ def main(args):
 			if model is not None:
 				out_np = model.predict(out_np)
 			
-			#Write's new file for each angle:	
-			for i in range(out_np.ndim):
-				out_img = GetImage(out_np[i])
+			if ( fobj["amt"] == 1 ):
+				for i in range(out_np.ndim):
+					out_img = GetImage(out_np[i])
 
-				p = ".*(?=\.)"
-				prefix = re.findall(p, fobj["out"])
+					p = ".*(?=\.)"
+					prefix = re.findall(p, fobj["out"])
 					
-				s ="([^\.]+$)" 
-				suffix = re.findall(s, fobj["out"])
+					s ="([^\.]+$)" 
+					suffix = re.findall(s, fobj["out"])
 	
-				filename=prefix[0]+str(i)+"."+suffix[0]
-				print("Writing:", filename)
+					filename=prefix[0]+str(i)+"."+suffix[0]
+					print("Writing:", filename)
 			
-				writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
+					writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
+					writer.UseCompressionOn()
+					writer.Update()
+			else:
+				out_img = GetImage(out_np)
+
+				print("Writing:", fobj["out"])
+				writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
 				writer.UseCompressionOn()
 				writer.Update()
+				
 
 		flyby.removeActors()
 
@@ -249,6 +258,8 @@ if __name__ == '__main__':
 	output_params.add_argument('--out', type=str, help='Output filename or directory', default="out.nrrd")
 	output_params.add_argument('--uuid', type=bool, help='Use uuid to name the outputs', default=False)
 	output_params.add_argument('--ow', type=int, help='Overwrite outputs', default=1)
+	output_params.add_argument('--amt', type=int, help='1 for multiple output files, 0 for single output file', default=1)
+
 
 	args = parser.parse_args()
 

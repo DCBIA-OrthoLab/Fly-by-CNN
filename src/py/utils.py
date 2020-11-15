@@ -160,6 +160,19 @@ def GetActor(surf):
 	surfMapper.SetInputData(surf)
 
 	############
+	#surf is the mesh - we apply look up table to its mapper
+	# we are missing step with some sort of mapper
+
+	# mesh vs mapper? do we apply LUT to mesh or mapper?
+	# do we create a mesh using the region id from the surfMapper
+	# cell vs point data? differences? Preferences? vtk file has both types
+	# how to interpret parts of the vtk file? 
+	# QUESTION: How do we get lut to reference region ids (from vtk file)
+	# Is the LUT coloring overwritten later in the program?
+	# Where is the current coloring being specified? is it standard or based on some metric (normals and distance)?
+
+	#Add a flag that turns the normal shading (in the getunitactors meathod) to off, and then use the LUT - TODO	
+ 
 	surfMapper.SetScalarRange(0.0,1.0)
 	
 	#build lookup table
@@ -173,7 +186,6 @@ def GetActor(surf):
 
 	lut.Build()
 
-	#QUESTION: How do we get lut to reference region ids (from vtk file)
 	surfMapper.SetLookupTable(lut)
 	surfMapper.SetScalarModeToUseCellData()
 	###########
@@ -208,6 +220,7 @@ def GetUnitActor(fileName, random_rotation=False, normal_shaders=True):
 			rotationAngle = np.random.random()*360.0
 			surf = RotateSurf(surf, rotationAngle, rotationVector)
 
+		#This needs to be turned off based on user input, if we use LUT
 		if(normal_shaders):
 			normals = vtk.vtkPolyDataNormals()
 			normals.SetInputData(surf);
