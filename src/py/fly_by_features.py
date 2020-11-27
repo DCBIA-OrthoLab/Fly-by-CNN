@@ -139,6 +139,7 @@ def main(args):
 		fobj["surf"] = args.surf
 		fobj["out"] = args.out
 		fobj["amt"] = args.amt
+		fobj["norm_shader"] = args.norm_shader
 		filenames.append(fobj)
 			
 	else:
@@ -189,7 +190,7 @@ def main(args):
 
 	for fobj in filenames:
 
-		surf_actor = GetUnitActor(fobj["surf"], args.random_rotation, True)
+		surf_actor = GetUnitActor(fobj["surf"], args.random_rotation, fobj["norm_shader"])
 		
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
@@ -199,7 +200,7 @@ def main(args):
 			if model is not None:
 				out_np = model.predict(out_np)
 			
-			if ( fobj["amt"] == 1 ):
+			if ( fobj["amt"] ):
 				for i in range(out_np.ndim):
 					out_img = GetImage(out_np[i])
 
@@ -241,6 +242,7 @@ if __name__ == '__main__':
 	input_group.add_argument('--csv_root_path', type=str, help='CSV rooth path for replacement', default="")
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
+	input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
