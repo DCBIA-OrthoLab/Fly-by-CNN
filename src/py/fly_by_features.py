@@ -210,7 +210,7 @@ def main(args):
 					s ="([^\.]+$)" 
 					suffix = re.findall(s, fobj["out"])
 	
-					filename=prefix[0]+str(i)+"."+suffix[0]
+					filename=prefix[0]+"_"+str(i)+"."+suffix[0]
 					print("Writing:", filename)
 			
 					writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)

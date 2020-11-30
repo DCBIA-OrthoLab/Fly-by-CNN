@@ -158,8 +158,7 @@ def ReadSurf(fileName):
 def GetActor(surf):
 	surfMapper = vtk.vtkPolyDataMapper()
 	surfMapper.SetInputData(surf)
-
-	surfMapper.SetScalarRange(0.0,2.0)
+	surfMapper.SetUseLookupTableScalarRange(True)
 	
 	#build lookup table
 	lut = vtk.vtkLookupTable()
