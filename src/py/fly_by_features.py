@@ -73,6 +73,7 @@ class FlyByGenerator():
 	def getFlyBy(self):
 
 		sphere_points = self.sphere.GetPoints()
+		print(sphere_points.GetNumberOfPoints())
 		camera = self.renderer.GetActiveCamera()
 
 		if self.visualize:
@@ -138,7 +139,6 @@ def main(args):
 		fobj = {}
 		fobj["surf"] = args.surf
 		fobj["out"] = args.out
-		fobj["amt"] = args.amt
 		fobj["norm_shader"] = args.norm_shader
 		filenames.append(fobj)
 			
@@ -200,8 +200,8 @@ def main(args):
 			if model is not None:
 				out_np = model.predict(out_np)
 			
-			if ( fobj["amt"] ):
-				for i in range(out_np.ndim):
+			if ( not args.concatenate ):
+				for i in range(out_np.shape[0]):
 					out_img = GetImage(out_np[i])
 
 					p = ".*(?=\.)"
@@ -260,7 +260,7 @@ if __name__ == '__main__':
 	output_params.add_argument('--out', type=str, help='Output filename or directory', default="out.nrrd")
 	output_params.add_argument('--uuid', type=bool, help='Use uuid to name the outputs', default=False)
 	output_params.add_argument('--ow', type=int, help='Overwrite outputs', default=1)
-	output_params.add_argument('--amt', type=int, help='1 for multiple output files, 0 for single output file', default=1)
+	output_params.add_argument('--concatenate', type=int, help='0 for multiple output files, 1 for single output file', default=1)
 
 
 	args = parser.parse_args()
