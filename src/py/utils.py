@@ -155,14 +155,16 @@ def ReadSurf(fileName):
 
 	return surf
 
-def GetActor(surf):
-
+def GetActor(surf, property):
 	point_data = vtk.vtkDoubleArray()
 	point_data.SetNumberOfComponents(1)
-	for i in range(163842):
-		point_data.InsertNextTuple([1.00])
+
+	with open(property) as property_file:
+		for line in property_file:
+			point_val = float(line[:-1])
+			point_data.InsertNextTuple([point_val])
+			
 	surf.GetPointData().SetScalars(point_data)
-	#read in text file and then assign point_data
 
 	surfMapper = vtk.vtkPolyDataMapper()
 	surfMapper.SetInputData(surf)
@@ -176,6 +178,7 @@ def GetActor(surf):
 	lut.SetTableValue(0, 1.0, 0.0, 0.0) # Red
 	lut.SetTableValue(1, 0.0, 0.0, 1.0) # Blue 
 	lut.SetTableValue(2, 0.0, 1.0, 0.0) # Green
+
 	#Add color transfer function for smaller integers
 
 	lut.Build()
@@ -198,7 +201,7 @@ def RotateSurf(surf, rotationAngle, rotationVector):
 	transformFilter.Update()
 	return transformFilter.GetOutput()
 
-def GetUnitActor(fileName, random_rotation=False, normal_shaders=True):
+def GetUnitActor(fileName, property, random_rotation=False, normal_shaders=True):
 
 	try:
 
@@ -224,7 +227,7 @@ def GetUnitActor(fileName, random_rotation=False, normal_shaders=True):
 			surf = normals.GetOutput()
 
 		# mapper
-		surfActor = GetActor(surf)
+		surfActor = GetActor(surf, property)
 
 		if(normal_shaders):
 

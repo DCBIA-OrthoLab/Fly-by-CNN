@@ -190,7 +190,7 @@ def main(args):
 
 	for fobj in filenames:
 
-		surf_actor = GetUnitActor(fobj["surf"], args.random_rotation, fobj["norm_shader"])
+		surf_actor = GetUnitActor(fobj["surf"], args.property, args.random_rotation, fobj["norm_shader"])
 		
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
@@ -238,12 +238,12 @@ if __name__ == '__main__':
 	input_params.add_argument('--surf', type=str, help='Target surface/mesh')
 	input_params.add_argument('--dir', type=str, help='Input directory with 3D models')
 	input_params.add_argument('--csv', type=str, help='Input csv with column "surf"')
-	input_params.add_argument('--property', type=str, help='Input txt same number of points as "surf"')
 
 	input_group.add_argument('--csv_root_path', type=str, help='CSV rooth path for replacement', default="")
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 	input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
+	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"')
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
