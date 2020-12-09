@@ -238,6 +238,7 @@ if __name__ == '__main__':
 	input_params.add_argument('--surf', type=str, help='Target surface/mesh')
 	input_params.add_argument('--dir', type=str, help='Input directory with 3D models')
 	input_params.add_argument('--csv', type=str, help='Input csv with column "surf"')
+	input_params.add_argument('--property', type=str, help='Input txt same number of points as "surf"')
 
 	input_group.add_argument('--csv_root_path', type=str, help='CSV rooth path for replacement', default="")
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)

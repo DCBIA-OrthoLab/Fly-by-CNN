@@ -156,6 +156,14 @@ def ReadSurf(fileName):
 	return surf
 
 def GetActor(surf):
+
+	point_data = vtk.vtkDoubleArray()
+	point_data.SetNumberOfComponents(1)
+	for i in range(163842):
+		point_data.InsertNextTuple([1.00])
+	surf.GetPointData().SetScalars(point_data)
+	#read in text file and then assign point_data
+
 	surfMapper = vtk.vtkPolyDataMapper()
 	surfMapper.SetInputData(surf)
 	surfMapper.SetUseLookupTableScalarRange(True)
@@ -168,6 +176,7 @@ def GetActor(surf):
 	lut.SetTableValue(0, 1.0, 0.0, 0.0) # Red
 	lut.SetTableValue(1, 0.0, 0.0, 1.0) # Blue 
 	lut.SetTableValue(2, 0.0, 1.0, 0.0) # Green
+	#Add color transfer function for smaller integers
 
 	lut.Build()
 
