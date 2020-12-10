@@ -161,6 +161,7 @@ def GetActor(surf, property):
 
 	with open(property) as property_file:
 		for line in property_file:
+			#TODO: need universal way to read float
 			point_val = float(line[:-1])
 			point_data.InsertNextTuple([point_val])
 			
@@ -171,15 +172,25 @@ def GetActor(surf, property):
 	surfMapper.SetUseLookupTableScalarRange(True)
 	
 	#build lookup table
+	number_of_colors = 512
+	low_range = 0
+	high_range = 1  
 	lut = vtk.vtkLookupTable()
-	lut.SetTableRange(0.0, 2.0)
+	lut.SetTableRange(low_range, high_range)
 
-	lut.SetNumberOfColors(3)
-	lut.SetTableValue(0, 1.0, 0.0, 0.0) # Red
-	lut.SetTableValue(1, 0.0, 0.0, 1.0) # Blue 
-	lut.SetTableValue(2, 0.0, 1.0, 0.0) # Green
+	lut.SetNumberOfColors(number_of_colors)
+	lut.SetTableValue(0, 1.0, 1.0, 0.0) # Yellow 
+	lut.SetTableValue(1, 1.0, 0.0, 0.0) # Red 
 
-	#Add color transfer function for smaller integers
+	#Color transfer function  
+	ctransfer = vtk.vtkColorTransferFunction()
+	ctransfer.AddRGBPoint(0.0, 1.0, 1.0, 0.0) # Yellow
+	ctransfer.AddRGBPoint(1.0, 1.0, 0.0, 0.0) # Red
+
+	#Calculated new colors for LUT
+	for i in range(number_of_colors):
+    		new_colour = ctransfer.GetColor( (i * ((high_range-low_range)/number_of_colors) ) )
+    		lut.SetTableValue(i, *new_colour)
 
 	lut.Build()
 
