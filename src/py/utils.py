@@ -179,13 +179,13 @@ def GetActor(surf, property):
 	lut.SetTableRange(low_range, high_range)
 
 	lut.SetNumberOfColors(number_of_colors)
-	lut.SetTableValue(0, 1.0, 1.0, 0.0) # Yellow 
-	lut.SetTableValue(1, 1.0, 0.0, 0.0) # Red 
+	#lut.SetTableValue(0, 1.0, 1.0, 0.0) # Yellow 
+	#lut.SetTableValue(1, 1.0, 0.0, 0.0) # Red 
 
 	#Color transfer function  
 	ctransfer = vtk.vtkColorTransferFunction()
 	ctransfer.AddRGBPoint(0.0, 1.0, 1.0, 0.0) # Yellow
-	ctransfer.AddRGBPoint(1.0, 1.0, 0.0, 0.0) # Red
+	ctransfer.AddRGBPoint(0.5, 1.0, 0.0, 0.0) # Red
 
 	#Calculated new colors for LUT
 	for i in range(number_of_colors):
