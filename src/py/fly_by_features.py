@@ -243,7 +243,7 @@ if __name__ == '__main__':
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 	input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
-	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"')
+	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default="")
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
