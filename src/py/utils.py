@@ -163,7 +163,6 @@ def GetActor(surf, property):
 
         with open(property) as property_file:
             for line in property_file:
-                #TODO: need universal way to read float
                 point_val = float(line[:-1])
                 point_data.InsertNextTuple([point_val])
                 
