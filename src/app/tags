@@ -39,7 +39,6 @@ ZImageType	fly_by_features.cxx	/^typedef itk::Image<double, 2> ZImageType;$/;"	t
 ZVTKImageToImageFilterType	fly_by_features.cxx	/^typedef itk::VTKImageToImageFilter<ZImageType> ZVTKImageToImageFilterType;$/;"	t	file:
 __vtkOFFReader_h	vtkOFFReader.h	22;"	d
 camera	fly_by_features.cxx	/^  vtkCamera* camera = nullptr;$/;"	m	class:vtkTimerCallback2	file:
-compose_v	fly_by_features.cxx	/^  vector<ImageType::Pointer> compose_v;$/;"	m	class:vtkTimerCallback2	file:
 compute_curvedness	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_curvedness()			\/\/ C$/;"	f	class:SurfaceFeaturesExtractor
 compute_distances	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_distances()$/;"	f	class:SurfaceFeaturesExtractor
 compute_gaussiancurvatures	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::compute_gaussiancurvatures()	\/\/ G$/;"	f	class:SurfaceFeaturesExtractor
@@ -63,8 +62,6 @@ meanShapesList	surfacefeaturesextractor.h	/^    std::vector< vtkSmartPointer<vtk
 outputSurface	surfacefeaturesextractor.h	/^    vtkSmartPointer<vtkPolyData> outputSurface;$/;"	m	class:SurfaceFeaturesExtractor
 override	vtkLinearSubdivisionFilter2.h	/^                                 vtkPointData *outputPD) override;$/;"	m	class:vtkLinearSubdivisionFilter2
 override	vtkLinearSubdivisionFilter2.h	/^                  vtkInformationVector *) override;$/;"	m	class:vtkLinearSubdivisionFilter2
-planeResolution	fly_by_features.cxx	/^  int planeResolution = 0;$/;"	m	class:vtkTimerCallback2	file:
-renderer	fly_by_features.cxx	/^  vtkRenderer* renderer;$/;"	m	class:vtkTimerCallback2	file:
 scalar_indexPoint	surfacefeaturesextractor.hxx	/^void SurfaceFeaturesExtractor::scalar_indexPoint()$/;"	f	class:SurfaceFeaturesExtractor
 spherePoints	fly_by_features.cxx	/^  vtkPoints* spherePoints = nullptr;$/;"	m	class:vtkTimerCallback2	file:
 sphere_i	fly_by_features.cxx	/^  int sphere_i = -1;$/;"	m	class:vtkTimerCallback2	file:
