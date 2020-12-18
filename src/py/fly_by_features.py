@@ -139,7 +139,6 @@ def main(args):
 		fobj = {}
 		fobj["surf"] = args.surf
 		fobj["out"] = args.out
-		fobj["norm_shader"] = args.norm_shader
 		filenames.append(fobj)
 			
 	else:
@@ -190,7 +189,7 @@ def main(args):
 
 	for fobj in filenames:
 
-		surf_actor = GetUnitActor(fobj["surf"], args.property, args.random_rotation, fobj["norm_shader"])
+		surf_actor = GetUnitActor(fobj["surf"], args.property, args.scale_factor, args.center, args.random_rotation, args.norm_shader)
 		
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
@@ -244,6 +243,8 @@ if __name__ == '__main__':
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 	input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
 	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default="")
+	input_group.add_argument('--scale_factor', type=int, help='Scale the surface by this vale', default= -1)
+	input_group.add_argument('--center', type=bool, help='Center the surface', default=True)
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)

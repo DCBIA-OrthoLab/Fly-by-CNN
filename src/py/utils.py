@@ -155,8 +155,41 @@ def ReadSurf(fileName):
 
     return surf
 
-def GetActor(surf, property):
+def CenterSurf(surf, center):
+    if(center):
+        shapedatapoints = surf.GetPoints()
 
+        shape_points = []
+        for i in range(shapedatapoints.GetNumberOfPoints()):
+            p = shapedatapoints.GetPoint(i)
+            shape_points.append(p)
+
+        #centering points of the shape
+        shape_points = np.array(shape_points)
+        shape_mean = np.mean(shape_points, axis=0)
+        shape_points = shape_points - shape_mean
+
+        #assigning centered points back to shape
+        for i in range(shapedatapoints.GetNumberOfPoints()):
+            shapedatapoints.SetPoint(i, shape_points[i])    
+
+        surf.SetPoints(shapedatapoints)
+
+    return surf
+
+def ScaleSurf(surf, scale_factor):
+#    if(scale_factor != -1):
+    
+    return surf
+
+def GetActor(surf, property, scale_factor, center):
+    #center the data
+    CenterSurf(surf, center)
+
+    #apply scale faCtor 
+    ScaleSurf(surf, scale_factor)
+
+    #display property on surface
     if(property != ""):
         point_data = vtk.vtkDoubleArray()
         point_data.SetNumberOfComponents(1)
@@ -178,17 +211,14 @@ def GetActor(surf, property):
     high_range = 1  
     lut = vtk.vtkLookupTable()
     lut.SetTableRange(low_range, high_range)
-
     lut.SetNumberOfColors(number_of_colors)
-    #lut.SetTableValue(0, 1.0, 1.0, 0.0) # Yellow 
-    #lut.SetTableValue(1, 1.0, 0.0, 0.0) # Red 
 
     #Color transfer function  
     ctransfer = vtk.vtkColorTransferFunction()
     ctransfer.AddRGBPoint(0.0, 1.0, 1.0, 0.0) # Yellow
     ctransfer.AddRGBPoint(0.5, 1.0, 0.0, 0.0) # Red
 
-    #Calculated new colors for LUT
+    #Calculated new colors for LUT via color transfer function
     for i in range(number_of_colors):
             new_colour = ctransfer.GetColor( (i * ((high_range-low_range)/number_of_colors) ) )
             lut.SetTableValue(i, *new_colour)
@@ -196,6 +226,7 @@ def GetActor(surf, property):
     lut.Build()
 
     surfMapper.SetLookupTable(lut)
+
 
     surfActor = vtk.vtkActor()
     surfActor.SetMapper(surfMapper)
@@ -213,7 +244,7 @@ def RotateSurf(surf, rotationAngle, rotationVector):
     transformFilter.Update()
     return transformFilter.GetOutput()
 
-def GetUnitActor(fileName, property, random_rotation=False, normal_shaders=True):
+def GetUnitActor(fileName, property, scale_factor=-1, center=True, random_rotation=False, normal_shaders=True):
 
     try:
 
@@ -227,7 +258,7 @@ def GetUnitActor(fileName, property, random_rotation=False, normal_shaders=True)
             rotationAngle = np.random.random()*360.0
             surf = RotateSurf(surf, rotationAngle, rotationVector)
 
-        #This needs to be turned off based on user input, if we use LUT
+        #Color with normals
         if(normal_shaders):
             normals = vtk.vtkPolyDataNormals()
             normals.SetInputData(surf);
@@ -239,7 +270,7 @@ def GetUnitActor(fileName, property, random_rotation=False, normal_shaders=True)
             surf = normals.GetOutput()
 
         # mapper
-        surfActor = GetActor(surf, property)
+        surfActor = GetActor(surf, property, scale_factor=-1, center=True)
 
         if(normal_shaders):
 
