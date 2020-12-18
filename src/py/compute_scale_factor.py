@@ -51,7 +51,7 @@ def main(args):
 
 	print(scale_factor)
 	with open(args.out, "a+") as f:
-		f.write(str(scale_factor))
+		f.write(str(scale_factor)+"\n")
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Computes maximum magnitude/scaling factor using bounding box and appends to file')
