@@ -54,9 +54,9 @@ def main(args):
 		f.write(str(scale_factor))
 
 if __name__ == "__main__":
-	parser = argparse.ArgumentParser(description='Computes maximum magnitude/scaling factor using bounding box')
+	parser = argparse.ArgumentParser(description='Computes maximum magnitude/scaling factor using bounding box and appends to file')
 	parser.add_argument('--surf', type=str, default=None, help='Target surface or mesh', required=True)
-	parser.add_argument('--out', type=str, default="max.txt", help='Output filename')
+	parser.add_argument('--out', type=str, default="scale_factor.txt", help='Output filename')
 	args = parser.parse_args()
 
 	main(args)
