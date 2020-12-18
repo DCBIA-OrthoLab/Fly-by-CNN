@@ -50,7 +50,7 @@ def main(args):
 	scale_factor = np.linalg.norm(bounds_max_arr - mean_arr)
 
 	print(scale_factor)
-	with open(args.out, "w") as f:
+	with open(args.out, "a+") as f:
 		f.write(str(scale_factor))
 
 if __name__ == "__main__":
