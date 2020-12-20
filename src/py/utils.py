@@ -178,8 +178,24 @@ def CenterSurf(surf, center):
     return surf
 
 def ScaleSurf(surf, scale_factor):
-#    if(scale_factor != -1):
-    
+    if(scale_factor != -1):
+        shapedatapoints = surf.GetPoints()
+
+        shape_points = []
+        for i in range(shapedatapoints.GetNumberOfPoints()):
+            p = shapedatapoints.GetPoint(i)
+            shape_points.append(p)
+
+        #scale points of the shape by scale factor
+        shape_points = np.array(shape_points)
+        shape_points_scaled = np.divide(shape_points, scale_factor)
+
+        #assigning scaled points back to shape
+        for i in range(shapedatapoints.GetNumberOfPoints()):
+            shapedatapoints.SetPoint(i, shape_points_scaled[i])    
+
+        surf.SetPoints(shapedatapoints)
+
     return surf
 
 def GetActor(surf, property, scale_factor, center):
@@ -270,7 +286,7 @@ def GetUnitActor(fileName, property, scale_factor=-1, center=True, random_rotati
             surf = normals.GetOutput()
 
         # mapper
-        surfActor = GetActor(surf, property, scale_factor=-1, center=True)
+        surfActor = GetActor(surf, property, scale_factor, center)
 
         if(normal_shaders):
 
