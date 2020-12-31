@@ -155,55 +155,52 @@ def ReadSurf(fileName):
 
     return surf
 
-def CenterSurf(surf, center):
-    if(center):
-        shapedatapoints = surf.GetPoints()
-
-        shape_points = []
-        for i in range(shapedatapoints.GetNumberOfPoints()):
-            p = shapedatapoints.GetPoint(i)
-            shape_points.append(p)
-
-        #centering points of the shape
-        shape_points = np.array(shape_points)
-        shape_mean = np.mean(shape_points, axis=0)
-        shape_points = shape_points - shape_mean
-
-        #assigning centered points back to shape
-        for i in range(shapedatapoints.GetNumberOfPoints()):
-            shapedatapoints.SetPoint(i, shape_points[i])    
-
-        surf.SetPoints(shapedatapoints)
-
-    return surf
-
 def ScaleSurf(surf, scale_factor):
-    if(scale_factor != -1):
-        shapedatapoints = surf.GetPoints()
+    shapedatapoints = surf.GetPoints()
 
-        shape_points = []
-        for i in range(shapedatapoints.GetNumberOfPoints()):
-            p = shapedatapoints.GetPoint(i)
-            shape_points.append(p)
+    shape_points = []
+    for i in range(shapedatapoints.GetNumberOfPoints()):
+        p = shapedatapoints.GetPoint(i)
+        shape_points.append(p)
 
-        #scale points of the shape by scale factor
-        shape_points = np.array(shape_points)
-        shape_points_scaled = np.divide(shape_points, scale_factor)
+    #calculate bounding box
+    bounds = [0.0] * 6
+    mean_v = [0.0] * 3
+    bounds_max_v = [0.0] * 3
+    bounds = shapedatapoints.GetBounds()
+    mean_v[0] = (bounds[0] + bounds[1])/2.0
+    mean_v[1] = (bounds[2] + bounds[3])/2.0
+    mean_v[2] = (bounds[4] + bounds[5])/2.0
+    bounds_max_v[0] = max(bounds[0], bounds[1])
+    bounds_max_v[1] = max(bounds[2], bounds[3])
+    bounds_max_v[2] = max(bounds[4], bounds[5])
 
-        #assigning scaled points back to shape
-        for i in range(shapedatapoints.GetNumberOfPoints()):
-            shapedatapoints.SetPoint(i, shape_points_scaled[i])    
+    #centering points of the shape
+    shape_points = np.array(shape_points)
+    mean_arr = np.array(mean_v)
+    shape_points = shape_points - mean_arr
 
-        surf.SetPoints(shapedatapoints)
+    #Computing scale factor if it is not provided
+    if(scale_factor == -1):
+        bounds_max_arr = np.array(bounds_max_v)
+        scale_factor = np.linalg.norm(bounds_max_arr - mean_arr)
+
+    #scale points of the shape by scale factor
+    shape_points = np.array(shape_points)
+    shape_points_scaled = np.divide(shape_points, scale_factor)
+
+    #assigning scaled points back to shape
+    for i in range(shapedatapoints.GetNumberOfPoints()):
+       shapedatapoints.SetPoint(i, shape_points_scaled[i])    
+
+    surf.SetPoints(shapedatapoints)
 
     return surf
 
-def GetActor(surf, property, scale_factor, center):
-    #center the data
-    CenterSurf(surf, center)
+def GetActor(surf, property, scale_factor):
 
     #apply scale faCtor 
-    ScaleSurf(surf, scale_factor)
+    surf = ScaleSurf(surf, scale_factor)
 
     #display property on surface
     if(property != ""):
@@ -260,7 +257,7 @@ def RotateSurf(surf, rotationAngle, rotationVector):
     transformFilter.Update()
     return transformFilter.GetOutput()
 
-def GetUnitActor(fileName, property, scale_factor=-1, center=True, random_rotation=False, normal_shaders=True):
+def GetUnitActor(fileName, property, scale_factor, random_rotation=False, normal_shaders=True):
 
     try:
 
@@ -286,7 +283,8 @@ def GetUnitActor(fileName, property, scale_factor=-1, center=True, random_rotati
             surf = normals.GetOutput()
 
         # mapper
-        surfActor = GetActor(surf, property, scale_factor, center)
+        surfActor = GetActor(surf, property, scale_factor)
+
 
         if(normal_shaders):
 

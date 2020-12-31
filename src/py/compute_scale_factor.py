@@ -17,22 +17,6 @@ def main(args):
 	shapedata = reader.GetOutput()
 	shapedatapoints = shapedata.GetPoints()
 	
-
-	shape_points = []
-	for i in range(shapedatapoints.GetNumberOfPoints()):
-		p = shapedatapoints.GetPoint(i)
-		shape_points.append(p)
-
-	#centering points of the shape
-	shape_points = np.array(shape_points)
-	shape_mean = np.mean(shape_points, axis=0)
-	shape_points = shape_points - shape_mean
-
-	#assigning centered points back to shape
-	for i in range(shapedatapoints.GetNumberOfPoints()):
-		shapedatapoints.SetPoint(i, shape_points[i])
-
-	#computing bounds and mean
 	bounds = [0.0] * 6
 	mean_v = [0.0] * 3
 	bounds_max_v = [0.0] * 3
@@ -44,9 +28,24 @@ def main(args):
 	bounds_max_v[1] = max(bounds[2], bounds[3])
 	bounds_max_v[2] = max(bounds[4], bounds[5])
 
+	#Getting points from shape
+	shape_points = []
+	for i in range(shapedatapoints.GetNumberOfPoints()):
+		p = shapedatapoints.GetPoint(i)
+		shape_points.append(p)
+
+	#centering points of the shape
+	shape_points = np.array(shape_points)
+	mean_arr = np.array(mean_v)
+	shape_points = shape_points - mean_arr 
+
+	#assigning centered points back to shape
+	for i in range(shapedatapoints.GetNumberOfPoints()):
+		shapedatapoints.SetPoint(i, shape_points[i])
+
+
 	#Computing scale factor
 	bounds_max_arr = np.array(bounds_max_v)
-	mean_arr = np.array(mean_v)
 	scale_factor = np.linalg.norm(bounds_max_arr - mean_arr)
 
 	print(scale_factor)
@@ -57,6 +56,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser(description='Computes maximum magnitude/scaling factor using bounding box and appends to file')
 	parser.add_argument('--surf', type=str, default=None, help='Target surface or mesh', required=True)
 	parser.add_argument('--out', type=str, default="scale_factor.txt", help='Output filename')
+	#option to input a csv file with all the names of file TODO
+	#option to input a directory (like compute_max script) TODO
 	args = parser.parse_args()
 
 	main(args)
