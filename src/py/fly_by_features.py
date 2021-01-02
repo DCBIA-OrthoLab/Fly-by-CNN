@@ -1,6 +1,6 @@
 
 import os
-import tensorflow as tf
+# import tensorflow as tf
 import numpy as np
 import itk
 import vtk
@@ -49,14 +49,16 @@ class FlyByGenerator():
 
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
-		renderWindow.AddRenderer(renderer)
+		renderWindow.AddRenderer(renderer)		
 		renderWindow.SetSize(resolution, resolution)
+		renderWindow.SetMultiSamples(0)
 		renderWindow.OffScreenRenderingOn()
 
 		self.renderer = renderer
 		self.renderWindow = renderWindow
 		self.sphere = sphere
 		self.visualize = visualize
+		self.resolution = resolution
 
 	def removeActor(self, actor):
 		self.renderer.RemoveActor(actor)
@@ -70,7 +72,7 @@ class FlyByGenerator():
 	def addActor(self, actor):
 		self.renderer.AddActor(actor)
 
-	def getFlyBy(self):
+	def getFlyBy(self, use_z=True):
 
 		sphere_points = self.sphere.GetPoints()
 		camera = self.renderer.GetActiveCamera()
@@ -106,25 +108,30 @@ class FlyByGenerator():
 			windowToImageN.SetInput(self.renderWindow)
 			windowToImageN.Update()
 
-			windowFilterZ = vtk.vtkWindowToImageFilter()
-			windowFilterZ.SetInputBufferTypeToZBuffer()
-			windowFilterZ.SetInput(self.renderWindow)
-
-			scalez = vtk.vtkImageShiftScale()
-			scalez.SetOutputScalarTypeToDouble();
-			scalez.SetInputConnection(windowFilterZ.GetOutputPort());
-			scalez.SetShift(0);
-			scalez.SetScale(-1);
-			scalez.Update()
-			
 			img_o = windowToImageN.GetOutput()
-			img_z = scalez.GetOutput()
-			
-			img_o_np = vtk_to_numpy(img_o.GetPointData().GetScalars())
-			scalez_np = vtk_to_numpy(img_z.GetPointData().GetScalars())
-			scalez_np = np.abs(scalez_np).reshape([-1, 1])
 
-			img_np = np.multiply(img_o_np, scalez_np)
+			img_o_np = vtk_to_numpy(img_o.GetPointData().GetScalars())
+
+			if use_z:
+				windowFilterZ = vtk.vtkWindowToImageFilter()
+				windowFilterZ.SetInputBufferTypeToZBuffer()
+				windowFilterZ.SetInput(self.renderWindow)
+
+				scalez = vtk.vtkImageShiftScale()
+				scalez.SetOutputScalarTypeToDouble();
+				scalez.SetInputConnection(windowFilterZ.GetOutputPort());
+				scalez.SetShift(0);
+				scalez.SetScale(-1);
+				scalez.Update()
+				
+				img_z = scalez.GetOutput()
+				
+				scalez_np = vtk_to_numpy(img_z.GetPointData().GetScalars())
+				scalez_np = np.abs(scalez_np).reshape([-1, 1])
+
+				img_np = np.multiply(img_o_np, scalez_np)
+			else:
+				img_np = img_o_np
 
 			img_seq.append(img_np.reshape([d for d in img_o.GetDimensions() if d != 1] + [img_o.GetNumberOfScalarComponents()]))
 
@@ -185,10 +192,21 @@ def main(args):
 		model.summary()
 
 	flyby = FlyByGenerator(sphere, args.resolution, args.visualize)
+	
+	if args.point_features:
+		flyby_features = FlyByGenerator(sphere, args.resolution, args.visualize)
 
 	for fobj in filenames:
 
-		surf_actor = GetUnitActor(fobj["surf"], args.random_rotation, True)
+		surf = ReadSurf(fobj["surf"])
+		surf = GetUnitSurf(surf)
+
+		if args.random_rotation:
+			surf = RandomRotation(surf)
+
+		# surf_actor_cellids = GetCellIdMapActor(fobj["surf"])
+
+		surf_actor = GetNormalsActor(surf)
 		
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
@@ -204,6 +222,22 @@ def main(args):
 			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
 			writer.UseCompressionOn()
 			writer.Update()
+
+		if args.point_features:
+			surf_actor = GetPointIdMapActor(surf)
+			flyby_features.addActor(surf_actor)
+			out_pointids_rgb_np = flyby_features.getFlyBy(False)
+
+			for point_features_name in args.point_features:
+				print("Extracting:", point_features_name)
+				out_features_np = ExtractPointFeatures(surf, out_pointids_rgb_np, point_features_name)
+				out_features_name = os.path.splitext(fobj["out"])
+				out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
+				print("Writing:", out_features_name)
+				out_features = GetImage(out_features_np)
+				writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
+				writer.UseCompressionOn()
+				writer.Update()
 
 		flyby.removeActors()
 
@@ -239,6 +273,7 @@ if __name__ == '__main__':
 	output_params.add_argument('--out', type=str, help='Output filename or directory', default="out.nrrd")
 	output_params.add_argument('--uuid', type=bool, help='Use uuid to name the outputs', default=False)
 	output_params.add_argument('--ow', type=int, help='Overwrite outputs', default=1)
+	output_params.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
 
 	args = parser.parse_args()
 

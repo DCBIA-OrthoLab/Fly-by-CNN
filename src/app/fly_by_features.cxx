@@ -32,6 +32,7 @@
 #endif
 #include <vtkRenderer.h>
 #include <vtkCamera.h>
+#include <vtkLight.h>
 #include <vtkShaderProperty.h>
 #include <vtkRenderWindowInteractor.h>
 #include <vtkWindowToImageFilter.h>
@@ -45,6 +46,7 @@
 #include <vtkTransform.h>
 #include <vtkTransformPolyDataFilter.h>
 #include <vtkDoubleArray.h>
+#include <vtkUnsignedCharArray.h>
 #include <vtkIdTypeArray.h>
 #include <vtkCommand.h>
 #include <vtkImageShiftScale.h>
@@ -319,6 +321,11 @@ int main(int argc, char * argv[])
 
   if(applyRotation || randomRotation){
 
+    if(rotationAngle == -1){
+      vnl_random rand_gen = vnl_random();
+      rotationAngle = rand_gen.drand32()*360.0;
+    }
+
     cout<<"Apply rotation: angle: "<<rotationAngle<<", vector: "<<rotationVector[0]<<","<<rotationVector[1]<<","<<rotationVector[2]<<endl;
 
     vtkSmartPointer<vtkTransform> transform = vtkSmartPointer<vtkTransform>::New();
@@ -504,6 +511,7 @@ int main(int argc, char * argv[])
         renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
         renderWindowInteractor->SetRenderWindow(renderWindow);
 
+        
         vtkShaderProperty* sp = inputActor->GetShaderProperty();
 
         sp->AddVertexShaderReplacement(
@@ -536,13 +544,24 @@ int main(int argc, char * argv[])
             false                                   // only do it once
         );
 
-        sp->AddFragmentShaderReplacement(
-            "//VTK::Normal::Impl",  // replace the normal block
-            true,                   // before the standard replacements
-            "//VTK::Normal::Impl\n" // we still want the default calc
-            "  diffuseColor = myNormalMCVSOutput*0.5f + 0.5f;\n", // but we add this
-            false                                          // only do it once
-        );
+        if(useAbsNormals){
+          sp->AddFragmentShaderReplacement(
+              "//VTK::Light::Impl",
+              true,
+              "//VTK::Light::Impl\n"
+              "  gl_FragData[0] = vec4(abs(myNormalMCVSOutput), 1.0);\n",
+              false
+          );
+        }else{
+          sp->AddFragmentShaderReplacement(
+              "//VTK::Light::Impl",
+              true,
+              "//VTK::Light::Impl\n"
+              "  gl_FragData[0] = vec4(myNormalMCVSOutput*0.5f + 0.5, 1.0);\n",
+              false
+          );  
+        }
+        
 
         renderer->AddActor(sphereActor);
         renderer->AddActor(spherePointsActor);  
@@ -795,26 +814,26 @@ int main(int argc, char * argv[])
 
           //More visualization stuff
           if(visualize && i == visualizeIndexStopCriteria){
-            // vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
-            // lineSource->SetPoint1(point_plane_v.data_block());
-            // lineSource->SetPoint2(point_end_v.data_block());
+            vtkSmartPointer<vtkLineSource> lineSource = vtkSmartPointer<vtkLineSource>::New();
+            lineSource->SetPoint1(point_plane_v.data_block());
+            lineSource->SetPoint2(point_end_v.data_block());
 
-            // vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-            // lineMapper->SetInputConnection(lineSource->GetOutputPort());
-            // vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
-            // lineActor->SetMapper(lineMapper);
-            // lineActor->GetProperty()->SetLineWidth(8.0);
-            // lineActor->GetProperty()->SetColor(0.4, 0, 1.0);
+            vtkSmartPointer<vtkPolyDataMapper> lineMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+            lineMapper->SetInputConnection(lineSource->GetOutputPort());
+            vtkSmartPointer<vtkActor> lineActor = vtkSmartPointer<vtkActor>::New();
+            lineActor->SetMapper(lineMapper);
+            lineActor->GetProperty()->SetLineWidth(8.0);
+            lineActor->GetProperty()->SetColor(0.4, 0, 1.0);
 
-            // vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
-            // planeMapper->SetInputData(planeMesh);
-            // vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
-            // planeActor->SetMapper(planeMapper);
-            // planeActor->GetProperty()->SetRepresentationToWireframe();
-            // planeActor->GetProperty()->SetColor(0, 0.9, 1.0);
+            vtkSmartPointer<vtkPolyDataMapper> planeMapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+            planeMapper->SetInputData(planeMesh);
+            vtkSmartPointer<vtkActor> planeActor = vtkSmartPointer<vtkActor>::New();
+            planeActor->SetMapper(planeMapper);
+            planeActor->GetProperty()->SetRepresentationToWireframe();
+            planeActor->GetProperty()->SetColor(0, 0.9, 1.0);
             
-            // renderer->AddActor(lineActor);
-            // renderer->AddActor(planeActor);
+            renderer->AddActor(lineActor);
+            renderer->AddActor(planeActor);
             renderWindowInteractor->Start();
           }
           
@@ -839,62 +858,81 @@ int main(int argc, char * argv[])
 #endif
       
       renderWindow->SetSize(planeResolution, planeResolution);
-      renderer->SetBackground(0, 0, 0);
+      renderer->SetBackground(1, 1, 1);
+      // vtkLight* light = renderer->MakeLight();
+      // light->SetLightTypeToCameraLight();
+      // light->SetIntensity(1);
+      // light->SetExponent(10);
+      // light->SwitchOn();
       renderWindow->AddRenderer(renderer);
 
       vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
       inputMapper->SetInputData(input_mesh);
       vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
       inputActor->SetMapper(inputMapper);
-      inputActor->GetProperty()->SetInterpolationToPhong();
+      if(usePhong){
+        inputActor->GetProperty()->SetInterpolationToPhong();  
+      }
+      
       renderer->AddActor(inputActor);
 
-      vtkShaderProperty* sp = inputActor->GetShaderProperty();
+      if(!usePhong){
+        vtkShaderProperty* sp = inputActor->GetShaderProperty();
 
-      sp->AddVertexShaderReplacement(
-          "//VTK::Normal::Dec",  // replace the normal block
-          true,                  // before the standard replacements
-          "//VTK::Normal::Dec\n" // we still want the default
-          "  varying vec3 myNormalMCVSOutput;\n", // but we add this
-          false                                   // only do it once
-      );
+        sp->AddVertexShaderReplacement(
+            "//VTK::Normal::Dec",  // replace the normal block
+            true,                  // before the standard replacements
+            "//VTK::Normal::Dec\n" // we still want the default
+            "  varying vec3 myNormalMCVSOutput;\n", // but we add this
+            false                                   // only do it once
+        );
 
-      sp->AddVertexShaderReplacement(
-          "//VTK::Normal::Impl",                // replace the normal block
-          true,                                 // before the standard replacements
-          "//VTK::Normal::Impl\n"               // we still want the default
-          "  myNormalMCVSOutput = normalMC;\n", // but we add this
-          false                                 // only do it once
-      );
+        sp->AddVertexShaderReplacement(
+            "//VTK::Normal::Impl",                // replace the normal block
+            true,                                 // before the standard replacements
+            "//VTK::Normal::Impl\n"               // we still want the default
+            "myNormalMCVSOutput = normalMC;\n", // but we add this
+            false                                 // only do it once
+        );
 
-      sp->AddVertexShaderReplacement(
-          "//VTK::Color::Impl", // dummy replacement for testing clear method
-          true, "VTK::Color::Impl\n", false);
+        sp->AddVertexShaderReplacement(
+            "//VTK::Color::Impl", // dummy replacement for testing clear method
+            true, "VTK::Color::Impl\n", false);
 
-      sp->ClearVertexShaderReplacement("//VTK::Color::Impl", true);
+        sp->ClearVertexShaderReplacement("//VTK::Color::Impl", true);
 
-      sp->AddFragmentShaderReplacement(
-          "//VTK::Normal::Dec",  // replace the normal block
-          true,                  // before the standard replacements
-          "//VTK::Normal::Dec\n" // we still want the default
-          "  varying vec3 myNormalMCVSOutput;\n", // but we add this
-          false                                   // only do it once
-      );
+        sp->AddFragmentShaderReplacement(
+            "//VTK::Normal::Dec",  // replace the normal block
+            true,                  // before the standard replacements
+            "//VTK::Normal::Dec\n" // we still want the default
+            "varying vec3 myNormalMCVSOutput;\n", // but we add this
+            false                                   // only do it once
+        );
 
-      sp->AddFragmentShaderReplacement(
-          "//VTK::Normal::Impl",  // replace the normal block
-          true,                   // before the standard replacements
-          "//VTK::Normal::Impl\n" // we still want the default calc
-          "  diffuseColor = myNormalMCVSOutput*0.5f + 0.5f;\n", // but we add this
-          false                                          // only do it once
-      );
+        if(useAbsNormals){
+          sp->AddFragmentShaderReplacement(
+              "//VTK::Light::Impl",
+              true,
+              "//VTK::Light::Impl\n"
+              "  gl_FragData[0] = vec4(abs(myNormalMCVSOutput), 1.0);\n",
+              false
+          );
+        }else{
+          sp->AddFragmentShaderReplacement(
+              "//VTK::Light::Impl",
+              true,
+              "//VTK::Light::Impl\n"
+              "  gl_FragData[0] = vec4(myNormalMCVSOutput*0.5f + 0.5, 1.0);\n",
+              false
+          );  
+        }
+      }
+      
       
       vtkSmartPointer<vtkCamera> camera = renderer->GetActiveCamera();
       vtkSmartPointer<vtkPoints> spherePoints = sphere->GetPoints();
 
       if(visualize){
-
-        renderer->SetBackground(1, 1, 1);
 
         vtkSmartPointer<vtkRenderWindowInteractor> renderWindowInteractor = vtkSmartPointer<vtkRenderWindowInteractor>::New();
         renderWindowInteractor->SetRenderWindow(renderWindow);
@@ -909,8 +947,6 @@ int main(int argc, char * argv[])
         cb->timerId = timerId;
         
         renderWindowInteractor->Start();
-
-        renderer->SetBackground(0, 0, 0);
       }
 
       for(int sphere_i = 0; sphere_i < spherePoints->GetNumberOfPoints(); sphere_i++){
@@ -926,8 +962,7 @@ int main(int argc, char * argv[])
           camera->SetViewUp(-1, 0, 0);
         }
         camera->SetPosition(sphere_point[0], sphere_point[1], sphere_point[2]);
-        camera->SetFocalPoint(0, 0, 0);  
-        
+        camera->SetFocalPoint(0, 0, 0);
 
         renderer->ResetCameraClippingRange();
         renderWindow->Render();
@@ -944,34 +979,37 @@ int main(int argc, char * argv[])
         CastImageFilterType::Pointer cast = CastImageFilterType::New();
         cast->SetInput(convert_image->GetOutput());
         cast->Update();
-
-        vtkSmartPointer<vtkWindowToImageFilter> windowFilterZ = vtkSmartPointer<vtkWindowToImageFilter>::New();
-        windowFilterZ->SetInput(renderWindow);
-        windowFilterZ->SetInputBufferTypeToZBuffer();
-        windowFilterZ->Update();
-
-        vtkSmartPointer<vtkImageShiftScale> scale = vtkSmartPointer<vtkImageShiftScale>::New();
-        scale->SetOutputScalarTypeToDouble();
-        scale->SetInputConnection(windowFilterZ->GetOutputPort());
-        scale->SetShift(0);
-        scale->SetScale(-1.0);
-        scale->Update();
-
-        ZVTKImageToImageFilterType::Pointer convert_zimage = ZVTKImageToImageFilterType::New();
-        convert_zimage->SetInput(scale->GetOutput());
-        convert_zimage->Update();
-
-        ZAbsImageType::Pointer zabs = ZAbsImageType::New();
-        zabs->SetInput(convert_zimage->GetOutput());
-        zabs->Update();
-
-        MultiplyImageFilterType::Pointer multiply = MultiplyImageFilterType::New();
-        multiply->SetInput1(cast->GetOutput());
-        multiply->SetInput2(zabs->GetOutput());
-        multiply->Update();
         
-        compose_v.push_back(multiply->GetOutput());
+        if(!usePhong){
+          vtkSmartPointer<vtkWindowToImageFilter> windowFilterZ = vtkSmartPointer<vtkWindowToImageFilter>::New();
+          windowFilterZ->SetInput(renderWindow);
+          windowFilterZ->SetInputBufferTypeToZBuffer();
+          windowFilterZ->Update();
 
+          vtkSmartPointer<vtkImageShiftScale> scale = vtkSmartPointer<vtkImageShiftScale>::New();
+          scale->SetOutputScalarTypeToDouble();
+          scale->SetInputConnection(windowFilterZ->GetOutputPort());
+          scale->SetShift(0);
+          scale->SetScale(-1.0);
+          scale->Update();
+
+          ZVTKImageToImageFilterType::Pointer convert_zimage = ZVTKImageToImageFilterType::New();
+          convert_zimage->SetInput(scale->GetOutput());
+          convert_zimage->Update();
+
+          ZAbsImageType::Pointer zabs = ZAbsImageType::New();
+          zabs->SetInput(convert_zimage->GetOutput());
+          zabs->Update();
+
+          MultiplyImageFilterType::Pointer multiply = MultiplyImageFilterType::New();
+          multiply->SetInput1(cast->GetOutput());
+          multiply->SetInput2(zabs->GetOutput());
+          multiply->Update();
+          
+          compose_v.push_back(multiply->GetOutput());  
+        }else{
+          compose_v.push_back(cast->GetOutput());
+        }
       }
     }
 

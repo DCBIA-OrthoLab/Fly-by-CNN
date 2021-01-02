@@ -140,9 +140,9 @@
       <name>rotationAngle</name>
       <label>Use this rotation angle</label>
       <channel>input</channel>
-      <description>Apply this angle of rotation</description>
+      <description>Apply this angle of rotation, -1 for random angle</description>
       <longflag>rotationAngle</longflag>
-      <default>0</default>
+      <default>-1</default>
     </double>
 
     <double-vector>
@@ -214,6 +214,24 @@
       <channel>input</channel>
       <description>Use an octree to locate cells instead of the rendering engine (slow algorithm)</description>
       <longflag>useOctree</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
+      <name>usePhong</name>
+      <label>Use phong interpolation model</label>
+      <channel>input</channel>
+      <description>Use phong</description>
+      <longflag>usePhong</longflag>
+      <default>0</default>
+    </boolean>
+
+    <boolean>
+      <name>useAbsNormals</name>
+      <label>Use absolute normal value</label>
+      <channel>input</channel>
+      <description>Use absolute normal value</description>
+      <longflag>useAbsNormals</longflag>
       <default>0</default>
     </boolean>
 
