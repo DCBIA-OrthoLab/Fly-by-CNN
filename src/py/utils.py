@@ -179,6 +179,7 @@ def ScaleSurf(surf, scale_factor):
     shape_points = np.array(shape_points)
     mean_arr = np.array(mean_v)
     shape_points = shape_points - mean_arr
+    print(shape_points)
 
     #Computing scale factor if it is not provided
     if(scale_factor == -1):
@@ -188,6 +189,7 @@ def ScaleSurf(surf, scale_factor):
     #scale points of the shape by scale factor
     shape_points = np.array(shape_points)
     shape_points_scaled = np.divide(shape_points, scale_factor)
+    print(shape_points_scaled)
 
     #assigning scaled points back to shape
     for i in range(shapedatapoints.GetNumberOfPoints()):
