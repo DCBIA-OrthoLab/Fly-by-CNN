@@ -3,14 +3,13 @@ kind: Pod
 metadata:
   name: fly-by-cnn-pod
 spec:
-  restartPolicy: Never
   containers:
     - name: fly-by-cnn-container
       image: fly-by-cnn:2.0
       volumeMounts:
         - mountPath: "/shiny-tooth"
           name: shiny-tooth-storage
-      command: ["ls", "-l", "/shiny-tooth"]
+      command: ["sleep", "infinity"]
   volumes:
     - name: shiny-tooth-storage
       persistentVolumeClaim:
