@@ -184,11 +184,12 @@ def ScaleSurf(surf, scale_factor):
     #Computing scale factor if it is not provided
     if(scale_factor == -1):
         bounds_max_arr = np.array(bounds_max_v)
-        scale_factor = np.linalg.norm(bounds_max_arr - mean_arr)
+        scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
+        print(scale_factor)
 
     #scale points of the shape by scale factor
     shape_points = np.array(shape_points)
-    shape_points_scaled = np.divide(shape_points, scale_factor)
+    shape_points_scaled = np.multiply(shape_points, scale_factor)
     print(shape_points_scaled)
 
     #assigning scaled points back to shape

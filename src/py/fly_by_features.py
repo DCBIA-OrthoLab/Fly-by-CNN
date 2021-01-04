@@ -17,31 +17,31 @@ from utils import *
 
 # class ShapeAlignment(tf.keras.Model):
 
-# 	def __init__(self, dimension=2):
-# 		super(ShapeAlignment, self).__init__()
+#	def __init__(self, dimension=2):
+#		super(ShapeAlignment, self).__init__()
 
-# 		self.transform = tf.Variable(tf.eye(4), dtype=tf.float32)
-# 		self.loss = tf.keras.losses.MeanAbsoluteError()
+#		self.transform = tf.Variable(tf.eye(4), dtype=tf.float32)
+#		self.loss = tf.keras.losses.MeanAbsoluteError()
 
-# 		# lr = tf.keras.optimizers.schedules.ExponentialDecay(1e-3, 100, 0.96, 1)
-# 		self.optimizer = tf.keras.optimizers.SGD(1e-3)
+#		# lr = tf.keras.optimizers.schedules.ExponentialDecay(1e-3, 100, 0.96, 1)
+#		self.optimizer = tf.keras.optimizers.SGD(1e-3)
 
-# 	# @tf.function
-# 	def train_step(self, logits, target):
+#	# @tf.function
+#	def train_step(self, logits, target):
 
-# 		with tf.GradientTape() as tape:
+#		with tf.GradientTape() as tape:
 			
-# 			loss = self.loss(logits, target)
+#			loss = self.loss(logits, target)
 			
-# 			var_list = self.trainable_variables
+#			var_list = self.trainable_variables
 
-# 			gradients = tape.gradient(loss, var_list)
-# 			self.optimizer.apply_gradients(zip(gradients, var_list))
+#			gradients = tape.gradient(loss, var_list)
+#			self.optimizer.apply_gradients(zip(gradients, var_list))
 
-# 			return loss
+#			return loss
 
-# 	def get_transform(self):
-# 		return self.transform.get_weights()
+#	def get_transform(self):
+#		return self.transform.get_weights()
 	
 
 class FlyByGenerator():
@@ -194,34 +194,36 @@ def main(args):
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
 			
-			out_np = flyby.getFlyBy()
+		out_np = flyby.getFlyBy()
+		print(out_np.shape)
 
-			if model is not None:
-				out_np = model.predict(out_np)
-			
-			if ( not args.concatenate ):
-				for i in range(out_np.shape[0]):
-					out_img = GetImage(out_np[i])
+		if model is not None:
+			out_np = model.predict(out_np)
+		
 
-					p = ".*(?=\.)"
-					prefix = re.findall(p, fobj["out"])
-					
-					s ="([^\.]+$)" 
-					suffix = re.findall(s, fobj["out"])
-	
-					filename=prefix[0]+"_"+str(i)+"."+suffix[0]
-					print("Writing:", filename)
-			
-					writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
-					writer.UseCompressionOn()
-					writer.Update()
-			else:
-				out_img = GetImage(out_np)
+		if ( not args.concatenate ):
+			for i in range(out_np.shape[0]):
+				out_img = GetImage(out_np[i])
 
-				print("Writing:", fobj["out"])
-				writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
+				p = ".*(?=\.)"
+				prefix = re.findall(p, fobj["out"])
+				
+				s ="([^\.]+$)" 
+				suffix = re.findall(s, fobj["out"])
+
+				filename=prefix[0]+"_"+str(i)+"."+suffix[0]
+				print("Writing:", filename)
+		
+				writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
 				writer.UseCompressionOn()
 				writer.Update()
+		else:
+			out_img = GetImage(out_np)
+
+			print("Writing:", fobj["out"])
+			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
+			writer.UseCompressionOn()
+			writer.Update()
 				
 
 		flyby.removeActors()

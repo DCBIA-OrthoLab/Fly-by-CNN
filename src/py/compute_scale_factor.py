@@ -56,7 +56,7 @@ def main(args):
 
         #Computing scale factor
         bounds_max_arr = np.array(bounds_max_v)
-        scale_factor = np.linalg.norm(bounds_max_arr - mean_arr)
+        scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
         
         if(scale_factor>max_value):
             max_value=scale_factor
