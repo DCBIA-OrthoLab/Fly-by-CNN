@@ -157,12 +157,7 @@ def ReadSurf(fileName):
 
 def ScaleSurf(surf, scale_factor):
     shapedatapoints = surf.GetPoints()
-
-    shape_points = []
-    for i in range(shapedatapoints.GetNumberOfPoints()):
-        p = shapedatapoints.GetPoint(i)
-        shape_points.append(p)
-
+    
     #calculate bounding box
     bounds = [0.0] * 6
     mean_v = [0.0] * 3
@@ -175,11 +170,16 @@ def ScaleSurf(surf, scale_factor):
     bounds_max_v[1] = max(bounds[2], bounds[3])
     bounds_max_v[2] = max(bounds[4], bounds[5])
 
+    shape_points = []
+    for i in range(shapedatapoints.GetNumberOfPoints()):
+        p = shapedatapoints.GetPoint(i)
+        shape_points.append(p)
+
+
     #centering points of the shape
     shape_points = np.array(shape_points)
     mean_arr = np.array(mean_v)
     shape_points = shape_points - mean_arr
-    print(shape_points)
 
     #Computing scale factor if it is not provided
     if(scale_factor == -1):
@@ -190,7 +190,6 @@ def ScaleSurf(surf, scale_factor):
     #scale points of the shape by scale factor
     shape_points = np.array(shape_points)
     shape_points_scaled = np.multiply(shape_points, scale_factor)
-    print(shape_points_scaled)
 
     #assigning scaled points back to shape
     for i in range(shapedatapoints.GetNumberOfPoints()):

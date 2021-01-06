@@ -195,7 +195,6 @@ def main(args):
 			flyby.addActor(surf_actor)
 			
 		out_np = flyby.getFlyBy()
-		print(out_np.shape)
 
 		if model is not None:
 			out_np = model.predict(out_np)

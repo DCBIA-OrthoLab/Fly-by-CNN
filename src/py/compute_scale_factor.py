@@ -4,6 +4,23 @@ import os
 import glob
 import argparse
 
+def Normalization(vtkdata):
+    polypoints = vtkdata.GetPoints()
+    
+    nppoints = []
+    for pid in range(polypoints.GetNumberOfPoints()):
+        spoint = polypoints.GetPoint(pid)
+        nppoints.append(spoint)
+
+    npmean = np.mean(np.array(nppoints), axis=0)
+    nppoints -= npmean
+    npscale = np.max([np.linalg.norm(p) for p in nppoints])
+    nppoints /= npscale
+
+    for pid in range(polypoints.GetNumberOfPoints()):
+        vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
+
+    return vtkdata, npmean, npscale
 
 def main(args):
     shapes_arr = []
@@ -25,6 +42,8 @@ def main(args):
         reader.SetFileName(vtkfilename)
         reader.Update()
         shapedata = reader.GetOutput()
+        #QUESTION: Do i normalize the shape before finding scale factor - bc the surface is being normalized in the utils.py file before using the scale factor
+        shapedata, shape_mean, shape_scale = Normalization(shapedata)
         shapedatapoints = shapedata.GetPoints()
         
         bounds = [0.0] * 6
@@ -49,11 +68,6 @@ def main(args):
         mean_arr = np.array(mean_v)
         shape_points = shape_points - mean_arr 
 
-        #assigning centered points back to shape
-        for i in range(shapedatapoints.GetNumberOfPoints()):
-            shapedatapoints.SetPoint(i, shape_points[i])
-
-
         #Computing scale factor
         bounds_max_arr = np.array(bounds_max_v)
         scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
@@ -69,11 +83,10 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Computes maximum magnitude/scaling factor using bounding box and appends to file')
-    #TODO: MAKE AT LEAST ONE OF THE CSV, DIRECTRY OR SURF REQUIRED
+    #TODO: MAKE AT LEAST ONE OF THE DIRECTRY OR SURF REQUIRED
     parser.add_argument('--surf', type=str, default=None, help='Target surface or mesh')
     parser.add_argument('--out', type=str, default="scale_factor.txt", help='Output filename')
     parser.add_argument('--dir', type=str, default=None, help='Directory with vtk files')
-    #option to input a csv file with all the names of file TODO
 
     args = parser.parse_args()
 
