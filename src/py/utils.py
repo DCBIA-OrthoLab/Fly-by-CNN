@@ -11,55 +11,55 @@ from multiprocessing import Pool, cpu_count
 from vtk.util.numpy_support import vtk_to_numpy
 
 def Normalization(vtkdata):
-	polypoints = vtkdata.GetPoints()
-	
-	nppoints = []
-	for pid in range(polypoints.GetNumberOfPoints()):
-		spoint = polypoints.GetPoint(pid)
-		nppoints.append(spoint)
+    polypoints = vtkdata.GetPoints()
+    
+    nppoints = []
+    for pid in range(polypoints.GetNumberOfPoints()):
+        spoint = polypoints.GetPoint(pid)
+        nppoints.append(spoint)
 
-	npmean = np.mean(np.array(nppoints), axis=0)
-	nppoints -= npmean
-	npscale = np.max([np.linalg.norm(p) for p in nppoints])
-	nppoints /= npscale
+    npmean = np.mean(np.array(nppoints), axis=0)
+    nppoints -= npmean
+    npscale = np.max([np.linalg.norm(p) for p in nppoints])
+    nppoints /= npscale
 
-	for pid in range(polypoints.GetNumberOfPoints()):
-		vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
+    for pid in range(polypoints.GetNumberOfPoints()):
+        vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
 
-	return vtkdata, npmean, npscale
+    return vtkdata, npmean, npscale
 
 def normalize_points(poly, radius):
-	polypoints = poly.GetPoints()
-	for pid in range(polypoints.GetNumberOfPoints()):
-		spoint = polypoints.GetPoint(pid)
-		spoint = np.array(spoint)
-		norm = np.linalg.norm(spoint)
-		spoint = spoint/norm * radius
-		polypoints.SetPoint(pid, spoint)
-	poly.SetPoints(polypoints)
-	return poly
+    polypoints = poly.GetPoints()
+    for pid in range(polypoints.GetNumberOfPoints()):
+        spoint = polypoints.GetPoint(pid)
+        spoint = np.array(spoint)
+        norm = np.linalg.norm(spoint)
+        spoint = spoint/norm * radius
+        polypoints.SetPoint(pid, spoint)
+    poly.SetPoints(polypoints)
+    return poly
 
 def normalize_vector(x):
-	return x/np.linalg.norm(x)
+    return x/np.linalg.norm(x)
 
 def CreateIcosahedron(radius, sl):
-	icosahedronsource = vtk.vtkPlatonicSolidSource()
-	icosahedronsource.SetSolidTypeToIcosahedron()
-	icosahedronsource.Update()
-	icosahedron = icosahedronsource.GetOutput()
-	
-	subdivfilter = lsf.LinearSubdivisionFilter()
-	subdivfilter.SetInputData(icosahedron)
-	subdivfilter.SetNumberOfSubdivisions(sl)
-	subdivfilter.Update()
+    icosahedronsource = vtk.vtkPlatonicSolidSource()
+    icosahedronsource.SetSolidTypeToIcosahedron()
+    icosahedronsource.Update()
+    icosahedron = icosahedronsource.GetOutput()
+    
+    subdivfilter = lsf.LinearSubdivisionFilter()
+    subdivfilter.SetInputData(icosahedron)
+    subdivfilter.SetNumberOfSubdivisions(sl)
+    subdivfilter.Update()
 
-	icosahedron = subdivfilter.GetOutput()
-	icosahedron = normalize_points(icosahedron, radius)
+    icosahedron = subdivfilter.GetOutput()
+    icosahedron = normalize_points(icosahedron, radius)
 
-	return icosahedron
+    return icosahedron
 
 def CreateSpiral(sphereRadius=4, numberOfSpiralSamples=64, numberOfSpiralTurns=4):
-	
+    
     sphere = vtk.vtkPolyData()
     sphere_points = vtk.vtkPoints()
     lines = vtk.vtkCellArray()
@@ -98,65 +98,109 @@ def CreateSpiral(sphereRadius=4, numberOfSpiralSamples=64, numberOfSpiralTurns=4
     return sphere
 
 def CreatePlane(Origin,Point1,Point2,Resolution):
-	plane = vtk.vtkPlaneSource()
-	
-	plane.SetOrigin(Origin)
-	plane.SetPoint1(Point1)
-	plane.SetPoint2(Point2)
-	plane.SetXResolution(Resolution)
-	plane.SetYResolution(Resolution)
-	plane.Update()
-	return plane.GetOutput()
+    plane = vtk.vtkPlaneSource()
+    
+    plane.SetOrigin(Origin)
+    plane.SetPoint1(Point1)
+    plane.SetPoint2(Point2)
+    plane.SetXResolution(Resolution)
+    plane.SetYResolution(Resolution)
+    plane.Update()
+    return plane.GetOutput()
 
 def ReadSurf(fileName):
 
-	print("Reading:", fileName)
+    print("Reading:", fileName)
 
-	fname, extension = os.path.splitext(fileName)
-	extension = extension.lower()
-	if extension == ".vtk":
-		reader = vtk.vtkPolyDataReader()
-		reader.SetFileName(fileName)
-		reader.Update()
-		surf = reader.GetOutput()
-	elif extension == ".stl":
-		reader = vtk.vtkSTLReader()
-		reader.SetFileName(fileName)
-		reader.Update()
-		surf = reader.GetOutput()
-	elif extension == ".off":
-		reader = OFFReader()
-		reader.SetFileName(fileName)
-		reader.Update()
-		surf = reader.GetOutput()
-	elif extension == ".obj":
-		if os.path.exists(fname + ".mtl"):
-			obj_import = vtk.vtkOBJImporter()
-			obj_import.SetFileName(fileName)
-			obj_import.SetFileNameMTL(fname + ".mtl")
-			textures_path = os.path.normpath(os.path.dirname(fname) + "/../images")
-			if os.path.exists(textures_path):
-				obj_import.SetTexturePath(textures_path)
-			obj_import.Read()
+    fname, extension = os.path.splitext(fileName)
+    extension = extension.lower()
+    if extension == ".vtk":
+        reader = vtk.vtkPolyDataReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()
+    elif extension == ".stl":
+        reader = vtk.vtkSTLReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()
+    elif extension == ".off":
+        reader = OFFReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()
+    elif extension == ".obj":
+        if os.path.exists(fname + ".mtl"):
+            obj_import = vtk.vtkOBJImporter()
+            obj_import.SetFileName(fileName)
+            obj_import.SetFileNameMTL(fname + ".mtl")
+            textures_path = os.path.normpath(os.path.dirname(fname) + "/../images")
+            if os.path.exists(textures_path):
+                obj_import.SetTexturePath(textures_path)
+            obj_import.Read()
 
-			actors = obj_import.GetRenderer().GetActors()
-			actors.InitTraversal()
-			append = vtk.vtkAppendPolyData()
+            actors = obj_import.GetRenderer().GetActors()
+            actors.InitTraversal()
+            append = vtk.vtkAppendPolyData()
 
-			for i in range(actors.GetNumberOfItems()):
-				surfActor = actors.GetNextActor()
-				append.AddInputData(surfActor.GetMapper().GetInputAsDataSet())
-			
-			append.Update()
-			surf = append.GetOutput()
-			
-		else:
-			reader = vtk.vtkOBJReader()
-			reader.SetFileName(fileName)
-			reader.Update()
-			surf = reader.GetOutput()
+            for i in range(actors.GetNumberOfItems()):
+                surfActor = actors.GetNextActor()
+                append.AddInputData(surfActor.GetMapper().GetInputAsDataSet())
+            
+            append.Update()
+            surf = append.GetOutput()
+            
+        else:
+            reader = vtk.vtkOBJReader()
+            reader.SetFileName(fileName)
+            reader.Update()
+            surf = reader.GetOutput()
 
-	return surf
+    return surf
+
+def ScaleSurf(surf, scale_factor):
+    shapedatapoints = surf.GetPoints()
+    
+    #calculate bounding box
+    bounds = [0.0] * 6
+    mean_v = [0.0] * 3
+    bounds_max_v = [0.0] * 3
+    bounds = shapedatapoints.GetBounds()
+    mean_v[0] = (bounds[0] + bounds[1])/2.0
+    mean_v[1] = (bounds[2] + bounds[3])/2.0
+    mean_v[2] = (bounds[4] + bounds[5])/2.0
+    bounds_max_v[0] = max(bounds[0], bounds[1])
+    bounds_max_v[1] = max(bounds[2], bounds[3])
+    bounds_max_v[2] = max(bounds[4], bounds[5])
+
+    shape_points = []
+    for i in range(shapedatapoints.GetNumberOfPoints()):
+        p = shapedatapoints.GetPoint(i)
+        shape_points.append(p)
+
+
+    #centering points of the shape
+    shape_points = np.array(shape_points)
+    mean_arr = np.array(mean_v)
+    shape_points = shape_points - mean_arr
+
+    #Computing scale factor if it is not provided
+    if(scale_factor == -1):
+        bounds_max_arr = np.array(bounds_max_v)
+        scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
+        print(scale_factor)
+
+    #scale points of the shape by scale factor
+    shape_points = np.array(shape_points)
+    shape_points_scaled = np.multiply(shape_points, scale_factor)
+
+    #assigning scaled points back to shape
+    for i in range(shapedatapoints.GetNumberOfPoints()):
+       shapedatapoints.SetPoint(i, shape_points_scaled[i])    
+
+    surf.SetPoints(shapedatapoints)
+
+    return surf
 
 def GetActor(surf):
 	surfMapper = vtk.vtkPolyDataMapper()
@@ -188,6 +232,53 @@ def GetUnitSurf(surf):
 	surf, surf_mean, surf_scale = Normalization(surf)
 	return surf
 
+def GetPropertyActor(surf, property_name):
+
+    #display property on surface
+    point_data = vtk.vtkDoubleArray()
+    point_data.SetNumberOfComponents(1)
+
+    with open(property_name) as property_file:
+        for line in property_file:
+            point_val = float(line[:-1])
+            point_data.InsertNextTuple([point_val])
+                
+        surf.GetPointData().SetScalars(point_data)
+
+    surf_actor = GetActor(surf)
+    surf_actor.GetProperty().LightingOff()
+    surf_actor.GetProperty().ShadingOff()
+    surf_actor.GetProperty().SetInterpolationToFlat()
+
+    surfMapper = surf_actor.GetMapper()
+    surfMapper.SetUseLookupTableScalarRange(True)
+
+    
+    #build lookup table
+    number_of_colors = 512
+    low_range = 0
+    high_range = 1  
+    lut = vtk.vtkLookupTable()
+    lut.SetTableRange(low_range, high_range)
+    lut.SetNumberOfColors(number_of_colors)
+
+    #Color transfer function  
+    ctransfer = vtk.vtkColorTransferFunction()
+    ctransfer.AddRGBPoint(0.0, 1.0, 1.0, 0.0) # Yellow
+    ctransfer.AddRGBPoint(0.5, 1.0, 0.0, 0.0) # Red
+
+    #Calculated new colors for LUT via color transfer function
+    for i in range(number_of_colors):
+        new_colour = ctransfer.GetColor( (i * ((high_range-low_range)/number_of_colors) ) )
+        lut.SetTableValue(i, *new_colour)
+
+    lut.Build()
+
+    surfMapper.SetLookupTable(lut)
+
+
+    return surfActor
+
 def GetNormalsActor(surf):
 
 	try:
@@ -203,49 +294,145 @@ def GetNormalsActor(surf):
 		# mapper
 		surf_actor = GetActor(surf)
 
-		sp = surf_actor.GetShaderProperty();
-		sp.AddVertexShaderReplacement(
-			"//VTK::Normal::Dec",
-			True,
-			"//VTK::Normal::Dec\n" + 
-			"  varying vec3 myNormalMCVSOutput;\n",
-			False
-		)
+		if vtk.VTK_MAJOR_VERSION > 8:
 
-		sp.AddVertexShaderReplacement(
-			"//VTK::Normal::Impl",
-			True,
-			"//VTK::Normal::Impl\n" +
-			"  myNormalMCVSOutput = normalMC;\n",
-			False
-		)
+			sp = surf_actor.GetShaderProperty();
+			sp.AddVertexShaderReplacement(
+				"//VTK::Normal::Dec",
+				True,
+				"//VTK::Normal::Dec\n" + 
+				"  varying vec3 myNormalMCVSOutput;\n",
+				False
+			)
 
-		sp.AddVertexShaderReplacement(
-			"//VTK::Color::Impl",
-			True, "VTK::Color::Impl\n", False)
+			sp.AddVertexShaderReplacement(
+				"//VTK::Normal::Impl",
+				True,
+				"//VTK::Normal::Impl\n" +
+				"  myNormalMCVSOutput = normalMC;\n",
+				False
+			)
 
-		sp.ClearVertexShaderReplacement("//VTK::Color::Impl", True)
+			sp.AddVertexShaderReplacement(
+				"//VTK::Color::Impl",
+				True, "VTK::Color::Impl\n", False)
 
-		sp.AddFragmentShaderReplacement(
-			"//VTK::Normal::Dec",
-			True,
-			"//VTK::Normal::Dec\n" + 
-			"  varying vec3 myNormalMCVSOutput;\n",
-			False
-		)
+			sp.ClearVertexShaderReplacement("//VTK::Color::Impl", True)
 
-		sp.AddFragmentShaderReplacement(
-			"//VTK::Light::Impl",
-			True,
-			"//VTK::Light::Impl\n" +
-			"  gl_FragData[0] = vec4(myNormalMCVSOutput*0.5f + 0.5, 1.0);\n",
-			False
-		)
+			sp.AddFragmentShaderReplacement(
+				"//VTK::Normal::Dec",
+				True,
+				"//VTK::Normal::Dec\n" + 
+				"  varying vec3 myNormalMCVSOutput;\n",
+				False
+			)
+
+			sp.AddFragmentShaderReplacement(
+				"//VTK::Light::Impl",
+				True,
+				"//VTK::Light::Impl\n" +
+				"  gl_FragData[0] = vec4(myNormalMCVSOutput*0.5f + 0.5, 1.0);\n",
+				False
+			)
+
+		else:
+			colored_points = vtk.vtkUnsignedCharArray()
+			colored_points.SetName('colors')
+			colored_points.SetNumberOfComponents(3)
+
+			normals = surf.GetPointData().GetArray('Normals')
+			for pid in range(surf.GetNumberOfPoints()):
+				normal = np.array(normals.GetTuple(pid))
+				rgb = (normal*0.5 + 0.5)*255.0
+				colored_points.InsertNextTuple3(rgb[0], rgb[1], rgb[2])
+
+			surf.GetPointData().SetScalars(colored_points)
+
+			surf_actor = GetActor(surf)
+			surf_actor.GetProperty().LightingOff()
+			surf_actor.GetProperty().ShadingOff()
+			surf_actor.GetProperty().SetInterpolationToFlat()
+
 
 		return surf_actor
 	except Exception as e:
 		print(e, file=sys.stderr)
 		return None
+
+# def GetUnitActor(fileName, property, scale_factor, random_rotation=False, normal_shaders=True):
+
+#     try:
+
+#         surf = ReadSurf(fileName)
+
+#         surf, surf_mean, surf_scale = Normalization(surf)
+
+#         if(random_rotation):
+#             rotationVector = np.random.random(3)*2.0 - 1.0
+#             rotationVector = rotationVector/np.linalg.norm(rotationVector)
+#             rotationAngle = np.random.random()*360.0
+#             surf = RotateSurf(surf, rotationAngle, rotationVector)
+
+#         #Color with normals
+#         if(normal_shaders):
+#             normals = vtk.vtkPolyDataNormals()
+#             normals.SetInputData(surf);
+#             normals.ComputeCellNormalsOff();
+#             normals.ComputePointNormalsOn();
+#             # normals.AutoOrientNormalsOn();
+#             normals.SplittingOff();
+#             normals.Update()
+#             surf = normals.GetOutput()
+
+#         # mapper
+#         surfActor = GetActor(surf, property, scale_factor)
+
+
+#         if(normal_shaders):
+
+#             sp = surfActor.GetShaderProperty();
+#             sp.AddVertexShaderReplacement(
+#                 "//VTK::Normal::Dec",
+#                 True,
+#                 "//VTK::Normal::Dec\n" + 
+#                 "  varying vec3 myNormalMCVSOutput;\n",
+#                 False
+#             )
+
+#             sp.AddVertexShaderReplacement(
+#                 "//VTK::Normal::Impl",
+#                 True,
+#                 "//VTK::Normal::Impl\n" +
+#                 "  myNormalMCVSOutput = normalMC;\n",
+#                 False
+#             )
+
+#             sp.AddVertexShaderReplacement(
+#                 "//VTK::Color::Impl",
+#                 True, "VTK::Color::Impl\n", False)
+
+#             sp.ClearVertexShaderReplacement("//VTK::Color::Impl", True)
+
+#             sp.AddFragmentShaderReplacement(
+#                 "//VTK::Normal::Dec",
+#                 True,
+#                 "//VTK::Normal::Dec\n" + 
+#                 "  varying vec3 myNormalMCVSOutput;\n",
+#                 False
+#             )
+
+#             sp.AddFragmentShaderReplacement(
+#                 "//VTK::Normal::Impl",
+#                 True,
+#                 "//VTK::Normal::Impl\n" +
+#                 "  diffuseColor = myNormalMCVSOutput*0.5f + 0.5f;\n",
+#                 False
+#             )
+
+#         return surfActor
+#     except Exception as e:
+#         print(e, file=sys.stderr)
+#         return None
 
 def GetCellIdMapActor(surf):
 
@@ -384,45 +571,45 @@ def ReadImage(fName, image_dimension=2, pixel_dimension=-1):
 	return img
 
 def GetImage(img_np):
-	img_np_shape = np.shape(img_np)
-	ComponentType = itk.ctype('float')
+    img_np_shape = np.shape(img_np)
+    ComponentType = itk.ctype('float')
 
-	Dimension = img_np.ndim - 1
-	PixelDimension = img_np.shape[-1]
-	print("Dimension:", Dimension, "PixelDimension:", PixelDimension)
+    Dimension = img_np.ndim - 1
+    PixelDimension = img_np.shape[-1]
+    print("Dimension:", Dimension, "PixelDimension:", PixelDimension)
 
-	if Dimension == 1:
-		OutputImageType = itk.VectorImage[ComponentType, 2]
-	else:
-		OutputImageType = itk.VectorImage[ComponentType, Dimension]
-	
-	out_img = OutputImageType.New()
-	out_img.SetNumberOfComponentsPerPixel(PixelDimension)
+    if Dimension == 1:
+        OutputImageType = itk.VectorImage[ComponentType, 2]
+    else:
+        OutputImageType = itk.VectorImage[ComponentType, Dimension]
+    
+    out_img = OutputImageType.New()
+    out_img.SetNumberOfComponentsPerPixel(PixelDimension)
 
-	size = itk.Size[OutputImageType.GetImageDimension()]()
-	size.Fill(1)
-	
-	prediction_shape = list(img_np.shape[0:-1])
-	prediction_shape.reverse()
+    size = itk.Size[OutputImageType.GetImageDimension()]()
+    size.Fill(1)
+    
+    prediction_shape = list(img_np.shape[0:-1])
+    prediction_shape.reverse()
 
-	if Dimension == 1:
-		size[1] = prediction_shape[0]
-	else:
-		for i, s in enumerate(prediction_shape):
-			size[i] = s
+    if Dimension == 1:
+        size[1] = prediction_shape[0]
+    else:
+        for i, s in enumerate(prediction_shape):
+            size[i] = s
 
-	index = itk.Index[OutputImageType.GetImageDimension()]()
-	index.Fill(0)
+    index = itk.Index[OutputImageType.GetImageDimension()]()
+    index.Fill(0)
 
-	RegionType = itk.ImageRegion[OutputImageType.GetImageDimension()]
-	region = RegionType()
-	region.SetIndex(index)
-	region.SetSize(size)
+    RegionType = itk.ImageRegion[OutputImageType.GetImageDimension()]
+    region = RegionType()
+    region.SetIndex(index)
+    region.SetSize(size)
 
-	out_img.SetRegions(region)
-	out_img.Allocate()
+    out_img.SetRegions(region)
+    out_img.Allocate()
 
-	out_img_np = itk.GetArrayViewFromImage(out_img)
-	out_img_np.setfield(img_np.reshape(out_img_np.shape), out_img_np.dtype)
+    out_img_np = itk.GetArrayViewFromImage(out_img)
+    out_img_np.setfield(img_np.reshape(out_img_np.shape), out_img_np.dtype)
 
-	return out_img
+    return out_img
