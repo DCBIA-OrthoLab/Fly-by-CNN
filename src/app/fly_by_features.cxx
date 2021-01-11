@@ -17,6 +17,11 @@
 #include <vtkPlaneSource.h>
 #include <vtkPolyDataNormals.h>
 #include <vtkPolyDataReader.h>
+#include <vtkLookupTable.h>
+#include <vtkNamedColors.h>
+#include <vtkCellData.h>
+#include <algorithm>
+#include <vtkFloatArray.h>
 //vtkOBJPolyDataProcessor
 #include <vtkOBJImporterInternals.h>
 #include <vtkAppendPolyData.h>
@@ -167,6 +172,7 @@ public:
 int main(int argc, char * argv[])
 {
   
+
   PARSE_ARGS;
 
   int numFeatures = 4;
@@ -188,6 +194,7 @@ int main(int argc, char * argv[])
     subdivision->SetNumberOfSubdivisions(numberOfSubdivisions);
     subdivision->Update();
     sphere = subdivision->GetOutput();
+    cout<<"Mansi Version";
     cout<<"Number of fly by samples: "<<sphere->GetNumberOfPoints()<<endl;;
 
     vtkSmartPointer<vtkCellArray> vertices = vtkSmartPointer<vtkCellArray>::New();
@@ -866,8 +873,31 @@ int main(int argc, char * argv[])
       // light->SwitchOn();
       renderWindow->AddRenderer(renderer);
 
+
+      //Set up look up table:
+      /*vtkSmartPointer<vtkLookupTable> lut = vtkSmartPointer<vtkLookupTable>::New();
+      int tableSize = std::max(planeResolution*planeResolution + 1, 4);
+      lut->SetNumberOfTableValues(tableSize);
+      lut->Build();
+
+      vtkSmartPointer<vtkNamedColors> colors = vtkSmartPointer<vtkNamedColors>::New();
+      lut->SetTableValue(0, colors->GetColor4d("Black").GetData());
+      lut->SetTableValue(1, colors->GetColor4d("Banana").GetData());
+      lut->SetTableValue(2, colors->GetColor4d("Tomato").GetData());
+      lut->SetTableValue(3, colors->GetColor4d("Wheat").GetData());
+
+      //If regionLabels exists, assign labels to input_mesh
+   //   if(createRegionLabels){
+
+         //   cout << "region Labels exist";
+      //    input_mesh->GetCellData()->SetScalars(regionLabels);
+      //    I am not sure what exactly regionLabels looks like? why is a cstring? Why does it not exist sometime?
+    //      input_mesh->GetCellData()->SetActiveScalars(regionLabels.c_str());
+    //  }
+       */
       vtkSmartPointer<vtkPolyDataMapper> inputMapper = vtkSmartPointer<vtkOpenGLPolyDataMapper>::New();
       inputMapper->SetInputData(input_mesh);
+     // inputMapper->SetScalarRange(0, tableSize - 1); //range of colors
       vtkSmartPointer<vtkActor> inputActor = vtkSmartPointer<vtkActor>::New();
       inputActor->SetMapper(inputMapper);
       if(usePhong){
