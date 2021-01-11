@@ -190,6 +190,7 @@ def main(args):
 	for fobj in filenames:
 
 		surf_actor = GetUnitActor(fobj["surf"], args.property, args.scale_factor, args.random_rotation, args.norm_shader)
+#Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
 		
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
@@ -204,6 +205,7 @@ def main(args):
 			for i in range(out_np.shape[0]):
 				out_img = GetImage(out_np[i])
 
+                #use os.path.splitext(fobj["out"])[0] <- parse the file name
 				p = ".*(?=\.)"
 				prefix = re.findall(p, fobj["out"])
 				
