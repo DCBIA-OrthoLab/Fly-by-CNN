@@ -5,10 +5,14 @@ import math
 import os
 import sys
 import itk
+import nibabel as ni
 from readers import OFFReader
 
 from multiprocessing import Pool, cpu_count
 from vtk.util.numpy_support import vtk_to_numpy
+
+from scaling import *
+
 
 def Normalization(vtkdata):
 	polypoints = vtkdata.GetPoints()
@@ -18,15 +22,17 @@ def Normalization(vtkdata):
 		spoint = polypoints.GetPoint(pid)
 		nppoints.append(spoint)
 
-	npmean = np.mean(np.array(nppoints), axis=0)
-	nppoints -= npmean
 	npscale = np.max([np.linalg.norm(p) for p in nppoints])
+	npmean = np.mean(np.array(nppoints), axis=0)
+	
+	nppoints -= npmean
 	nppoints /= npscale
 
 	for pid in range(polypoints.GetNumberOfPoints()):
 		vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
 
 	return vtkdata, npmean, npscale
+
 
 def normalize_points(poly, radius):
 	polypoints = poly.GetPoints()
@@ -184,8 +190,12 @@ def RandomRotation(surf):
 	rotationAngle = np.random.random()*360.0
 	return RotateSurf(surf, rotationAngle, rotationVector)
 
-def GetUnitSurf(surf):
-	surf, surf_mean, surf_scale = Normalization(surf)
+def GetUnitSurf(surf, scale=None, translate=None, shape=None):
+
+	if scale and translate and shape :
+		surf = scalingSurf(surf, scale, translate, shape)
+	else :
+		surf, surf_mean, surf_scale = Normalization(surf)
 	return surf
 
 def GetNormalsActor(surf):
@@ -384,6 +394,7 @@ def ReadImage(fName, image_dimension=2, pixel_dimension=-1):
 	return img
 
 def GetImage(img_np):
+
 	img_np_shape = np.shape(img_np)
 	ComponentType = itk.ctype('float')
 
@@ -400,6 +411,7 @@ def GetImage(img_np):
 	out_img.SetNumberOfComponentsPerPixel(PixelDimension)
 
 	size = itk.Size[OutputImageType.GetImageDimension()]()
+
 	size.Fill(1)
 	
 	prediction_shape = list(img_np.shape[0:-1])
@@ -426,3 +438,41 @@ def GetImage(img_np):
 	out_img_np.setfield(img_np.reshape(out_img_np.shape), out_img_np.dtype)
 
 	return out_img
+
+def GetTubeFilter(surf, list_random_id):
+
+	ids = vtk.vtkIdTypeArray()
+	ids.SetNumberOfComponents(1)
+	ids.InsertNextValue(list_random_id) 
+
+	# extract a subset from a dataset
+	selectionNode = vtk.vtkSelectionNode() 
+	selectionNode.SetFieldType(0) 		# CELL_DATA = 0
+	selectionNode.SetContentType(4) 	# INDICES = 4
+	selectionNode.SetSelectionList(ids) # add the cell we want to extract
+	
+	# set containing cell to 1 = extract cell
+	selectionNode.GetProperties().Set(vtk.vtkSelectionNode.CONTAINING_CELLS(), 1) 
+
+	selection = vtk.vtkSelection()
+	selection.AddNode(selectionNode)
+
+	# extract the cell from the cluster
+	extractSelection = vtk.vtkExtractSelection()
+	extractSelection.SetInputData(0, surf)
+	extractSelection.SetInputData(1, selection)
+	extractSelection.Update()
+
+	# convert the extract cell to a polygonal type (a line here)
+	geometryFilter = vtk.vtkGeometryFilter()
+	geometryFilter.SetInputData(extractSelection.GetOutput())
+	geometryFilter.Update()
+
+	# create a tube fiber 
+	tubeFilter = vtk.vtkTubeFilter()
+	tubeFilter.SetNumberOfSides(50)
+	tubeFilter.SetRadius(0.008)
+	tubeFilter.SetInputData(geometryFilter.GetOutput())
+	tubeFilter.Update()
+
+	return tubeFilter.GetOutput()
