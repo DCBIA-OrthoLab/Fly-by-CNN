@@ -12,8 +12,11 @@ import glob
 import pandas
 import uuid 
 
+import nibabel as ni
+
 import LinearSubdivisionFilter as lsf
 from utils import * 
+from scaling import *
 
 # class ShapeAlignment(tf.keras.Model):
 
@@ -156,6 +159,33 @@ def main(args):
 			for surf in glob.iglob(normpath, recursive=True):
 				if os.path.isfile(surf) and True in [ext in surf for ext in [".vtk", ".obj", ".stl"]]:
 					surf_filenames.append(os.path.realpath(surf))
+
+			# if(args.fiberBundle) :
+			# 	fobj = {}
+			# 	fobj["out"] = args.out
+			# 	connexion_clusters_tracts = np.array([["cluster", "fiber Tract"]])
+
+			# 	if not os.path.exists(fobj["out"]):
+			# 	   os.makedirs(fobj["out"])
+
+			# 	for file_path in surf_filenames:
+			# 		split_path = os.path.split(file_path)
+			# 		clusterName = os.path.splitext(split_path[1])[0]
+			# 		split_path = os.path.split(split_path[0])
+			# 		fiberBundleName = os.path.split(split_path[0])[1]
+
+			# 		dir_cluster = '/'.join([fobj["out"], clusterName])
+
+			# 		if not os.path.exists(dir_cluster):
+			# 			os.makedirs(dir_cluster)
+
+			# 		connexion_clusters_tracts = np.append( connexion_clusters_tracts, [[clusterName, fiberBundleName]], axis=0 )
+
+			# 	path_file = "/".join([args.out, fiberBundleName + "_Clusters.txt"])
+
+			# 	fileName = open(path_file, "w")
+			# 	fileName.write(np.array2string(connexion_clusters_tracts))
+			# 	fileName.close()
 			
 		elif(args.csv):
 			replace_dir_name = args.csv_root_path
@@ -169,59 +199,167 @@ def main(args):
 			fobj = {}
 			fobj["surf"] = surf
 
+			# don't want n output for n files
+			# if(not args.fiberBundle):
 			dir_filename = os.path.splitext(surf.replace(replace_dir_name, ''))[0] +  ".nrrd"
 			fobj["out"] = os.path.normpath("/".join([args.out, dir_filename]))
-
+	
 			if(args.uuid):
 				fobj["out"] = fobj["out"].replace(".nrrd", "-" + str(uuid.uuid1()).split('-')[0] + ".nrrd")
 
 			if not os.path.exists(os.path.dirname(fobj["out"])):
 				os.makedirs(os.path.dirname(fobj["out"]))
-
+			
 			if args.ow or not os.path.exists(fobj["out"]):
 				filenames.append(fobj)
+
 
 	if(args.subdivision):
 		sphere = CreateIcosahedron(args.radius, args.subdivision)
 	else:
 		sphere = CreateSpiral(args.radius, args.spiral, args.turns)
 
-	model = None
-	if args.model is not None:
-		model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
-		model.summary()
+	# model = None
+	# if args.model is not None:
+		# model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
+		# model.summary()
 
 	flyby = FlyByGenerator(sphere, args.resolution, args.visualize)
 	
 	if args.point_features:
 		flyby_features = FlyByGenerator(sphere, args.resolution, args.visualize)
 
-	for fobj in filenames:
 
+	for fobj in filenames:
 		surf = ReadSurf(fobj["surf"])
-		surf = GetUnitSurf(surf)
+			
+		surf = GetUnitSurf(surf, args.scale_factor, args.translate, args.shape) # Modify it to accept a scaling factor and scaling_centering
+		
 
 		if args.random_rotation:
 			surf = RandomRotation(surf)
 
-		# surf_actor_cellids = GetCellIdMapActor(fobj["surf"])
+		if args.fiberBundle:
 
-		surf_actor = GetNormalsActor(surf)
-		
-		if surf_actor is not None:
-			flyby.addActor(surf_actor)
+			nbCell = surf.GetNumberOfCells()
+			nbFiber = int(nbCell*0.2)
+			print("number of fibers:", nbCell, "number of exctracted fiber:", nbFiber)
+			list_random_id = np.random.default_rng().choice(nbCell, size=nbFiber, replace=False) # avoid numbers repetition 
+			for i_cell in list_random_id:
+				fiber_surf = GetTubeFilter(surf, i_cell)
+
+				surf_actor = GetNormalsActor(fiber_surf)
+
+				if surf_actor:
+
+					flyby.addActor(surf_actor)
+					
+					out_np = flyby.getFlyBy()
+
+					# if model is not None:
+					# 	out_np = model.predict(out_np)
+
+					out_img = GetImage(out_np)
+
+
+
+					fiberName = "fiber_" + str(i_cell) + ".nrrd"
+					path_file = os.path.normpath("/".join([args.out, fiberName]))
+
+					print("Writing:", path_file)
+					writer = itk.ImageFileWriter.New(FileName=path_file, Input=out_img)
+					writer.UseCompressionOn()
+					writer.Update()
+
+					flyby.removeActor(surf_actor) # otherwise display the new fiber and the previous fibers
+
+		else:
+			# surf = GetUnitSurf(surf)
+			surf_actor = GetNormalsActor(surf)
 			
-			out_np = flyby.getFlyBy()
+			if surf_actor is not None:
+				flyby.addActor(surf_actor)
+				
+				out_np = flyby.getFlyBy()
 
-			if model is not None:
-				out_np = model.predict(out_np)
+				# if model is not None:
+				# 	out_np = model.predict(out_np)
 
-			out_img = GetImage(out_np)
+				out_img = GetImage(out_np)
 
-			print("Writing:", fobj["out"])
-			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
-			writer.UseCompressionOn()
-			writer.Update()
+				print("Writing:", fobj["out"])
+				writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
+				writer.UseCompressionOn()
+				writer.Update()
+# =======
+# 			if path_mean_population is not None :
+# 				data = ni.load(path_mean_population)
+# 				transform_mat = data.affine
+
+# 				vec_center, vec_scale = ComputeMean( [ "/work/lumargot/data/100HCP-population-mean-T1.nii", "/work/lumargot/data/100HCP-population-mean-b0.nii"] )
+# 				# print(vec_center, vec_scale)
+
+			
+
+# 				if fiber_surf is not None :
+
+# 					# surf = rescale_center(fiber_surf.GetOutput(), vec_center, vec_scale)
+
+# 					surf_actor = GetUnitActor(fiber_surf.GetOutput(), args.random_rotation, True)
+
+# 					clusterName = os.path.split( os.path.splitext(fobj["surf"])[0])[1]
+
+# 					# writer = vtk.vtkXMLPolyDataWriter()
+# 					# writer.SetFileName(args.out + "fiber_"+str(i_cell)+".vtp")
+# 					# writer.SetInputData(fiber_surf.GetOutput())
+# 					# writer.Write()
+
+# 					fiberName = "fiber_" + str(i_cell) + ".nrrd"
+# 					path_file = os.path.normpath("/".join([args.out, clusterName, fiberName]))
+
+# 					# create the file
+# 					if not os.path.exists(path_file):
+
+# 						fiber_file = open(path_file, "w")
+# 						fiber_file.close()
+
+# 					if surf_actor is not None:
+# 						flyby.addActor(surf_actor)
+						
+# 						out_np = flyby.getFlyBy()
+
+# 						# if model is not None:
+# 						# 	out_np = model.predict(out_np)
+
+# 						out_img = GetImage(out_np)
+
+# 						writer = itk.ImageFileWriter.New(FileName=path_file, Input=out_img)
+# 						writer.UseCompressionOn()
+# 						writer.Update()
+
+# 						flyby.removeActors()
+
+# 		else :
+# 		# for fobj in filenames:
+# 			# surf = ReadSurf(fobj["surf"])
+
+# 			surf_actor = GetUnitActor(surf, args.random_rotation, True)
+# >>>>>>> Stashed changes
+			
+			# if surf_actor is not None:
+			# 	flyby.addActor(surf_actor)
+				
+			# 	out_np = flyby.getFlyBy()
+
+			# 	# if model is not None:
+			# 	# 	out_np = model.predict(out_np)
+
+			# 	out_img = GetImage(out_np)
+
+			# 	print("Writing:", fobj["out"])
+			# 	writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
+			# 	writer.UseCompressionOn()
+			# 	writer.Update()
 
 		if args.point_features:
 			surf_actor = GetPointIdMapActor(surf)
@@ -256,6 +394,12 @@ if __name__ == '__main__':
 	input_group.add_argument('--csv_root_path', type=str, help='CSV rooth path for replacement', default="")
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
+	input_group.add_argument('--fiberBundle', type=bool, help='If input directory is a fiber tract', default=False)
+	input_group.add_argument('--nbFiber', type=int, help='Number of fiber per cluster', default=3)
+	input_group.add_argument('--scale_factor', type=float, help='Scaling factor ', default=None)
+	input_group.add_argument('--translate', nargs="+", type=float, help='Translation', default=None)
+	input_group.add_argument('--shape', nargs="+", type=int, help='Shape of the matrix', default=None)
+
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
