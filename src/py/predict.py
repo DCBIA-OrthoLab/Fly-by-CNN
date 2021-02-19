@@ -57,7 +57,8 @@ clean.SetInputData(original_surf)
 clean.SetTolerance(0.0001)
 clean.Update()
 
-surf, surfmean, surfscale = Normalization(clean.GetOutput())
+surf, surfmean, surfscale = ScaleSurf(clean.GetOutput(), -1)
+# surf, surfmean, surfscale = Normalization(clean.GetOutput())
 
 normals = vtk.vtkPolyDataNormals()
 normals.SetInputData(surf)
@@ -172,7 +173,7 @@ with tf.compat.v1.Session() as sess:
 	surf_points = surf.GetPoints()
 	for pid in range(surf_points.GetNumberOfPoints()):
 		spoint = np.array(surf_points.GetPoint(pid))
-		spoint *= surfscale
+		spoint *= 1/surfscale
 		spoint += surfmean
 		surf_points.SetPoint(pid, spoint)
 
