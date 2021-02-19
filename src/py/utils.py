@@ -158,6 +158,20 @@ def ReadSurf(fileName):
 
     return surf
 
+def WriteSurf(surf, fileName):
+    fname, extension = os.path.splitext(fileName)
+    extension = extension.lower()
+    print("Writing:", fileName)
+    if extension == ".vtk":
+        writer = vtk.vtkPolyDataWriter()
+    elif extension == ".stl":
+        writer = vtk.vtkSTLWriter()
+
+    writer.SetFileName(fileName)
+    writer.SetInputData(surf)
+    writer.Update()
+
+
 def ScaleSurf(surf, scale_factor):
     shapedatapoints = surf.GetPoints()
     
@@ -286,6 +300,27 @@ def RandomRotation(surf):
 def GetUnitSurf(surf):
 	surf, surf_mean, surf_scale = Normalization(surf)
 	return surf
+
+def GetColoredActor(surf, property_name):
+    hueLut = vtk.vtkLookupTable()
+    hueLut.SetTableRange(-1, 4)
+    hueLut.SetHueRange(0, 1)
+    hueLut.SetSaturationRange(1, 1)
+    hueLut.SetValueRange(1, 1)
+    hueLut.Build()
+
+    surf.GetPointData().SetActiveScalars(property_name)
+
+    actor = GetActor(surf)
+    actor.GetMapper().ScalarVisibilityOn()
+    actor.GetMapper().SetScalarModeToUsePointData()
+    actor.GetMapper().SetColorModeToMapScalars()
+    actor.GetMapper().SetUseLookupTableScalarRange(True)
+
+    actor.GetMapper().SetLookupTable(hueLut)
+
+    return actor
+
 
 def GetPropertyActor(surf, property_name):
 
@@ -595,13 +630,13 @@ class ExtractPointFeaturesClass():
 
 		return point_features
 
-def ExtractPointFeatures(surf, point_ids_rgb, point_features_name):
+def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0):
 	
 	point_ids_rgb_shape = point_ids_rgb.shape
 
 	point_features = surf.GetPointData().GetScalars(point_features_name)
 	point_features_np = vtk_to_numpy(point_features)
-	zero = np.zeros(point_features.GetNumberOfComponents())
+	zero = np.zeros(point_features.GetNumberOfComponents()) + zero
 
 	with Pool(cpu_count()) as p:
 		feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)

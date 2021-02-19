@@ -237,6 +237,13 @@ def Label_Teeth(vtkdata, label_array):
 		
 	return vtkdata
 
+def GetAllNeighbors(vtkdata, pids):
+	all_neighbors = pids
+	for pid in pids:
+		neighbors = GetNeighbors(vtkdata, pid)
+		all_neighbors = np.concatenate((all_neighbors, neighbors))
+	return np.unique(all_neighbors)
+
 def GetNeighbors(vtkdata, pid):
 	cells_id = vtk.vtkIdList()
 	vtkdata.GetPointCells(pid, cells_id)

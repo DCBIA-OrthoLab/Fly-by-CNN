@@ -8,7 +8,7 @@ def main(args):
     
     colors = vtk.vtkNamedColors()
     # Read all the data from the file
-    surfActor = GetUnitActor(args.surf)
+    surfActor = GetActor(ReadSurf(args.surf))
 
     renderer = vtk.vtkRenderer()
     renderWindow = vtk.vtkRenderWindow()
