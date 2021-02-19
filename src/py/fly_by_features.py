@@ -1,6 +1,6 @@
 import os
 import re
-# import tensorflow as tf
+import tensorflow as tf
 import numpy as np
 import itk
 import vtk
@@ -14,7 +14,7 @@ import uuid
 
 import LinearSubdivisionFilter as lsf
 from utils import * 
-	
+from orientation import *
 
 class FlyByGenerator():
 	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False):
@@ -33,6 +33,11 @@ class FlyByGenerator():
 		self.resolution = resolution
 		self.use_z = use_z
 		self.split_z = split_z
+
+		#sphere_actor = GetActor(sphere)
+		# print(sphere_actor)
+		#sphere_actor.GetProperty().SetRepresentationToWireFrame()
+		#self.renderer.AddActor(sphere_actor)
 
 	def removeActor(self, actor):
 		self.renderer.RemoveActor(actor)
@@ -187,7 +192,9 @@ def main(args):
 		if args.random_rotation:
 			surf = RandomRotation(surf)
 
-		# surf_actor_cellids = GetCellIdMapActor(fobj["surf"])
+		if args.save_label:
+			# surf = OrientLabel_vector(surf, args.save_label)
+			surf = OrientLabel(surf, flyby.sphere, args.save_label, args.save_AA)
 
 		if args.property:
 			surf_actor = GetPropertyActor(surf, args.property)
@@ -198,7 +205,7 @@ def main(args):
 		if surf_actor is not None:
 			flyby.addActor(surf_actor)
 			
-		out_np = flyby.getFlyBy()
+		out_np = flyby.getFlyBy(args.use_z)
 
 		if model is not None:
 			out_np = model.predict(out_np)
@@ -264,6 +271,7 @@ if __name__ == '__main__':
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 	input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
+	input_group.add_argument('--use_z', type=int, help='1 to scale normals by z buffer',default = 1)
 	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
 	input_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
 	input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
@@ -287,6 +295,10 @@ if __name__ == '__main__':
 	sphere_params.add_argument('--turns', type=int, default=4, help='Number of spiral turns')
 	sphere_params.add_argument('--resolution', type=int, help='Image resolution', default=256)
 	sphere_params.add_argument('--radius', type=float, help='Radius of the sphere for the view points', default=4)
+
+	training_orientation = parser.add_argument_group('training orientation')
+	training_orientation.add_argument('--save_label', type=str, help='save the label', default="")
+	training_orientation.add_argument('--save_AA', type=str, help='save the label', default="")
 
 	visu_params = parser.add_argument_group('Visualize')
 	visu_params.add_argument('--visualize', type=int, default=0, help='Visualize the sampling')
