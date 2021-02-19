@@ -14,38 +14,10 @@ import uuid
 
 import LinearSubdivisionFilter as lsf
 from utils import * 
-
-# class ShapeAlignment(tf.keras.Model):
-
-#	def __init__(self, dimension=2):
-#		super(ShapeAlignment, self).__init__()
-
-#		self.transform = tf.Variable(tf.eye(4), dtype=tf.float32)
-#		self.loss = tf.keras.losses.MeanAbsoluteError()
-
-#		# lr = tf.keras.optimizers.schedules.ExponentialDecay(1e-3, 100, 0.96, 1)
-#		self.optimizer = tf.keras.optimizers.SGD(1e-3)
-
-#	# @tf.function
-#	def train_step(self, logits, target):
-
-#		with tf.GradientTape() as tape:
-			
-#			loss = self.loss(logits, target)
-			
-#			var_list = self.trainable_variables
-
-#			gradients = tape.gradient(loss, var_list)
-#			self.optimizer.apply_gradients(zip(gradients, var_list))
-
-#			return loss
-
-#	def get_transform(self):
-#		return self.transform.get_weights()
 	
 
 class FlyByGenerator():
-	def __init__(self, sphere, resolution, visualize=False):
+	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False):
 
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
@@ -59,6 +31,8 @@ class FlyByGenerator():
 		self.sphere = sphere
 		self.visualize = visualize
 		self.resolution = resolution
+		self.use_z = use_z
+		self.split_z = split_z
 
 	def removeActor(self, actor):
 		self.renderer.RemoveActor(actor)
@@ -72,7 +46,7 @@ class FlyByGenerator():
 	def addActor(self, actor):
 		self.renderer.AddActor(actor)
 
-	def getFlyBy(self, use_z=True):
+	def getFlyBy(self):
 
 		sphere_points = self.sphere.GetPoints()
 		print(sphere_points.GetNumberOfPoints())
@@ -86,6 +60,7 @@ class FlyByGenerator():
 			interactor.Start()
 
 		img_seq = []
+
 		for i in range(sphere_points.GetNumberOfPoints()):
 
 			sphere_point = sphere_points.GetPoint(i)
@@ -100,9 +75,8 @@ class FlyByGenerator():
 
 			camera.SetPosition(sphere_point[0], sphere_point[1], sphere_point[2])
 			camera.SetFocalPoint(0, 0, 0)
-			
+
 			self.renderer.ResetCameraClippingRange()
-			# self.renderWindow.Render()
 
 			windowToImageN = vtk.vtkWindowToImageFilter()
 			windowToImageN.SetInputBufferTypeToRGB()
@@ -112,29 +86,35 @@ class FlyByGenerator():
 			img_o = windowToImageN.GetOutput()
 
 			img_o_np = vtk_to_numpy(img_o.GetPointData().GetScalars())
+			num_components = img_o.GetNumberOfScalarComponents()
 
-			if use_z:
+			if self.use_z:
 				windowFilterZ = vtk.vtkWindowToImageFilter()
 				windowFilterZ.SetInputBufferTypeToZBuffer()
 				windowFilterZ.SetInput(self.renderWindow)
+				windowFilterZ.SetScale(1)
 
-				scalez = vtk.vtkImageShiftScale()
-				scalez.SetOutputScalarTypeToDouble();
-				scalez.SetInputConnection(windowFilterZ.GetOutputPort());
-				scalez.SetShift(0);
-				scalez.SetScale(-1);
-				scalez.Update()
+				windowFilterZ.Update()				
+				img_z = windowFilterZ.GetOutput()
 				
-				img_z = scalez.GetOutput()
-				
-				scalez_np = vtk_to_numpy(img_z.GetPointData().GetScalars())
-				scalez_np = np.abs(scalez_np).reshape([-1, 1])
+				img_z_np = vtk_to_numpy(img_z.GetPointData().GetScalars())
+				img_z_np = img_z_np.reshape([-1, 1])
 
-				img_np = np.multiply(img_o_np, scalez_np)
+				z_near, z_far = camera.GetClippingRange()
+
+				img_z_np = 2.0*z_far*z_near / (z_far + z_near - (z_far - z_near)*(2.0*img_z_np - 1.0))
+				img_z_np[img_z_np > (z_far - 0.1)] = 0
+
+				if(self.split_z):
+					img_np = np.concatenate([img_o_np, img_z_np], axis=-1)
+					num_components += 1
+				else:
+					img_z_np /= z_far
+					img_np = np.multiply(img_o_np, img_z_np)
 			else:
 				img_np = img_o_np
 
-			img_seq.append(img_np.reshape([d for d in img_o.GetDimensions() if d != 1] + [img_o.GetNumberOfScalarComponents()]))
+			img_seq.append(img_np.reshape([d for d in img_o.GetDimensions() if d != 1] + [num_components]))
 
 		return np.array(img_seq)
 
@@ -192,10 +172,12 @@ def main(args):
 		model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
 		model.summary()
 
-	flyby = FlyByGenerator(sphere, args.resolution, args.visualize)
+	flyby = FlyByGenerator(sphere, args.resolution, args.visualize, use_z=args.use_z, split_z=args.split_z)
 	
 	if args.point_features:
-		flyby_features = FlyByGenerator(sphere, args.resolution, args.visualize)
+		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
+
+
 
 	for fobj in filenames:
 
@@ -285,6 +267,17 @@ if __name__ == '__main__':
 	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
 	input_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
 	input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
+
+
+	features_group = parser.add_argument_group('Shape features/property to extract')
+	features_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table', default = 1)
+	features_group.add_argument('--split_z', type=int, help='1 to split the z buffer as a separate channel. Otherwise, the normals are scaled by z buffer to create an rgb image.', default = 0)
+	features_group.add_argument('--use_z', type=int, help='1 to to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
+
+	features_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
+	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
+	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
+	
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
