@@ -188,7 +188,7 @@ def ScaleSurf(surf, scale_factor):
     if(scale_factor == -1):
         bounds_max_arr = np.array(bounds_max_v)
         scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
-        print(scale_factor)
+        # print(scale_factor)
 
     #scale points of the shape by scale factor
     shape_points = np.array(shape_points)
@@ -200,7 +200,7 @@ def ScaleSurf(surf, scale_factor):
 
     surf.SetPoints(shapedatapoints)
 
-    return surf
+    return surf, mean_arr, scale_factor
 
 def GetActor(surf):
 	surfMapper = vtk.vtkPolyDataMapper()
@@ -210,23 +210,78 @@ def GetActor(surf):
 	surfActor.SetMapper(surfMapper)
 
 	return surfActor
+def GetTransform(rotationAngle, rotationVector):
+    transform = vtk.vtkTransform()
+    transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
+    return transform
 
 def RotateSurf(surf, rotationAngle, rotationVector):
 	print("angle:", rotationAngle, "vector:", rotationVector)
-	transform = vtk.vtkTransform()
-	transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2]);
+	transform = GetTransform(rotationAngle, rotationVector)
+	return RotateTransform(surf, transform)
 
+def RotateInverse(surf, rotationAngle, rotationVector):
+    print("angle:", rotationAngle, "vector:", rotationVector)
+    transform = vtk.vtkTransform()
+    transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
+   
+    transform_i = vtk.vtkTransform()
+    m_inverse = vtk.vtkMatrix4x4()
+    transform.GetInverse(m_inverse)
+    transform_i.SetMatrix(m_inverse)
+
+    return RotateTransform(surf, transform_i)
+
+def RotateTransform(surf, transform):
 	transformFilter = vtk.vtkTransformPolyDataFilter()
 	transformFilter.SetTransform(transform)
 	transformFilter.SetInputData(surf)
 	transformFilter.Update()
 	return transformFilter.GetOutput()
 
+def RotateNpTransform(surf, angle, np_transform):
+	np_tran = np.load(np_transform)
+
+	rotationAngle = -angle
+	rotationVector = np_tran
+	return RotateInverse(surf, rotationAngle, rotationVector)
+
 def RandomRotation(surf):
 	rotationVector = np.random.random(3)*2.0 - 1.0
 	rotationVector = rotationVector/np.linalg.norm(rotationVector)
 	rotationAngle = np.random.random()*360.0
 	return RotateSurf(surf, rotationAngle, rotationVector)
+
+
+# def orientationTraining(surf, pathLabel):
+# 	rotationVector = np.random.random(3)*2.0 - 1.0
+# 	rotationVector = rotationVector/np.linalg.norm(rotationVector)
+# 	rotationAngle = np.random.random()*360.0
+
+# 	print("angle:", rotationAngle, "vector:", rotationVector)
+# 	transform = vtk.vtkTransform()
+# 	transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
+
+# 	transformFilter = vtk.vtkTransformPolyDataFilter()
+# 	transformFilter.SetTransform(transform)
+# 	transformFilter.SetInputData(surf)
+# 	transformFilter.Update()
+
+# 	theta = np.radians(rotationAngle)
+# 	c, s = np.cos(theta), np.sin(theta)
+# 	x, y, z = rotationVector[0], rotationVector[1], rotationVector[2]
+# 	R = np.array([[c+pow(x,2)*(1-c), x*y*(1-c)-z*s,    x*z*(1-c)+y*s], 
+# 				  [y*x*(1-c)+z*s,    c+pow(y,2)*(1-c), y*z*(1-c)-x*s], 
+# 				  [z*x*(1-c)-y*s,    z*y*(1-c)+x*s,    c+pow(z,2)*(1-c)]])
+
+# 	# print("matrice rotation")
+# 	# print(R)
+# 	# print("matrice inverse/transpose:")
+# 	Rt = np.transpose(R)
+# 	# print(Rt)
+# 	np.save(pathLabel, Rt)
+# 	return transformFilter.GetOutput()
+
 
 def GetUnitSurf(surf):
 	surf, surf_mean, surf_scale = Normalization(surf)
