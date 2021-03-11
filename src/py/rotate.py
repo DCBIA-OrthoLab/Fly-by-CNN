@@ -2,25 +2,7 @@ import vtk
 import numpy as np
 import argparse
 import os
-
-def transform(surf, rot_v = None, angle = None):
-    # create a transform that rotates the cone
-    transform = vtk.vtkTransform()
-    if rot_v is not None:
-        rot_vector = args.rot_v
-    else:
-        rot_vector = np.random.normal(loc=0.0, scale=1.0, size=(3,))
-        rot_vector = rot_vector/np.linalg.norm(rot_vector)
-
-    if angle is None:
-        angle = np.random.uniform(low=0.0, high=1.0)*360
-    transform.RotateWXYZ(angle, rot_vector[0], rot_vector[1], rot_vector[2])
-    transformFilter = vtk.vtkTransformPolyDataFilter()
-    transformFilter.SetTransform(transform)
-    transformFilter.SetInputData(surf)
-    transformFilter.Update()
-    return transformFilter.GetOutput()
-
+from utils import *
 
 
 def main(args):
@@ -31,21 +13,23 @@ def main(args):
 
     path, extension = os.path.splitext(inputSurface)
     extension = extension.lower()
-    if extension == ".vtk":
-        reader = vtk.vtkPolyDataReader()
-        reader.SetFileName(inputSurface)
-        reader.Update()
-        original_surf = reader.GetOutput()
-    elif extension == ".stl":
-        reader = vtk.vtkSTLReader()
-        reader.SetFileName(inputSurface)
-        reader.Update()
-        original_surf = reader.GetOutput()
+    surf = ReadSurf(args.surf)
 
+    if args.np_transform:
+        rotated_surf = RotateNpTransform(surf, args.angle, args.np_transform)
+        outfilename = args.out
+        print("Writting:", outfilename)
+        polydatawriter = vtk.vtkPolyDataWriter()
+        polydatawriter.SetFileName(outfilename)
+        polydatawriter.SetInputData(rotated_surf)
+        polydatawriter.Write()
 
-    if args.n_rot == 1:
+    elif args.n_rot == 1:
         
-        rotated_surf = transform(original_surf, args.rot_v, args.angle)
+        if args.angle and args.rot_v:
+            rotated_surf = RotateSurf(surf, args.angle, args.rot_v)
+        else:
+            rotated_surf = RandomRotation(surf)
         outfilename = args.out
 
         print("Writting:", outfilename)
@@ -55,7 +39,10 @@ def main(args):
         polydatawriter.Write()
     else:
         for i in range(args.n_rot):
-            rotated_surf = transform(original_surf)
+            if args.angle and args.rot_v:
+                rotated_surf = RotateSurf(surf, args.angle, args.rot_v)
+            else:
+                rotate_surf = RandomRotation(surf)
 
             outfilename, ext = os.path.splitext(inputSurface)
             outfilename = os.path.join(args.out, os.path.basename(outfilename)) + "_" + str(i) + ".vtk"
@@ -69,7 +56,7 @@ def main(args):
 
     if(args.visualize):
         mapper_orig = vtk.vtkPolyDataMapper()
-        mapper_orig.SetInputData(original_surf)
+        mapper_orig.SetInputData(surf)
 
         mapper_transform = vtk.vtkPolyDataMapper()
         mapper_transform.SetInputData(rotated_surf)
@@ -109,6 +96,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Perform a random rotation of a polydata', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--surf', type=str, help='Input surface mesh to label', required=True)
+    parser.add_argument('--np_transform', type=str, help='')
     parser.add_argument('--rot_v', type=float, nargs='+', help='rotation axis', default=None)
     parser.add_argument('--angle', type=float, help='rotation angle', default=None)
     parser.add_argument('--n_rot', type=int, help='Number of rotations to perform', default=1)

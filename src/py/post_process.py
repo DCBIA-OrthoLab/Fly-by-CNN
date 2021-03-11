@@ -237,6 +237,13 @@ def Label_Teeth(vtkdata, label_array):
 		
 	return vtkdata
 
+def GetAllNeighbors(vtkdata, pids):
+	all_neighbors = pids
+	for pid in pids:
+		neighbors = GetNeighbors(vtkdata, pid)
+		all_neighbors = np.concatenate((all_neighbors, neighbors))
+	return np.unique(all_neighbors)
+
 def GetNeighbors(vtkdata, pid):
 	cells_id = vtk.vtkIdList()
 	vtkdata.GetPointCells(pid, cells_id)
@@ -367,6 +374,169 @@ def ErodeLabel(vtkdata, labels, label):
 		else:
 			break
 
+def MeanCoordinatesTeeth(surf,labels):
+	nlabels, pid_labels = [], []
+
+	for pid in range(labels.GetNumberOfTuples()):
+		nlabels.append(int(labels.GetTuple(pid)[0]))
+		pid_labels.append(pid)
+
+	currentlabel = 2
+	L = []
+
+	while currentlabel != np.max(nlabels)+1:
+		Lcoordinates = []
+		for i in range(len(nlabels)):
+			if nlabels[i]==currentlabel:
+				xyzCoordinates = surf.GetPoint(pid_labels[i])
+				Lcoordinates.append(xyzCoordinates)
+
+		meantuple = np.mean(Lcoordinates,axis=0)
+		L.append(meantuple)		
+		currentlabel+=1			
+
+	return L
+
+
+def Alignement(surf,surf_GT):
+	print('Alignement ')
+	# CenterSurf = surf.GetCenter()
+	# print("center CenterSurf: ", CenterSurf)
+	# print(' ')
+	# CenterSurf_GT = surf_GT.GetCenter()
+	# print("center CenterSurf_GT: ", CenterSurf_GT)
+	# print(' ')
+	# direction = np.array(list(surf_GT.GetCenter())) - np.array(list(surf.GetCenter()))
+	# print('direction = ', direction)
+	# print(' ')
+
+	# trnf = vtk.vtkTransform()
+	# trnf.Translate(direction)
+
+	# tpd = vtk.vtkTransformPolyDataFilter()
+	# tpd.SetTransform(trnf)
+	# tpd.SetInputData(surf)
+	# tpd.Update()
+
+	# return tpd.GetOutput()
+
+
+	icp = vtk.vtkIterativeClosestPointTransform()
+	icp.StartByMatchingCentroidsOn()
+	icp.SetSource(surf)
+	icp.SetTarget(surf_GT)
+	icp.GetLandmarkTransform().SetModeToRigidBody()
+	icp.SetMaximumNumberOfLandmarks(100)
+	icp.SetMaximumMeanDistance(.00001)
+	icp.SetMaximumNumberOfIterations(500)
+	icp.CheckMeanDistanceOn()
+	icp.StartByMatchingCentroidsOn()
+	icp.Update()
+
+	lmTransform = icp.GetLandmarkTransform()
+	transform = vtk.vtkTransformPolyDataFilter()
+	transform.SetInputData(surf)
+	transform.SetTransform(lmTransform)
+	transform.SetTransform(icp)
+	transform.Update()
+
+	return transform.GetOutput()
+
+
+def UniversalID(surf, labels, LowerOrUpper):	
+	real_labels = vtk.vtkIntArray()
+	real_labels.SetNumberOfComponents(1)
+	real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
+	real_labels.SetName("UniversalID")
+	real_labels.Fill(-1)
+
+	for pid in range(labels.GetNumberOfTuples()):
+		if not LowerOrUpper: # Lower
+			real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])+15,))
+			
+		if LowerOrUpper: # Upper
+			real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])-1,))
+			
+	surf.GetPointData().AddArray(real_labels)
+
+
+def Labelize(surf,labels, Lsurf, Lsurf_GT):
+	L_label, L_label_GT = [], []
+
+	# print(' ')
+	# print("Lsurf :  || Nbre Elem: ", len(Lsurf))
+	# for i in range(len(Lsurf)):
+	# 	print(i+2,"  ",Lsurf[i])
+	# print(' ')
+	# print(' ')
+
+	# print("Lsurf_GT :  || Nbre Elem: ", len(Lsurf_GT))
+	# for i in range(len(Lsurf_GT)):
+	# 	print(i+2,"  ",Lsurf_GT[i])
+	# print(' ')
+	# print(' ')
+
+
+	for j in range(len(Lsurf)):
+		Ldist = []
+		for i in range (len(Lsurf_GT)):
+			Xdist = Lsurf_GT[i][0]-Lsurf[j][0]
+			Ydist = Lsurf_GT[i][1]-Lsurf[j][1]
+			Zdist = Lsurf_GT[i][2]-Lsurf[j][2]
+
+			dist = np.sqrt(pow(Xdist,2)+pow(Ydist,2)+pow(Zdist,2))		
+
+			if dist<10:
+				Ldist.append([dist,i+2,j+2])
+
+		if Ldist:
+			minDist = min(Ldist)
+			L_label.append(minDist[2])
+			L_label_GT.append(minDist[1])	
+
+		# print(Ldist)
+		# print(' ')
+
+	L_label_bias = [x+20 for x in L_label]
+
+	# print(L_label)
+	# print(L_label_bias)
+	# print(L_label_GT)
+	# print(' ')
+
+
+	bias = 0
+	for i in range(len(Lsurf)):
+		if i+2 not in L_label:
+			print(i+2)
+			ChangeLabel(surf, labels, i+2, -2)
+			bias = 1
+
+	for i in range(len(L_label_GT)):
+		ChangeLabel(surf, labels, L_label[i], L_label_bias[i])
+
+	for i in range(len(L_label_GT)):
+		if bias:
+			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
+		else:
+			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
+
+
+	# for i in range(len(L_label_GT)):
+	# 	if L_label_GT[i]>= 9:
+	# 		if bias:
+	# 			ChangeLabel(surf, labels, L_label_bias[i], abs(L_label_GT[i]-max(L_label_GT))+2+bias)
+	# 		else:
+	# 			ChangeLabel(surf, labels, L_label_bias[i], abs(L_label_GT[i]-max(L_label_GT))+2)
+	# 	else:
+	# 		if bias:
+	# 			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i]-(min(L_label_GT)-2)+bias)
+	# 		else:
+	# 			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i]-(min(L_label_GT)-2))
+
+	ChangeLabel(surf, labels, -2, 1)
+
+
 def ReLabel(surf, labels, label, relabel):
 	for pid in range(labels.GetNumberOfTuples()):
 		if labels.GetTuple(pid)[0] == label:
@@ -397,6 +567,12 @@ if __name__ == '__main__':
 	parser.add_argument('--threshold_min', type=int, help='Threshold min value', default=2)
 	parser.add_argument('--threshold_max', type=int, help='Threshold max value', default=100)
 	parser.add_argument('--min_count', type=int, help='Minimum count to remove', default=500)
+	
+	parser.add_argument('--labelize', type=bool, help='label the teeth', default=False)
+	parser.add_argument('--label_groundtruth', type=str, help='groundtruth of the label', default="groundtruth.vtk")
+	parser.add_argument('--universalID', type=bool, help='label the teeth with Universal ID', default=False)
+	parser.add_argument('--LowerOrUpper', type=int, help='0 == Lower | 1 == Upper', default=0)
+	
 	parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
 	args = parser.parse_args()
@@ -420,6 +596,20 @@ if __name__ == '__main__':
 	if(args.threshold):
 		print("Thresholding...")
 		surf = Threshold(surf, labels, args.threshold_min, args.threshold_max)
+
+	if(args.labelize):
+		print("Labelizing...")
+		surf_groundtruth, labels_groundtruth = ReadFile(args.label_groundtruth)
+		# For now it doesnt work with all cases may be because of the GT
+		surf = Alignement(surf,surf_groundtruth)
+		Lsurf = MeanCoordinatesTeeth(surf,labels)
+		Lsurf_GT = MeanCoordinatesTeeth(surf_groundtruth,labels_groundtruth)
+		Labelize(surf,labels,Lsurf,Lsurf_GT)
+
+	if(args.universalID):
+		print("UniversalID...")
+		UniversalID(surf, labels, args.LowerOrUpper)
+
 
 	Write(surf, args.out)
 

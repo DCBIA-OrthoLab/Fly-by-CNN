@@ -11,13 +11,13 @@
 Replace the hostPath by some path in your local machine. 
 
 ```
-	kind create cluster --config fly-by-cnn/src/docker/kind-config.yaml
+	kind create cluster --config fly-by-cnn/src/kubernetes/kind-config.yaml
 ```
 
 ## Build the fly-by-cnn docker image
 
 ```
-	docker build -t fly-by-cnn:2.0 fly-by-cnn/src/docker/
+	docker build -t fly-by-cnn:2.0 fly-by-cnn/src/kubernetes/
 ```
 
 ## Load the docker image into the kind local cluster
@@ -35,25 +35,25 @@ Replace the hostPath by some path in your local machine.
 ### Create a local-storage class
 
 ```
-	kubectl apply -f fly-by-cnn/src/docker/local-storage.yaml
+	kubectl apply -f fly-by-cnn/src/kubernetes/local-storage.yaml
 ```
 
 ### Create a volume
 
 ```
-	kubectl apply -f fly-by-cnn/src/docker/pv.yaml
+	kubectl apply -f fly-by-cnn/src/kubernetes/pv.yaml
 ```
 
 ### Create a volume-claim
 
 ```
-	kubectl apply -f fly-by-cnn/src/docker/pvc.yaml
+	kubectl apply -f fly-by-cnn/src/kubernetes/pvc.yaml
 ```
 
 ### Run a pod
 
 ```
-	kubectl apply -f fly-by-cnn/src/docker/pvc.yaml
+	kubectl apply -f fly-by-cnn/src/kubernetes/fly-by-cnn.yaml
 ```
 
 ### Exec the command in the pod
