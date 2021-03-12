@@ -1,6 +1,3 @@
-# rescale all fibers with the factors given in parameters 
-# should display the real location of the fiber
-
 import numpy as np
 import argparse
 import nibabel as ni
@@ -55,7 +52,7 @@ def main(args):
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Compute the average of the scale factor, centering vector and shape for any given file')
+	parser = argparse.ArgumentParser(description='Compute the average of the scale factor, centering vector and shape of a nifti file')
 	parser.add_argument('--nii', type=str, nargs="+", help='NIfTI files', required=True)
 
 	args = parser.parse_args()	
