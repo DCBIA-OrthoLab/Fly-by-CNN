@@ -1,6 +1,5 @@
 import os
 import re
-import tensorflow as tf
 import numpy as np
 import itk
 import vtk
@@ -11,8 +10,6 @@ import time
 import glob
 import pandas
 import uuid 
-
-import nibabel as ni
 
 import LinearSubdivisionFilter as lsf
 from utils import * 
@@ -46,7 +43,7 @@ from scaling import *
 # 	def get_transform(self):
 # 		return self.transform.get_weights()
 	
-from orientation import *
+# from orientation import *
 
 class FlyByGenerator():
 	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False):
@@ -164,6 +161,7 @@ def main(args):
 		fobj["surf"] = args.surf
 		fobj["out"] = args.out
 		filenames.append(fobj)
+		print(filenames)
 			
 	else:
 		surf_filenames = []
@@ -175,33 +173,6 @@ def main(args):
 				if os.path.isfile(surf) and True in [ext in surf for ext in [".vtk", ".obj", ".stl"]]:
 					surf_filenames.append(os.path.realpath(surf))
 
-			# if(args.fiberBundle) :
-			# 	fobj = {}
-			# 	fobj["out"] = args.out
-			# 	connexion_clusters_tracts = np.array([["cluster", "fiber Tract"]])
-
-			# 	if not os.path.exists(fobj["out"]):
-			# 	   os.makedirs(fobj["out"])
-
-			# 	for file_path in surf_filenames:
-			# 		split_path = os.path.split(file_path)
-			# 		clusterName = os.path.splitext(split_path[1])[0]
-			# 		split_path = os.path.split(split_path[0])
-			# 		fiberBundleName = os.path.split(split_path[0])[1]
-
-			# 		dir_cluster = '/'.join([fobj["out"], clusterName])
-
-			# 		if not os.path.exists(dir_cluster):
-			# 			os.makedirs(dir_cluster)
-
-			# 		connexion_clusters_tracts = np.append( connexion_clusters_tracts, [[clusterName, fiberBundleName]], axis=0 )
-
-			# 	path_file = "/".join([args.out, fiberBundleName + "_Clusters.txt"])
-
-			# 	fileName = open(path_file, "w")
-			# 	fileName.write(np.array2string(connexion_clusters_tracts))
-			# 	fileName.close()
-			
 		elif(args.csv):
 			replace_dir_name = args.csv_root_path
 			with open(args.csv) as csvfile:
@@ -248,23 +219,18 @@ def main(args):
 
 
 	for fobj in filenames:
+
 		surf = ReadSurf(fobj["surf"])
-			
-		surf = GetUnitSurf(surf, args.scale_factor, args.translate, args.shape) # Modify it to accept a scaling factor and scaling_centering
 		
-
-		if args.random_rotation:
-			surf = RandomRotation(surf)
-
-
+		surf = GetUnitSurf(surf, args.scaling, args.translate, args.shape)
+		
 		if args.fiberBundle:
-
 			nbCell = surf.GetNumberOfCells()
-			nbFiber = int(nbCell*0.2)
+			nbFiber = int(nbCell*args.nbFiber)
 			print("number of fibers:", nbCell, "number of exctracted fiber:", nbFiber)
-			list_random_id = np.random.default_rng().choice(nbCell, size=nbFiber, replace=False) # avoid numbers repetition 
+			list_random_id = np.random.default_rng().choice(nbCell, size=nbFiber, replace=False)
 			for i_cell in list_random_id:
-				fiber_surf = GetTubeFilter(surf, i_cell)
+				fiber_surf = ExtractFiber(surf, i_cell)
 
 				surf_actor = GetNormalsActor(fiber_surf)
 
@@ -279,8 +245,6 @@ def main(args):
 
 					out_img = GetImage(out_np)
 
-
-
 					fiberName = "fiber_" + str(i_cell) + ".nrrd"
 					path_file = os.path.normpath("/".join([args.out, fiberName]))
 
@@ -289,20 +253,54 @@ def main(args):
 					writer.UseCompressionOn()
 					writer.Update()
 
-					flyby.removeActor(surf_actor) # otherwise display the new fiber and the previous fibers
-
+					flyby.removeActor(surf_actor)
 		else:
-			# surf = GetUnitSurf(surf)
-			surf_actor = GetNormalsActor(surf)
-			
+
+
+			if args.random_rotation:
+				surf = RandomRotation(surf)
+
+			if args.fiber :
+				surf = GetTubeFilter(surf)
+
+			if args.save_label:
+				# surf = OrientLabel_vector(surf, args.save_label)
+				surf = OrientLabel(surf, flyby.sphere, args.save_label, args.save_AA)
+
+			if args.property:
+				surf_actor = GetPropertyActor(surf, args.property)
+			else:
+				surf_actor = GetNormalsActor(surf)
+		
+#Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
+		
 			if surf_actor is not None:
 				flyby.addActor(surf_actor)
 				
-				out_np = flyby.getFlyBy()
+			out_np = flyby.getFlyBy()
 
-				# if model is not None:
-				# 	out_np = model.predict(out_np)
+			# if model is not None:
+			# 	out_np = model.predict(out_np)
+		
 
+			if ( not args.concatenate ):
+				for i in range(out_np.shape[0]):
+					out_img = GetImage(out_np[i])
+
+	                #use os.path.splitext(fobj["out"])[0] <- parse the file name
+					p = ".*(?=\.)"
+					prefix = re.findall(p, fobj["out"])
+					
+					s ="([^\.]+$)" 
+					suffix = re.findall(s, fobj["out"])
+
+					filename=prefix[0]+"_"+str(i)+"."+suffix[0]
+					print("Writing:", filename)
+			
+					writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
+					writer.UseCompressionOn()
+					writer.Update()
+			else:
 				out_img = GetImage(out_np)
 
 				print("Writing:", fobj["out"])
@@ -310,67 +308,23 @@ def main(args):
 				writer.UseCompressionOn()
 				writer.Update()
 
-		if args.save_label:
-			# surf = OrientLabel_vector(surf, args.save_label)
-			surf = OrientLabel(surf, flyby.sphere, args.save_label, args.save_AA)
+			if args.point_features:
+				surf_actor = GetPointIdMapActor(surf)
+				flyby_features.addActor(surf_actor)
+				out_pointids_rgb_np = flyby_features.getFlyBy(False)
 
-		if args.property:
-			surf_actor = GetPropertyActor(surf, args.property)
-		else:
-			surf_actor = GetNormalsActor(surf)
-#Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
-		
-		if surf_actor is not None:
-			flyby.addActor(surf_actor)
-			
-		out_np = flyby.getFlyBy(args.use_z)
+				for point_features_name in args.point_features:
+					print("Extracting:", point_features_name)
+					out_features_np = ExtractPointFeatures(surf, out_pointids_rgb_np, point_features_name)
+					out_features_name = os.path.splitext(fobj["out"])
+					out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
+					print("Writing:", out_features_name)
+					out_features = GetImage(out_features_np)
+					writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
+					writer.UseCompressionOn()
+					writer.Update()
 
-		if model is not None:
-			out_np = model.predict(out_np)
-		
-
-		if ( not args.concatenate ):
-			for i in range(out_np.shape[0]):
-				out_img = GetImage(out_np[i])
-
-                #use os.path.splitext(fobj["out"])[0] <- parse the file name
-				p = ".*(?=\.)"
-				prefix = re.findall(p, fobj["out"])
-				
-				s ="([^\.]+$)" 
-				suffix = re.findall(s, fobj["out"])
-
-				filename=prefix[0]+"_"+str(i)+"."+suffix[0]
-				print("Writing:", filename)
-		
-				writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
-				writer.UseCompressionOn()
-				writer.Update()
-		else:
-			out_img = GetImage(out_np)
-
-			print("Writing:", fobj["out"])
-			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
-			writer.UseCompressionOn()
-			writer.Update()
-
-		if args.point_features:
-			surf_actor = GetPointIdMapActor(surf)
-			flyby_features.addActor(surf_actor)
-			out_pointids_rgb_np = flyby_features.getFlyBy(False)
-
-			for point_features_name in args.point_features:
-				print("Extracting:", point_features_name)
-				out_features_np = ExtractPointFeatures(surf, out_pointids_rgb_np, point_features_name)
-				out_features_name = os.path.splitext(fobj["out"])
-				out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
-				print("Writing:", out_features_name)
-				out_features = GetImage(out_features_np)
-				writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
-				writer.UseCompressionOn()
-				writer.Update()
-
-		flyby.removeActors()
+			flyby.removeActors()
 
 
 if __name__ == '__main__':
@@ -389,16 +343,17 @@ if __name__ == '__main__':
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 
 	input_group.add_argument('--fiberBundle', type=bool, help='If input directory is a fiber tract', default=False)
-	input_group.add_argument('--nbFiber', type=int, help='Number of fiber per cluster', default=3)
-	input_group.add_argument('--scale_factor', type=float, help='Scaling factor ', default=None)
-	input_group.add_argument('--translate', nargs="+", type=float, help='Translation', default=None)
-	input_group.add_argument('--shape', nargs="+", type=int, help='Shape of the matrix', default=None)
+	input_group.add_argument('--fiber', type=bool, help='If input surface is a fiber', default=False)
+	input_group.add_argument('--nbFiber', type=float, help='extract a percentage of fibers per cluster (value between 0 and 1)', default=0.05)
+	input_group.add_argument('--scaling', type=float, help='Scaling factor computed with scaling.py', default=None)
+	input_group.add_argument('--translate', nargs="+", type=float, help='Translation vector computed with scaling.py', default=None)
+	input_group.add_argument('--shape', nargs="+", type=int, help='Shape of the matrix computed with scaling.py', default=None)
 
-	input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
-	input_group.add_argument('--use_z', type=int, help='1 to scale normals by z buffer',default = 1)
-	input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
-	input_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
-	input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
+	# input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
+	# input_group.add_argument('--use_z', type=int, help='1 to scale normals by z buffer',default = 1)
+	# input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
+	# input_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
+	# input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
 
 
 	features_group = parser.add_argument_group('Shape features/property to extract')

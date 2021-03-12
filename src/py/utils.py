@@ -222,22 +222,22 @@ def ScaleSurf(surf, scale_factor):
     return surf, mean_arr, scale_factor
 
 def GetActor(surf):
-	surfMapper = vtk.vtkPolyDataMapper()
-	surfMapper.SetInputData(surf)
+    surfMapper = vtk.vtkPolyDataMapper()
+    surfMapper.SetInputData(surf)
 
-	surfActor = vtk.vtkActor()
-	surfActor.SetMapper(surfMapper)
+    surfActor = vtk.vtkActor()
+    surfActor.SetMapper(surfMapper)
 
-	return surfActor
+    return surfActor
 def GetTransform(rotationAngle, rotationVector):
     transform = vtk.vtkTransform()
     transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
     return transform
 
 def RotateSurf(surf, rotationAngle, rotationVector):
-	print("angle:", rotationAngle, "vector:", rotationVector)
-	transform = GetTransform(rotationAngle, rotationVector)
-	return RotateTransform(surf, transform)
+    print("angle:", rotationAngle, "vector:", rotationVector)
+    transform = GetTransform(rotationAngle, rotationVector)
+    return RotateTransform(surf, transform)
 
 def RotateInverse(surf, rotationAngle, rotationVector):
     print("angle:", rotationAngle, "vector:", rotationVector)
@@ -252,60 +252,64 @@ def RotateInverse(surf, rotationAngle, rotationVector):
     return RotateTransform(surf, transform_i)
 
 def RotateTransform(surf, transform):
-	transformFilter = vtk.vtkTransformPolyDataFilter()
-	transformFilter.SetTransform(transform)
-	transformFilter.SetInputData(surf)
-	transformFilter.Update()
-	return transformFilter.GetOutput()
+    transformFilter = vtk.vtkTransformPolyDataFilter()
+    transformFilter.SetTransform(transform)
+    transformFilter.SetInputData(surf)
+    transformFilter.Update()
+    return transformFilter.GetOutput()
 
 def RotateNpTransform(surf, angle, np_transform):
-	np_tran = np.load(np_transform)
+    np_tran = np.load(np_transform)
 
-	rotationAngle = -angle
-	rotationVector = np_tran
-	return RotateInverse(surf, rotationAngle, rotationVector)
+    rotationAngle = -angle
+    rotationVector = np_tran
+    return RotateInverse(surf, rotationAngle, rotationVector)
 
 def RandomRotation(surf):
-	rotationVector = np.random.random(3)*2.0 - 1.0
-	rotationVector = rotationVector/np.linalg.norm(rotationVector)
-	rotationAngle = np.random.random()*360.0
-	return RotateSurf(surf, rotationAngle, rotationVector)
+    rotationVector = np.random.random(3)*2.0 - 1.0
+    rotationVector = rotationVector/np.linalg.norm(rotationVector)
+    rotationAngle = np.random.random()*360.0
+    return RotateSurf(surf, rotationAngle, rotationVector)
 
 def GetUnitSurf(surf, scale=None, translate=None, shape=None):
 
-	if scale and translate and shape :
-		surf = scalingSurf(surf, scale, translate, shape)
-	else :
-		surf, surf_mean, surf_scale = Normalization(surf)
+    if scale and translate and shape :
+        print("scaling")
+        surf = scalingSurf(surf, scale, translate, shape)
+    else :
+        print("norm")
+        surf, surf_mean, surf_scale = Normalization(surf)
+    
+    return surf
 
 # def orientationTraining(surf, pathLabel):
-# 	rotationVector = np.random.random(3)*2.0 - 1.0
-# 	rotationVector = rotationVector/np.linalg.norm(rotationVector)
-# 	rotationAngle = np.random.random()*360.0
+#     rotationVector = np.random.random(3)*2.0 - 1.0
+#     rotationVector = rotationVector/np.linalg.norm(rotationVector)
+#     rotationAngle = np.random.random()*360.0
 
-# 	print("angle:", rotationAngle, "vector:", rotationVector)
-# 	transform = vtk.vtkTransform()
-# 	transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
+#     print("angle:", rotationAngle, "vector:", rotationVector)
+#     transform = vtk.vtkTransform()
+#     transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
 
-# 	transformFilter = vtk.vtkTransformPolyDataFilter()
-# 	transformFilter.SetTransform(transform)
-# 	transformFilter.SetInputData(surf)
-# 	transformFilter.Update()
+#     transformFilter = vtk.vtkTransformPolyDataFilter()
+#     transformFilter.SetTransform(transform)
+#     transformFilter.SetInputData(surf)
+#     transformFilter.Update()
 
-# 	theta = np.radians(rotationAngle)
-# 	c, s = np.cos(theta), np.sin(theta)
-# 	x, y, z = rotationVector[0], rotationVector[1], rotationVector[2]
-# 	R = np.array([[c+pow(x,2)*(1-c), x*y*(1-c)-z*s,    x*z*(1-c)+y*s], 
-# 				  [y*x*(1-c)+z*s,    c+pow(y,2)*(1-c), y*z*(1-c)-x*s], 
-# 				  [z*x*(1-c)-y*s,    z*y*(1-c)+x*s,    c+pow(z,2)*(1-c)]])
+#     theta = np.radians(rotationAngle)
+#     c, s = np.cos(theta), np.sin(theta)
+#     x, y, z = rotationVector[0], rotationVector[1], rotationVector[2]
+#     R = np.array([[c+pow(x,2)*(1-c), x*y*(1-c)-z*s,    x*z*(1-c)+y*s], 
+#                   [y*x*(1-c)+z*s,    c+pow(y,2)*(1-c), y*z*(1-c)-x*s], 
+#                   [z*x*(1-c)-y*s,    z*y*(1-c)+x*s,    c+pow(z,2)*(1-c)]])
 
-# 	# print("matrice rotation")
-# 	# print(R)
-# 	# print("matrice inverse/transpose:")
-# 	Rt = np.transpose(R)
-# 	# print(Rt)
-# 	np.save(pathLabel, Rt)
-# 	return transformFilter.GetOutput()
+#     # print("matrice rotation")
+#     # print(R)
+#     # print("matrice inverse/transpose:")
+#     Rt = np.transpose(R)
+#     # print(Rt)
+#     np.save(pathLabel, Rt)
+#     return transformFilter.GetOutput()
 
 def GetColoredActor(surf, property_name):
     hueLut = vtk.vtkLookupTable()
@@ -377,83 +381,83 @@ def GetPropertyActor(surf, property_name):
 
 def GetNormalsActor(surf):
 
-	try:
+    try:
 
-		normals = vtk.vtkPolyDataNormals()
-		normals.SetInputData(surf);
-		normals.ComputeCellNormalsOff();
-		normals.ComputePointNormalsOn();
-		normals.SplittingOff();
-		normals.Update()
-		surf = normals.GetOutput()
+        normals = vtk.vtkPolyDataNormals()
+        normals.SetInputData(surf);
+        normals.ComputeCellNormalsOff();
+        normals.ComputePointNormalsOn();
+        normals.SplittingOff();
+        normals.Update()
+        surf = normals.GetOutput()
 
-		# mapper
-		surf_actor = GetActor(surf)
+        # mapper
+        surf_actor = GetActor(surf)
 
-		if vtk.VTK_MAJOR_VERSION > 8:
+        if vtk.VTK_MAJOR_VERSION > 8:
 
-			sp = surf_actor.GetShaderProperty();
-			sp.AddVertexShaderReplacement(
-				"//VTK::Normal::Dec",
-				True,
-				"//VTK::Normal::Dec\n" + 
-				"  varying vec3 myNormalMCVSOutput;\n",
-				False
-			)
+            sp = surf_actor.GetShaderProperty();
+            sp.AddVertexShaderReplacement(
+                "//VTK::Normal::Dec",
+                True,
+                "//VTK::Normal::Dec\n" + 
+                "  varying vec3 myNormalMCVSOutput;\n",
+                False
+            )
 
-			sp.AddVertexShaderReplacement(
-				"//VTK::Normal::Impl",
-				True,
-				"//VTK::Normal::Impl\n" +
-				"  myNormalMCVSOutput = normalMC;\n",
-				False
-			)
+            sp.AddVertexShaderReplacement(
+                "//VTK::Normal::Impl",
+                True,
+                "//VTK::Normal::Impl\n" +
+                "  myNormalMCVSOutput = normalMC;\n",
+                False
+            )
 
-			sp.AddVertexShaderReplacement(
-				"//VTK::Color::Impl",
-				True, "VTK::Color::Impl\n", False)
+            sp.AddVertexShaderReplacement(
+                "//VTK::Color::Impl",
+                True, "VTK::Color::Impl\n", False)
 
-			sp.ClearVertexShaderReplacement("//VTK::Color::Impl", True)
+            sp.ClearVertexShaderReplacement("//VTK::Color::Impl", True)
 
-			sp.AddFragmentShaderReplacement(
-				"//VTK::Normal::Dec",
-				True,
-				"//VTK::Normal::Dec\n" + 
-				"  varying vec3 myNormalMCVSOutput;\n",
-				False
-			)
+            sp.AddFragmentShaderReplacement(
+                "//VTK::Normal::Dec",
+                True,
+                "//VTK::Normal::Dec\n" + 
+                "  varying vec3 myNormalMCVSOutput;\n",
+                False
+            )
 
-			sp.AddFragmentShaderReplacement(
-				"//VTK::Light::Impl",
-				True,
-				"//VTK::Light::Impl\n" +
-				"  gl_FragData[0] = vec4(myNormalMCVSOutput*0.5f + 0.5, 1.0);\n",
-				False
-			)
+            sp.AddFragmentShaderReplacement(
+                "//VTK::Light::Impl",
+                True,
+                "//VTK::Light::Impl\n" +
+                "  gl_FragData[0] = vec4(myNormalMCVSOutput*0.5f + 0.5, 1.0);\n",
+                False
+            )
 
-		else:
-			colored_points = vtk.vtkUnsignedCharArray()
-			colored_points.SetName('colors')
-			colored_points.SetNumberOfComponents(3)
+        else:
+            colored_points = vtk.vtkUnsignedCharArray()
+            colored_points.SetName('colors')
+            colored_points.SetNumberOfComponents(3)
 
-			normals = surf.GetPointData().GetArray('Normals')
-			for pid in range(surf.GetNumberOfPoints()):
-				normal = np.array(normals.GetTuple(pid))
-				rgb = (normal*0.5 + 0.5)*255.0
-				colored_points.InsertNextTuple3(rgb[0], rgb[1], rgb[2])
+            normals = surf.GetPointData().GetArray('Normals')
+            for pid in range(surf.GetNumberOfPoints()):
+                normal = np.array(normals.GetTuple(pid))
+                rgb = (normal*0.5 + 0.5)*255.0
+                colored_points.InsertNextTuple3(rgb[0], rgb[1], rgb[2])
 
-			surf.GetPointData().SetScalars(colored_points)
+            surf.GetPointData().SetScalars(colored_points)
 
-			surf_actor = GetActor(surf)
-			surf_actor.GetProperty().LightingOff()
-			surf_actor.GetProperty().ShadingOff()
-			surf_actor.GetProperty().SetInterpolationToFlat()
+            surf_actor = GetActor(surf)
+            surf_actor.GetProperty().LightingOff()
+            surf_actor.GetProperty().ShadingOff()
+            surf_actor.GetProperty().SetInterpolationToFlat()
 
 
-		return surf_actor
-	except Exception as e:
-		print(e, file=sys.stderr)
-		return None
+        return surf_actor
+    except Exception as e:
+        print(e, file=sys.stderr)
+        return None
 
 # def GetUnitActor(fileName, property, scale_factor, random_rotation=False, normal_shaders=True):
 
@@ -532,144 +536,144 @@ def GetNormalsActor(surf):
 
 def GetCellIdMapActor(surf):
 
-	colored_points = vtk.vtkUnsignedCharArray()
-	colored_points.SetName('cell_ids')
-	colored_points.SetNumberOfComponents(3)
+    colored_points = vtk.vtkUnsignedCharArray()
+    colored_points.SetName('cell_ids')
+    colored_points.SetNumberOfComponents(3)
 
-	for cell_id in range(0, surf.GetNumberOfCells()):
-		r = cell_id % 255.0 + 1
-		g = int(cell_id / 255.0) % 255.0
-		b = int(int(cell_id / 255.0) / 255.0) % 255.0
-		colored_points.InsertNextTuple3(r, g, b)
+    for cell_id in range(0, surf.GetNumberOfCells()):
+        r = cell_id % 255.0 + 1
+        g = int(cell_id / 255.0) % 255.0
+        b = int(int(cell_id / 255.0) / 255.0) % 255.0
+        colored_points.InsertNextTuple3(r, g, b)
 
-		# cell_id_color = int(b*255*255 + g*255 + r - 1)
+        # cell_id_color = int(b*255*255 + g*255 + r - 1)
 
-	surf.GetCellData().SetScalars(colored_points)
+    surf.GetCellData().SetScalars(colored_points)
 
-	surf_actor = GetActor(surf)
-	surf_actor.GetMapper().SetScalarModeToUseCellData()
-	surf_actor.GetProperty().LightingOff()
-	surf_actor.GetProperty().ShadingOff()
-	surf_actor.GetProperty().SetInterpolationToFlat()
+    surf_actor = GetActor(surf)
+    surf_actor.GetMapper().SetScalarModeToUseCellData()
+    surf_actor.GetProperty().LightingOff()
+    surf_actor.GetProperty().ShadingOff()
+    surf_actor.GetProperty().SetInterpolationToFlat()
 
-	return surf_actor
+    return surf_actor
 
 def GetPointIdMapActor(surf):
 
-	colored_points = vtk.vtkUnsignedCharArray()
-	colored_points.SetName('point_ids')
-	colored_points.SetNumberOfComponents(3)
+    colored_points = vtk.vtkUnsignedCharArray()
+    colored_points.SetName('point_ids')
+    colored_points.SetNumberOfComponents(3)
 
-	for cell_id in range(0, surf.GetNumberOfCells()):
+    for cell_id in range(0, surf.GetNumberOfCells()):
 
-		point_ids = vtk.vtkIdList()
-		surf.GetCellPoints(cell_id, point_ids)
+        point_ids = vtk.vtkIdList()
+        surf.GetCellPoints(cell_id, point_ids)
 
-		point_id = point_ids.GetId(0)
+        point_id = point_ids.GetId(0)
 
-		r = point_id % 255.0 + 1
-		g = int(point_id / 255.0) % 255.0
-		b = int(int(point_id / 255.0) / 255.0) % 255.0
-		colored_points.InsertNextTuple3(r, g, b)
+        r = point_id % 255.0 + 1
+        g = int(point_id / 255.0) % 255.0
+        b = int(int(point_id / 255.0) / 255.0) % 255.0
+        colored_points.InsertNextTuple3(r, g, b)
 
-		# cell_id_color = int(b*255*255 + g*255 + r - 1)
+        # cell_id_color = int(b*255*255 + g*255 + r - 1)
 
-	surf.GetCellData().SetScalars(colored_points)
+    surf.GetCellData().SetScalars(colored_points)
 
-	surf_actor = GetActor(surf)
-	surf_actor.GetMapper().SetScalarModeToUseCellData()
-	surf_actor.GetProperty().LightingOff()
-	surf_actor.GetProperty().ShadingOff()
-	surf_actor.GetProperty().SetInterpolationToFlat()
+    surf_actor = GetActor(surf)
+    surf_actor.GetMapper().SetScalarModeToUseCellData()
+    surf_actor.GetProperty().LightingOff()
+    surf_actor.GetProperty().ShadingOff()
+    surf_actor.GetProperty().SetInterpolationToFlat()
 
-	return surf_actor
+    return surf_actor
 
 # def ExtractPointFeatures(surf, cellids_rgb, point_features_name):
 
-# 	point_features_np = []
-	
-# 	cellids_rgb_shape = cellids_rgb.shape
-# 	cellids_rgb = cellids_rgb.reshape(-1, 3)
+#     point_features_np = []
+    
+#     cellids_rgb_shape = cellids_rgb.shape
+#     cellids_rgb = cellids_rgb.reshape(-1, 3)
 
-# 	point_features = surf.GetPointData().GetScalars(point_features_name)
-# 	zero = np.zeros(point_features.GetNumberOfComponents())
+#     point_features = surf.GetPointData().GetScalars(point_features_name)
+#     zero = np.zeros(point_features.GetNumberOfComponents())
 
-# 	for cell_id in cellids_rgb:
-# 		r = cell_id[0]
-# 		g = cell_id[1]
-# 		b = cell_id[2]
+#     for cell_id in cellids_rgb:
+#         r = cell_id[0]
+#         g = cell_id[1]
+#         b = cell_id[2]
 
-# 		cell_id_color = int(b*255*255 + g*255 + r - 1)
+#         cell_id_color = int(b*255*255 + g*255 + r - 1)
 
-# 		if cell_id_color >= 0 and cell_id_color < surf.GetNumberOfCells():
-# 			point_ids = vtk.vtkIdList()
-# 			surf.GetCellPoints(cell_id_color, point_ids)
-# 			point_id = point_ids.GetId(0)
-# 			point_features_np.append(point_features.GetTuple(point_id))
-# 		else:
-# 			point_features_np.append(zero)
+#         if cell_id_color >= 0 and cell_id_color < surf.GetNumberOfCells():
+#             point_ids = vtk.vtkIdList()
+#             surf.GetCellPoints(cell_id_color, point_ids)
+#             point_id = point_ids.GetId(0)
+#             point_features_np.append(point_features.GetTuple(point_id))
+#         else:
+#             point_features_np.append(zero)
 
-# 	return np.array(point_features_np).reshape(cellids_rgb_shape[0:-1] + (point_features.GetNumberOfComponents(),))
+#     return np.array(point_features_np).reshape(cellids_rgb_shape[0:-1] + (point_features.GetNumberOfComponents(),))
 
 class ExtractPointFeaturesClass():
-	def __init__(self, point_features_np, zero):
-		self.point_features_np = point_features_np
-		self.zero = zero
+    def __init__(self, point_features_np, zero):
+        self.point_features_np = point_features_np
+        self.zero = zero
 
-	def __call__(self, point_ids_rgb):
+    def __call__(self, point_ids_rgb):
 
-		point_ids_rgb = point_ids_rgb.reshape(-1, 3)
-		point_features = []
+        point_ids_rgb = point_ids_rgb.reshape(-1, 3)
+        point_features = []
 
-		for point_id_rgb in point_ids_rgb:
-			r = point_id_rgb[0]
-			g = point_id_rgb[1]
-			b = point_id_rgb[2]
+        for point_id_rgb in point_ids_rgb:
+            r = point_id_rgb[0]
+            g = point_id_rgb[1]
+            b = point_id_rgb[2]
 
-			point_id = int(b*255*255 + g*255 + r - 1)
+            point_id = int(b*255*255 + g*255 + r - 1)
 
-			point_features_np_shape = np.shape(self.point_features_np)
-			if point_id >= 0 and point_id < point_features_np_shape[0]:
-				point_features.append(self.point_features_np[point_id])
-			else:
-				point_features.append(self.zero)
+            point_features_np_shape = np.shape(self.point_features_np)
+            if point_id >= 0 and point_id < point_features_np_shape[0]:
+                point_features.append(self.point_features_np[point_id])
+            else:
+                point_features.append(self.zero)
 
-		return point_features
+        return point_features
 
 def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0):
-	
-	point_ids_rgb_shape = point_ids_rgb.shape
+    
+    point_ids_rgb_shape = point_ids_rgb.shape
 
-	point_features = surf.GetPointData().GetScalars(point_features_name)
-	point_features_np = vtk_to_numpy(point_features)
-	zero = np.zeros(point_features.GetNumberOfComponents()) + zero
+    point_features = surf.GetPointData().GetScalars(point_features_name)
+    point_features_np = vtk_to_numpy(point_features)
+    zero = np.zeros(point_features.GetNumberOfComponents()) + zero
 
-	with Pool(cpu_count()) as p:
-		feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
-	return np.array(feat).reshape(point_ids_rgb_shape[0:-1] + (point_features.GetNumberOfComponents(),))
+    with Pool(cpu_count()) as p:
+        feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
+    return np.array(feat).reshape(point_ids_rgb_shape[0:-1] + (point_features.GetNumberOfComponents(),))
 
 def ReadImage(fName, image_dimension=2, pixel_dimension=-1):
-	if(image_dimension == 1):
-		if(pixel_dimension != -1):
-			ImageType = itk.Image[itk.Vector[itk.F, pixel_dimension], 2]
-		else:
-			ImageType = itk.VectorImage[itk.F, 2]
-	else:
-		if(pixel_dimension != -1):
-			ImageType = itk.Image[itk.Vector[itk.F, pixel_dimension], image_dimension]
-		else:
-			ImageType = itk.VectorImage[itk.F, image_dimension]
+    if(image_dimension == 1):
+        if(pixel_dimension != -1):
+            ImageType = itk.Image[itk.Vector[itk.F, pixel_dimension], 2]
+        else:
+            ImageType = itk.VectorImage[itk.F, 2]
+    else:
+        if(pixel_dimension != -1):
+            ImageType = itk.Image[itk.Vector[itk.F, pixel_dimension], image_dimension]
+        else:
+            ImageType = itk.VectorImage[itk.F, image_dimension]
 
-	img_read = itk.ImageFileReader[ImageType].New(FileName=fName)
-	img_read.Update()
-	img = img_read.GetOutput()
+    img_read = itk.ImageFileReader[ImageType].New(FileName=fName)
+    img_read.Update()
+    img = img_read.GetOutput()
 
-	return img
+    return img
 
 def GetImage(img_np):
 
-	img_np_shape = np.shape(img_np)
-	ComponentType = itk.ctype('float')
+    img_np_shape = np.shape(img_np)
+    ComponentType = itk.ctype('float')
 
     Dimension = img_np.ndim - 1
     PixelDimension = img_np.shape[-1]
@@ -710,42 +714,47 @@ def GetImage(img_np):
     out_img_np = itk.GetArrayViewFromImage(out_img)
     out_img_np.setfield(img_np.reshape(out_img_np.shape), out_img_np.dtype)
 
-	return out_img
+    return out_img
 
-def GetTubeFilter(surf, list_random_id):
+def GetTubeFilter(vtkpolydata):
 
-	ids = vtk.vtkIdTypeArray()
-	ids.SetNumberOfComponents(1)
-	ids.InsertNextValue(list_random_id) 
+    tubeFilter = vtk.vtkTubeFilter()
+    tubeFilter.SetNumberOfSides(50)
+    tubeFilter.SetRadius(0.008)
+    tubeFilter.SetInputData(vtkpolydata)
+    tubeFilter.Update()
 
-	# extract a subset from a dataset
-	selectionNode = vtk.vtkSelectionNode() 
-	selectionNode.SetFieldType(0) 		# CELL_DATA = 0
-	selectionNode.SetContentType(4) 	# INDICES = 4
-	selectionNode.SetSelectionList(ids) # add the cell we want to extract
-	
-	# set containing cell to 1 = extract cell
-	selectionNode.GetProperties().Set(vtk.vtkSelectionNode.CONTAINING_CELLS(), 1) 
+    return tubeFilter.GetOutput()
 
-	selection = vtk.vtkSelection()
-	selection.AddNode(selectionNode)
+def ExtractFiber(surf, list_random_id) :
+    ids = vtk.vtkIdTypeArray()
+    ids.SetNumberOfComponents(1)
+    ids.InsertNextValue(list_random_id) 
 
-	# extract the cell from the cluster
-	extractSelection = vtk.vtkExtractSelection()
-	extractSelection.SetInputData(0, surf)
-	extractSelection.SetInputData(1, selection)
-	extractSelection.Update()
+    # extract a subset from a dataset
+    selectionNode = vtk.vtkSelectionNode() 
+    selectionNode.SetFieldType(0)
+    selectionNode.SetContentType(4)
+    selectionNode.SetSelectionList(ids) 
 
-	# convert the extract cell to a polygonal type (a line here)
-	geometryFilter = vtk.vtkGeometryFilter()
-	geometryFilter.SetInputData(extractSelection.GetOutput())
-	geometryFilter.Update()
+    # set containing cell to 1 = extract cell
+    selectionNode.GetProperties().Set(vtk.vtkSelectionNode.CONTAINING_CELLS(), 1) 
 
-	# create a tube fiber 
-	tubeFilter = vtk.vtkTubeFilter()
-	tubeFilter.SetNumberOfSides(50)
-	tubeFilter.SetRadius(0.008)
-	tubeFilter.SetInputData(geometryFilter.GetOutput())
-	tubeFilter.Update()
+    selection = vtk.vtkSelection()
+    selection.AddNode(selectionNode)
 
-	return tubeFilter.GetOutput()
+    # extract the cell from the cluster
+    extractSelection = vtk.vtkExtractSelection()
+    extractSelection.SetInputData(0, surf)
+    extractSelection.SetInputData(1, selection)
+    extractSelection.Update()
+
+    # convert the extract cell to a polygonal type (a line here)
+    geometryFilter = vtk.vtkGeometryFilter()
+    geometryFilter.SetInputData(extractSelection.GetOutput())
+    geometryFilter.Update()
+
+
+    tubefilter = GetTubeFilter(geometryFilter.GetOutput())
+
+    return tubefilter
