@@ -104,6 +104,7 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 def main(args):
     surf = ReadSurf(args.surf)
     actor = GetColoredActor(surf, args.property)
+    actor.GetProperty().SetInterpolationToFlat()
 
     colors = vtk.vtkNamedColors()
 
