@@ -1,3 +1,24 @@
+# Create docker image from Dockerfile
+
+1. Clone the repository with tag 2.1
+
+```
+	git clone --depth 1 --branch 2.1  https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
+```
+
+2. Download the VTK package with EGL support (no X server)
+
+```
+	cd fly-by-cnn/src/kubernetes
+	wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.0/vtk8.2.0.zip
+```
+
+3. Run docker build
+
+```
+	docker build -t flyby:2.0.0 .	
+```
+
 # Deploy fly-by-cnn to a kubernetes
 
 ## Install the docker engine https://docs.docker.com/get-docker/
