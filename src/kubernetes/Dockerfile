@@ -16,7 +16,7 @@ RUN unzip vtk8.2.0.zip
 RUN pip install itk sklearn pandas matplotlib
 
 WORKDIR /app
-git clone --depth 1 --branch 2.1  https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
+RUN git clone https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.6/dist-packages/vtkmodules/
 ENV MESA_GL_VERSION_OVERRIDE=3.2
