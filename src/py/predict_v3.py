@@ -12,7 +12,7 @@ import vtk
 
 parser = argparse.ArgumentParser(description='Predict an input with a trained neural network', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--surf', type=str, help='Input surface mesh to label', required=True)
-parser.add_argument('--model', type=str, help='Model to do segmentation', required=True)
+parser.add_argument('--model', type=str, help='Model to do segmentation', default="/app/u_seg_nn_v3.0")
 parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
 args = parser.parse_args()
@@ -42,8 +42,11 @@ img_point_id_map_np = img_point_id_map_np.reshape((-1, img_point_id_map_np.shape
 flyby_features.removeActors()
 
 
-model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
-model.summary()
+if os.path.exist(args.model):
+	model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
+	model.summary()
+else:
+	print("Please set the model directory to a valid path", file=sys.stderr)
 
 print("Predict ...")
 img_predict_np = model.predict(img_np)
