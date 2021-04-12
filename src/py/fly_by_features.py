@@ -33,6 +33,7 @@ class FlyByGenerator():
 		self.use_z = use_z
 		self.split_z = split_z
 
+		print("res", self.resolution)
 		#sphere_actor = GetActor(sphere)
 		# print(sphere_actor)
 		#sphere_actor.GetProperty().SetRepresentationToWireFrame()
@@ -190,12 +191,10 @@ def main(args):
 		model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
 		model.summary()
 
-	flyby = FlyByGenerator(sphere, args.resolution, args.visualize, use_z=args.use_z, split_z=args.split_z)
+	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z)
 	
 	if args.point_features or args.out_point_id:
 		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
-
-
 
 	for fobj in filenames:
 
@@ -222,30 +221,7 @@ def main(args):
 
 		if model is not None:
 			out_np = model.predict(out_np)
-		
-
-		if ( not args.concatenate ):
-			if not os.path.exists(fobj["out"]):
-				os.makedirs(fobj["out"])
-				
-			for i in range(out_np.shape[0]):
-				out_img = GetImage(out_np[i])
-
-				out_filename = os.path.join(fobj["out"], str(i) + ".nrrd")
-				print("Writing:", out_filename)
-		
-				writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
-				writer.UseCompressionOn()
-				writer.Update()
-		else:
-			out_img = GetImage(out_np)
-
-			print("Writing:", fobj["out"])
-			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
-			writer.UseCompressionOn()
-			writer.Update()
-				
-
+			
 		if args.point_features or args.out_point_id:
 
 			surf_actor = GetPointIdMapActor(surf)
@@ -284,29 +260,54 @@ def main(args):
 					print("Extracting:", point_features_name)
 					out_features_np = ExtractPointFeatures(surf, out_point_ids_rgb_np, point_features_name, args.zero)
 
-					if ( not args.concatenate ):
+					if(args.point_features_concat):
+						out_np = np.concatenate([out_np, out_features_np], axis=-1)
+					else:
+						if ( not args.concatenate ):
 
-						if not os.path.exists(fobj["out"]):
-							os.makedirs(fobj["out"])
+							if not os.path.exists(fobj["out"]):
+								os.makedirs(fobj["out"])
 
-						for i in range(out_features_np.shape[0]):
-							out_img = GetImage(out_features_np[i])
+							for i in range(out_features_np.shape[0]):
+								out_img = GetImage(out_features_np[i])
 
-							out_filename = os.path.join(fobj["out"], str(i) + "_" + point_features_name + ".nrrd")
-							print("Writing:", out_filename)
-					
-							writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
+								out_filename = os.path.join(fobj["out"], str(i) + "_" + point_features_name + ".nrrd")
+								print("Writing:", out_filename)
+						
+								writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
+								writer.UseCompressionOn()
+								writer.Update()
+						else:
+							out_features_name = os.path.splitext(fobj["out"])
+							out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
+							print("Writing:", out_features_name)
+							out_features = GetImage(out_features_np)
+							writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
 							writer.UseCompressionOn()
 							writer.Update()
-					else:
-						out_features_name = os.path.splitext(fobj["out"])
-						out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
-						print("Writing:", out_features_name)
-						out_features = GetImage(out_features_np)
-						writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
-						writer.UseCompressionOn()
-						writer.Update()
 				flyby_features.removeActors()
+
+		if ( not args.concatenate ):
+			if not os.path.exists(fobj["out"]):
+				os.makedirs(fobj["out"])
+				
+			for i in range(out_np.shape[0]):
+				out_img = GetImage(out_np[i])
+
+				out_filename = os.path.join(fobj["out"], str(i) + ".nrrd")
+				print("Writing:", out_filename)
+		
+				writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
+				writer.UseCompressionOn()
+				writer.Update()
+		else:
+			out_img = GetImage(out_np)
+
+			print("Writing:", fobj["out"])
+			writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
+			writer.UseCompressionOn()
+			writer.Update()
+			
 		flyby.removeActors()
 
 
@@ -336,6 +337,7 @@ if __name__ == '__main__':
 
 	features_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
 	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
+	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
 	
 
