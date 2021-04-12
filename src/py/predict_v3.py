@@ -65,7 +65,7 @@ real_labels = vtk.vtkIntArray()
 real_labels.SetNumberOfComponents(1)
 real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
 real_labels.SetName("RegionId")
-real_labels.Fill(-1)
+real_labels.Fill(0)
 
 for pointId,prediction in enumerate(prediction_array_count):
 	if np.max(prediction) > 0:
@@ -90,23 +90,26 @@ for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
 	post_process.RemoveIslands(surf, real_labels, label, 500)
 
 
-outfilename = args.out
-outfilename_islands = outfilename
+out_filename = args.out
+outfilename_islands = out_filename
 outfilename_islands = os.path.splitext(outfilename_islands)[0] + "_islands.vtk"
-print("Writting:", outfilename_pre)
+print("Writting:", outfilename_islands)
 polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_islands)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
 
 print("Relabel...")
-post_process.ReLabel(surf, real_labels, 3, -2)
+#Re label the gum which is label 3 to label -1
+post_process.ReLabel(surf, real_labels, 3, -1)
 
 print("Connectivity...")
+#Do the connected component analysis and assign labels starting at label 2
 post_process.ConnectivityLabeling(surf, real_labels, 2, 2)
 
 print("Eroding...")
-post_process.ErodeLabel(surf, real_labels, -2)
+#Erode the gum label 
+post_process.ErodeLabel(surf, real_labels, -1)
 
 print("Writting:", outfilename)
 polydatawriter = vtk.vtkPolyDataWriter()
@@ -131,3 +134,7 @@ polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_teeth)
 polydatawriter.SetInputData(teeth_surf)
 polydatawriter.Write()
+
+end_time = time.time()
+
+print("Prediction time took:", (end_time - start_time), "seconds")
