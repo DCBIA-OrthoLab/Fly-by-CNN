@@ -10,24 +10,6 @@ from readers import OFFReader
 from multiprocessing import Pool, cpu_count
 from vtk.util.numpy_support import vtk_to_numpy
 
-def Normalization(vtkdata):
-    polypoints = vtkdata.GetPoints()
-    
-    nppoints = []
-    for pid in range(polypoints.GetNumberOfPoints()):
-        spoint = polypoints.GetPoint(pid)
-        nppoints.append(spoint)
-
-    npmean = np.mean(np.array(nppoints), axis=0)
-    nppoints -= npmean
-    npscale = np.max([np.linalg.norm(p) for p in nppoints])
-    nppoints /= npscale
-
-    for pid in range(polypoints.GetNumberOfPoints()):
-        vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
-
-    return vtkdata, npmean, npscale
-
 def normalize_points(poly, radius):
     polypoints = poly.GetPoints()
     for pid in range(polypoints.GetNumberOfPoints()):
@@ -172,7 +154,11 @@ def WriteSurf(surf, fileName):
     writer.Update()
 
 
-def ScaleSurf(surf, scale_factor):
+def ScaleSurf(surf, scale_factor = -1):
+    surf_copy = vtk.vtkPolyData()
+    surf.DeepCopy(surf_copy)
+    surf = surf_copy
+
     shapedatapoints = surf.GetPoints()
     
     #calculate bounding box
@@ -266,40 +252,9 @@ def RandomRotation(surf):
 	rotationAngle = np.random.random()*360.0
 	return RotateSurf(surf, rotationAngle, rotationVector)
 
-
-# def orientationTraining(surf, pathLabel):
-# 	rotationVector = np.random.random(3)*2.0 - 1.0
-# 	rotationVector = rotationVector/np.linalg.norm(rotationVector)
-# 	rotationAngle = np.random.random()*360.0
-
-# 	print("angle:", rotationAngle, "vector:", rotationVector)
-# 	transform = vtk.vtkTransform()
-# 	transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
-
-# 	transformFilter = vtk.vtkTransformPolyDataFilter()
-# 	transformFilter.SetTransform(transform)
-# 	transformFilter.SetInputData(surf)
-# 	transformFilter.Update()
-
-# 	theta = np.radians(rotationAngle)
-# 	c, s = np.cos(theta), np.sin(theta)
-# 	x, y, z = rotationVector[0], rotationVector[1], rotationVector[2]
-# 	R = np.array([[c+pow(x,2)*(1-c), x*y*(1-c)-z*s,    x*z*(1-c)+y*s], 
-# 				  [y*x*(1-c)+z*s,    c+pow(y,2)*(1-c), y*z*(1-c)-x*s], 
-# 				  [z*x*(1-c)-y*s,    z*y*(1-c)+x*s,    c+pow(z,2)*(1-c)]])
-
-# 	# print("matrice rotation")
-# 	# print(R)
-# 	# print("matrice inverse/transpose:")
-# 	Rt = np.transpose(R)
-# 	# print(Rt)
-# 	np.save(pathLabel, Rt)
-# 	return transformFilter.GetOutput()
-
-
 def GetUnitSurf(surf):
-	surf, surf_mean, surf_scale = Normalization(surf)
-	return surf
+    surf, surf_mean, surf_scale = ScaleSurf(surf)
+    return surf
 
 def GetColoredActor(surf, property_name):
     hueLut = vtk.vtkLookupTable()
@@ -449,81 +404,6 @@ def GetNormalsActor(surf):
 		print(e, file=sys.stderr)
 		return None
 
-# def GetUnitActor(fileName, property, scale_factor, random_rotation=False, normal_shaders=True):
-
-#     try:
-
-#         surf = ReadSurf(fileName)
-
-#         surf, surf_mean, surf_scale = Normalization(surf)
-
-#         if(random_rotation):
-#             rotationVector = np.random.random(3)*2.0 - 1.0
-#             rotationVector = rotationVector/np.linalg.norm(rotationVector)
-#             rotationAngle = np.random.random()*360.0
-#             surf = RotateSurf(surf, rotationAngle, rotationVector)
-
-#         #Color with normals
-#         if(normal_shaders):
-#             normals = vtk.vtkPolyDataNormals()
-#             normals.SetInputData(surf);
-#             normals.ComputeCellNormalsOff();
-#             normals.ComputePointNormalsOn();
-#             # normals.AutoOrientNormalsOn();
-#             normals.SplittingOff();
-#             normals.Update()
-#             surf = normals.GetOutput()
-
-#         # mapper
-#         surfActor = GetActor(surf, property, scale_factor)
-
-
-#         if(normal_shaders):
-
-#             sp = surfActor.GetShaderProperty();
-#             sp.AddVertexShaderReplacement(
-#                 "//VTK::Normal::Dec",
-#                 True,
-#                 "//VTK::Normal::Dec\n" + 
-#                 "  varying vec3 myNormalMCVSOutput;\n",
-#                 False
-#             )
-
-#             sp.AddVertexShaderReplacement(
-#                 "//VTK::Normal::Impl",
-#                 True,
-#                 "//VTK::Normal::Impl\n" +
-#                 "  myNormalMCVSOutput = normalMC;\n",
-#                 False
-#             )
-
-#             sp.AddVertexShaderReplacement(
-#                 "//VTK::Color::Impl",
-#                 True, "VTK::Color::Impl\n", False)
-
-#             sp.ClearVertexShaderReplacement("//VTK::Color::Impl", True)
-
-#             sp.AddFragmentShaderReplacement(
-#                 "//VTK::Normal::Dec",
-#                 True,
-#                 "//VTK::Normal::Dec\n" + 
-#                 "  varying vec3 myNormalMCVSOutput;\n",
-#                 False
-#             )
-
-#             sp.AddFragmentShaderReplacement(
-#                 "//VTK::Normal::Impl",
-#                 True,
-#                 "//VTK::Normal::Impl\n" +
-#                 "  diffuseColor = myNormalMCVSOutput*0.5f + 0.5f;\n",
-#                 False
-#             )
-
-#         return surfActor
-#     except Exception as e:
-#         print(e, file=sys.stderr)
-#         return None
-
 def GetCellIdMapActor(surf):
 
 	colored_points = vtk.vtkUnsignedCharArray()
@@ -577,33 +457,6 @@ def GetPointIdMapActor(surf):
 	surf_actor.GetProperty().SetInterpolationToFlat()
 
 	return surf_actor
-
-# def ExtractPointFeatures(surf, cellids_rgb, point_features_name):
-
-# 	point_features_np = []
-	
-# 	cellids_rgb_shape = cellids_rgb.shape
-# 	cellids_rgb = cellids_rgb.reshape(-1, 3)
-
-# 	point_features = surf.GetPointData().GetScalars(point_features_name)
-# 	zero = np.zeros(point_features.GetNumberOfComponents())
-
-# 	for cell_id in cellids_rgb:
-# 		r = cell_id[0]
-# 		g = cell_id[1]
-# 		b = cell_id[2]
-
-# 		cell_id_color = int(b*255*255 + g*255 + r - 1)
-
-# 		if cell_id_color >= 0 and cell_id_color < surf.GetNumberOfCells():
-# 			point_ids = vtk.vtkIdList()
-# 			surf.GetCellPoints(cell_id_color, point_ids)
-# 			point_id = point_ids.GetId(0)
-# 			point_features_np.append(point_features.GetTuple(point_id))
-# 		else:
-# 			point_features_np.append(zero)
-
-# 	return np.array(point_features_np).reshape(cellids_rgb_shape[0:-1] + (point_features.GetNumberOfComponents(),))
 
 class ExtractPointFeaturesClass():
 	def __init__(self, point_features_np, zero):
