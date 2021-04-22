@@ -156,7 +156,7 @@ def WriteSurf(surf, fileName):
 
 def ScaleSurf(surf, scale_factor = -1):
     surf_copy = vtk.vtkPolyData()
-    surf.DeepCopy(surf_copy)
+    surf_copy.DeepCopy(surf)
     surf = surf_copy
 
     shapedatapoints = surf.GetPoints()
