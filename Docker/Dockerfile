@@ -19,8 +19,10 @@ WORKDIR /app
 
 RUN git clone https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
 
-RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.1/u_seg_nn_v3.0.zip
-RUN	unzip u_seg_nn_v3.0.zip
+#RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.1/u_seg_nn_v3.0.zip
+#RUN unzip u_seg_nn_v3.0.zip
+RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.2/u_seg_nn_v3.1.zip
+RUN unzip u_seg_nn_v3.1.zip
 
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.6/dist-packages/vtkmodules/
