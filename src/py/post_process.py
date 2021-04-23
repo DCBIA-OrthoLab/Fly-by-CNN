@@ -335,7 +335,6 @@ def ConnectivityLabeling(vtkdata, labels, label, start_label):
 				labels.SetTuple(int(cpid), (start_label,))
 			start_label += 1
 
-
 def ErodeLabel(vtkdata, labels, label):
 	
 	pid_labels = []
@@ -373,6 +372,29 @@ def ErodeLabel(vtkdata, labels, label):
 				labels.SetTuple(int(npid), (nlabel,))
 		else:
 			break
+
+def DilateLabel(vtkdata, labels, label, iterations=2):
+	
+	pid_labels = []
+
+	while iterations > 0:
+		#Get all neighbors to the 'label' that have a different label
+		all_neighbor_labels = []
+		for pid in range(labels.GetNumberOfTuples()):
+			if labels.GetTuple(pid)[0] == label:
+				neighbor_pids = GetNeighbors(vtkdata, pid)
+				pid_labels.append(pid)
+
+				for npid in neighbor_pids:
+					neighbor_label = labels.GetTuple(npid)[0]
+					if neighbor_label != label:
+						all_neighbor_labels.append(npid)
+
+		#Dilate them, i.e., change the value to label
+		for npid in all_neighbor_labels:
+			labels.SetTuple(int(npid), (label,))
+
+		iterations -= 1
 
 def MeanCoordinatesTeeth(surf,labels):
 	nlabels, pid_labels = [], []
@@ -562,7 +584,9 @@ if __name__ == '__main__':
 	parser.add_argument('--connectivity', type=bool, help='Label all elements with unique labels', default=False)
 	parser.add_argument('--connectivity_label', type=int, help='Connectivity label', default=2)
 	parser.add_argument('--erode', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
-	parser.add_argument('--erode_label', type=int, help='Eroding label', default=0)
+	parser.add_argument('--dilate', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
+	parser.add_argument('--dilate_iterations', type=int, help='Number of dilate iterations', default=2)
+	parser.add_argument('--label', type=int, help='Eroding/dilating label', default=0)
 	parser.add_argument('--threshold', type=bool, help='Threshold between two values', default=False)
 	parser.add_argument('--threshold_min', type=int, help='Threshold min value', default=2)
 	parser.add_argument('--threshold_max', type=int, help='Threshold max value', default=100)
@@ -591,7 +615,11 @@ if __name__ == '__main__':
 
 	if(args.erode):
 		print("Eroding...")
-		ErodeLabel(surf, labels, args.erode_label)
+		ErodeLabel(surf, labels, args.label)
+
+	if(args.dilate):
+		print("Dilate...")
+		DilateLabel(surf, labels, args.label, args.dilate_iterations)
 
 	if(args.threshold):
 		print("Thresholding...")
