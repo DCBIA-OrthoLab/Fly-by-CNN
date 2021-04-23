@@ -102,6 +102,10 @@ polydatawriter.SetFileName(outfilename_islands)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
 
+print("Dilate...")
+#Re label the gum which is label 3 to label -1
+post_process.DilateLabel(surf, real_labels, 3)
+
 print("Relabel...")
 #Re label the gum which is label 3 to label -1
 post_process.ReLabel(surf, real_labels, 3, -1)
