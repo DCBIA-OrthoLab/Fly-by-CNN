@@ -3,6 +3,10 @@ import numpy as np
 import argparse
 import sys
 import os
+import predict_LU
+from collections import namedtuple
+
+
 
 # parser = argparse.ArgumentParser()
 # parser.add_argument('--mesh', help='Insert mesh path')
@@ -399,7 +403,6 @@ def MeanCoordinatesTeeth(surf,labels):
 
 
 def Alignement(surf,surf_GT):
-	print('Alignement ')
 	# CenterSurf = surf.GetCenter()
 	# print("center CenterSurf: ", CenterSurf)
 	# print(' ')
@@ -420,10 +423,13 @@ def Alignement(surf,surf_GT):
 
 	# return tpd.GetOutput()
 
+	copy_surf = vtk.vtkPolyData()
+	copy_surf.DeepCopy(surf)
+
 
 	icp = vtk.vtkIterativeClosestPointTransform()
 	icp.StartByMatchingCentroidsOn()
-	icp.SetSource(surf)
+	icp.SetSource(copy_surf)
 	icp.SetTarget(surf_GT)
 	icp.GetLandmarkTransform().SetModeToRigidBody()
 	icp.SetMaximumNumberOfLandmarks(100)
@@ -435,26 +441,39 @@ def Alignement(surf,surf_GT):
 
 	lmTransform = icp.GetLandmarkTransform()
 	transform = vtk.vtkTransformPolyDataFilter()
-	transform.SetInputData(surf)
+	transform.SetInputData(copy_surf)
 	transform.SetTransform(lmTransform)
 	transform.SetTransform(icp)
 	transform.Update()
 
-	return transform.GetOutput()
+	return surf, transform.GetOutput()
 
 
-def UniversalID(surf, labels, LowerOrUpper):	
+def UniversalID(surf, labels, path_surf, model_feature, model_LU, out_feature):	
 	real_labels = vtk.vtkIntArray()
 	real_labels.SetNumberOfComponents(1)
 	real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
 	real_labels.SetName("UniversalID")
 	real_labels.Fill(-1)
 
+	# Load the code & prediction model to know if it is a lower or upper scan
+	split_obj = {}
+	split_obj["surf"] = path_surf
+	split_obj["spiral"] = 64
+	split_obj["model_feature"] = model_feature
+	split_obj["model_LU"] = model_LU
+	split_obj["out_feature"] = out_feature
+
+	split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
+	LowerOrUpper = predict_LU.main(split_args)
+	LowerOrUpper = LowerOrUpper[0][0]
+
+
 	for pid in range(labels.GetNumberOfTuples()):
-		if not LowerOrUpper: # Lower
+		if LowerOrUpper<=0.5: # Lower
 			real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])+15,))
 			
-		if LowerOrUpper: # Upper
+		if LowerOrUpper>=0.5: # Upper
 			real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])-1,))
 			
 	surf.GetPointData().AddArray(real_labels)
@@ -508,18 +527,18 @@ def Labelize(surf,labels, Lsurf, Lsurf_GT):
 	bias = 0
 	for i in range(len(Lsurf)):
 		if i+2 not in L_label:
-			print(i+2)
+			print("label considered as artifact:", i+2)
 			ChangeLabel(surf, labels, i+2, -2)
-			bias = 1
+			# bias = 1
 
 	for i in range(len(L_label_GT)):
 		ChangeLabel(surf, labels, L_label[i], L_label_bias[i])
 
 	for i in range(len(L_label_GT)):
-		if bias:
-			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
-		else:
-			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
+		# if bias:
+		# 	ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
+		# else:
+		ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
 
 
 	# for i in range(len(L_label_GT)):
@@ -534,7 +553,7 @@ def Labelize(surf,labels, Lsurf, Lsurf_GT):
 	# 		else:
 	# 			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i]-(min(L_label_GT)-2))
 
-	ChangeLabel(surf, labels, -2, 1)
+	ChangeLabel(surf, labels, -2, 0)
 
 
 def ReLabel(surf, labels, label, relabel):
@@ -568,11 +587,16 @@ if __name__ == '__main__':
 	parser.add_argument('--threshold_max', type=int, help='Threshold max value', default=100)
 	parser.add_argument('--min_count', type=int, help='Minimum count to remove', default=500)
 	
-	parser.add_argument('--labelize', type=bool, help='label the teeth', default=False)
-	parser.add_argument('--label_groundtruth', type=str, help='groundtruth of the label', default="groundtruth.vtk")
-	parser.add_argument('--universalID', type=bool, help='label the teeth with Universal ID', default=False)
-	parser.add_argument('--LowerOrUpper', type=int, help='0 == Lower | 1 == Upper', default=0)
-	
+	labelize_parser = parser.add_argument_group('Universal ID parameters')
+	labelize_parser.add_argument('--labelize', type=bool, help='label the teeth', default=False)
+	labelize_parser.add_argument('--label_groundtruth', type=str, help='groundtruth of the label', default="groundtruth.vtk")
+
+	universalID_parser = parser.add_argument_group('Universal ID parameters')
+	universalID_parser.add_argument('--universalID', type=bool, help='label the teeth with Universal ID', default=False)
+	universalID_parser.add_argument('--model_feature', type=str, help='path of the VGG19 model', default='')
+	universalID_parser.add_argument('--model_LU', type=str, help='path of the LowerUpper model', default='')
+	universalID_parser.add_argument('--out_feature', type=str, help='out of the feature', default='')
+
 	parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
 	args = parser.parse_args()
@@ -601,14 +625,14 @@ if __name__ == '__main__':
 		print("Labelizing...")
 		surf_groundtruth, labels_groundtruth = ReadFile(args.label_groundtruth)
 		# For now it doesnt work with all cases may be because of the GT
-		surf = Alignement(surf,surf_groundtruth)
-		Lsurf = MeanCoordinatesTeeth(surf,labels)
+		surf, copy_surf = Alignement(surf,surf_groundtruth)
+		Lsurf = MeanCoordinatesTeeth(copy_surf,labels)
 		Lsurf_GT = MeanCoordinatesTeeth(surf_groundtruth,labels_groundtruth)
 		Labelize(surf,labels,Lsurf,Lsurf_GT)
 
 	if(args.universalID):
 		print("UniversalID...")
-		UniversalID(surf, labels, args.LowerOrUpper)
+		UniversalID(surf, labels, args.surf, args.model_feature, args.model_LU, args.out_feature)
 
 
 	Write(surf, args.out)

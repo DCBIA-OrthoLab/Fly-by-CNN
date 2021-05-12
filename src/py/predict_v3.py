@@ -42,7 +42,7 @@ img_point_id_map_np = img_point_id_map_np.reshape((-1, img_point_id_map_np.shape
 flyby_features.removeActors()
 
 
-if os.path.exist(args.model):
+if os.path.exists(args.model):
 	model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
 	model.summary()
 else:
