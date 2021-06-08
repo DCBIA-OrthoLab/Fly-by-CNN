@@ -92,8 +92,6 @@ def CreatePlane(Origin,Point1,Point2,Resolution):
 
 def ReadSurf(fileName):
 
-    print("Reading:", fileName)
-
     fname, extension = os.path.splitext(fileName)
     extension = extension.lower()
     if extension == ".vtk":
@@ -216,12 +214,10 @@ def GetTransform(rotationAngle, rotationVector):
     return transform
 
 def RotateSurf(surf, rotationAngle, rotationVector):
-	print("angle:", rotationAngle, "vector:", rotationVector)
 	transform = GetTransform(rotationAngle, rotationVector)
 	return RotateTransform(surf, transform)
 
 def RotateInverse(surf, rotationAngle, rotationVector):
-    print("angle:", rotationAngle, "vector:", rotationVector)
     transform = vtk.vtkTransform()
     transform.RotateWXYZ(rotationAngle, rotationVector[0], rotationVector[1], rotationVector[2])
    
@@ -247,21 +243,25 @@ def RotateNpTransform(surf, angle, np_transform):
 	return RotateInverse(surf, rotationAngle, rotationVector)
 
 def RandomRotation(surf):
-	rotationVector = np.random.random(3)*2.0 - 1.0
-	rotationVector = rotationVector/np.linalg.norm(rotationVector)
-	rotationAngle = np.random.random()*360.0
-	return RotateSurf(surf, rotationAngle, rotationVector)
+    rotationAngle = np.random.random()*360.0
+    rotationVector = np.random.random(3)*2.0 - 1.0
+    rotationVector = rotationVector/np.linalg.norm(rotationVector)
+    return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
 def GetUnitSurf(surf):
     surf, surf_mean, surf_scale = ScaleSurf(surf)
     return surf
 
 def GetColoredActor(surf, property_name):
+
+    range_scalars = surf.GetPointData().GetScalars(property_name).GetRange()
+
     hueLut = vtk.vtkLookupTable()
-    hueLut.SetTableRange(-1, 4)
-    hueLut.SetHueRange(0, 1)
-    hueLut.SetSaturationRange(1, 1)
-    hueLut.SetValueRange(1, 1)
+    print("Scalar range", range_scalars)
+    hueLut.SetTableRange(0, range_scalars[1])
+    hueLut.SetHueRange(0.0, 1.0)
+    hueLut.SetSaturationRange(0.9, 1.0)
+    hueLut.SetValueRange(0.9, 1)
     hueLut.Build()
 
     surf.GetPointData().SetActiveScalars(property_name)
