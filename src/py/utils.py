@@ -484,16 +484,23 @@ class ExtractPointFeaturesClass():
 		return point_features
 
 def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0):
-	
-	point_ids_rgb_shape = point_ids_rgb.shape
 
-	point_features = surf.GetPointData().GetScalars(point_features_name)
-	point_features_np = vtk_to_numpy(point_features)
-	zero = np.zeros(point_features.GetNumberOfComponents()) + zero
+    point_ids_rgb_shape = point_ids_rgb.shape
 
-	with Pool(cpu_count()) as p:
-		feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
-	return np.array(feat).reshape(point_ids_rgb_shape[0:-1] + (point_features.GetNumberOfComponents(),))
+    if point_features_name == "coords" or point_features_name == "points":
+        points = surf.GetPoints()
+        point_features_np = vtk_to_numpy(points.GetData())
+        number_of_components = 3
+    else:    
+        point_features = surf.GetPointData().GetScalars(point_features_name)
+        point_features_np = vtk_to_numpy(point_features)
+        number_of_components = point_features.GetNumberOfComponents()
+    
+    zero = np.zeros(number_of_components) + zero
+
+    with Pool(cpu_count()) as p:
+    	feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
+    return np.array(feat).reshape(point_ids_rgb_shape[0:-1] + (number_of_components,))
 
 def ReadImage(fName, image_dimension=2, pixel_dimension=-1):
 	if(image_dimension == 1):

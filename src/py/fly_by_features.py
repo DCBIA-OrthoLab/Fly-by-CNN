@@ -351,7 +351,7 @@ if __name__ == '__main__':
 	features_group.add_argument('--use_z', type=int, help='1 to to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
 
 	features_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
-	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
+	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features. If name is coords or points, it extracts the x,y,z coordinates', default=None)
 	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
 	
