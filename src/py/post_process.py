@@ -586,8 +586,10 @@ if __name__ == '__main__':
 	parser.add_argument('--erode', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
 	parser.add_argument('--dilate', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
 	parser.add_argument('--dilate_iterations', type=int, help='Number of dilate iterations', default=2)
-	parser.add_argument('--label', type=int, help='Eroding/dilating label', default=0)
+	parser.add_argument('--label', type=int, help='Eroding/dilating/ReLabel label', default=0)
 	parser.add_argument('--threshold', type=bool, help='Threshold between two values', default=False)
+	parser.add_argument('--relabel', type=bool, help='relabel an input surface', default=False)
+	parser.add_argument('--label_re', type=int, help='relabel with this label', default=-1)
 	parser.add_argument('--threshold_min', type=int, help='Threshold min value', default=2)
 	parser.add_argument('--threshold_max', type=int, help='Threshold max value', default=100)
 	parser.add_argument('--min_count', type=int, help='Minimum count to remove', default=500)
@@ -608,6 +610,10 @@ if __name__ == '__main__':
 		for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
 			print("Removing islands:", label)
 			RemoveIslands(surf, labels, label, args.min_count)
+
+	if args.relabel:
+		print("Relabel:", )
+		ReLabel(surf, labels, args.label, args.label_re)
 	
 	if(args.connectivity):
 		print("Connectivity...")
