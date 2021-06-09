@@ -339,7 +339,6 @@ def ConnectivityLabeling(vtkdata, labels, label, start_label):
 				labels.SetTuple(int(cpid), (start_label,))
 			start_label += 1
 
-
 def ErodeLabel(vtkdata, labels, label):
 	
 	pid_labels = []
@@ -377,6 +376,29 @@ def ErodeLabel(vtkdata, labels, label):
 				labels.SetTuple(int(npid), (nlabel,))
 		else:
 			break
+
+def DilateLabel(vtkdata, labels, label, iterations=2):
+	
+	pid_labels = []
+
+	while iterations > 0:
+		#Get all neighbors to the 'label' that have a different label
+		all_neighbor_labels = []
+		for pid in range(labels.GetNumberOfTuples()):
+			if labels.GetTuple(pid)[0] == label:
+				neighbor_pids = GetNeighbors(vtkdata, pid)
+				pid_labels.append(pid)
+
+				for npid in neighbor_pids:
+					neighbor_label = labels.GetTuple(npid)[0]
+					if neighbor_label != label:
+						all_neighbor_labels.append(npid)
+
+		#Dilate them, i.e., change the value to label
+		for npid in all_neighbor_labels:
+			labels.SetTuple(int(npid), (label,))
+
+		iterations -= 1
 
 def MeanCoordinatesTeeth(surf,labels):
 	nlabels, pid_labels = [], []
@@ -482,20 +504,6 @@ def UniversalID(surf, labels, path_surf, model_feature, model_LU, out_feature):
 def Labelize(surf,labels, Lsurf, Lsurf_GT):
 	L_label, L_label_GT = [], []
 
-	# print(' ')
-	# print("Lsurf :  || Nbre Elem: ", len(Lsurf))
-	# for i in range(len(Lsurf)):
-	# 	print(i+2,"  ",Lsurf[i])
-	# print(' ')
-	# print(' ')
-
-	# print("Lsurf_GT :  || Nbre Elem: ", len(Lsurf_GT))
-	# for i in range(len(Lsurf_GT)):
-	# 	print(i+2,"  ",Lsurf_GT[i])
-	# print(' ')
-	# print(' ')
-
-
 	for j in range(len(Lsurf)):
 		Ldist = []
 		for i in range (len(Lsurf_GT)):
@@ -513,16 +521,8 @@ def Labelize(surf,labels, Lsurf, Lsurf_GT):
 			L_label.append(minDist[2])
 			L_label_GT.append(minDist[1])	
 
-		# print(Ldist)
-		# print(' ')
 
 	L_label_bias = [x+20 for x in L_label]
-
-	# print(L_label)
-	# print(L_label_bias)
-	# print(L_label_GT)
-	# print(' ')
-
 
 	bias = 0
 	for i in range(len(Lsurf)):
@@ -539,19 +539,6 @@ def Labelize(surf,labels, Lsurf, Lsurf_GT):
 		# 	ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
 		# else:
 		ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
-
-
-	# for i in range(len(L_label_GT)):
-	# 	if L_label_GT[i]>= 9:
-	# 		if bias:
-	# 			ChangeLabel(surf, labels, L_label_bias[i], abs(L_label_GT[i]-max(L_label_GT))+2+bias)
-	# 		else:
-	# 			ChangeLabel(surf, labels, L_label_bias[i], abs(L_label_GT[i]-max(L_label_GT))+2)
-	# 	else:
-	# 		if bias:
-	# 			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i]-(min(L_label_GT)-2)+bias)
-	# 		else:
-	# 			ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i]-(min(L_label_GT)-2))
 
 	ChangeLabel(surf, labels, -2, 0)
 
@@ -581,7 +568,9 @@ if __name__ == '__main__':
 	parser.add_argument('--connectivity', type=bool, help='Label all elements with unique labels', default=False)
 	parser.add_argument('--connectivity_label', type=int, help='Connectivity label', default=2)
 	parser.add_argument('--erode', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
-	parser.add_argument('--erode_label', type=int, help='Eroding label', default=0)
+	parser.add_argument('--dilate', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
+	parser.add_argument('--dilate_iterations', type=int, help='Number of dilate iterations', default=2)
+	parser.add_argument('--label', type=int, help='Eroding/dilating label', default=0)
 	parser.add_argument('--threshold', type=bool, help='Threshold between two values', default=False)
 	parser.add_argument('--threshold_min', type=int, help='Threshold min value', default=2)
 	parser.add_argument('--threshold_max', type=int, help='Threshold max value', default=100)
@@ -615,7 +604,11 @@ if __name__ == '__main__':
 
 	if(args.erode):
 		print("Eroding...")
-		ErodeLabel(surf, labels, args.erode_label)
+		ErodeLabel(surf, labels, args.label)
+
+	if(args.dilate):
+		print("Dilate...")
+		DilateLabel(surf, labels, args.label, args.dilate_iterations)
 
 	if(args.threshold):
 		print("Thresholding...")
@@ -624,7 +617,6 @@ if __name__ == '__main__':
 	if(args.labelize):
 		print("Labelizing...")
 		surf_groundtruth, labels_groundtruth = ReadFile(args.label_groundtruth)
-		# For now it doesnt work with all cases may be because of the GT
 		surf, copy_surf = Alignement(surf,surf_groundtruth)
 		Lsurf = MeanCoordinatesTeeth(copy_surf,labels)
 		Lsurf_GT = MeanCoordinatesTeeth(surf_groundtruth,labels_groundtruth)
@@ -636,6 +628,7 @@ if __name__ == '__main__':
 
 
 	Write(surf, args.out)
+
 
 # mesh, mesh_label = ReadFile(arg.mesh)
 # mesh, mesh_label = Post_processing(mesh)

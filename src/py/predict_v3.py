@@ -12,7 +12,7 @@ import vtk
 
 parser = argparse.ArgumentParser(description='Predict an input with a trained neural network', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--surf', type=str, help='Input surface mesh to label', required=True)
-parser.add_argument('--model', type=str, help='Model to do segmentation', default="/app/u_seg_nn_v3.0")
+parser.add_argument('--model', type=str, help='Model to do segmentation', default="/app/u_seg_nn_v3.1")
 parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
 args = parser.parse_args()
@@ -101,6 +101,10 @@ polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_islands)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
+
+print("Dilate...")
+#Re label the gum which is label 3 to label -1
+post_process.DilateLabel(surf, real_labels, 3, iterations=3)
 
 print("Relabel...")
 #Re label the gum which is label 3 to label -1

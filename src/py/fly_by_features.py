@@ -204,10 +204,6 @@ def main(args):
 		if args.random_rotation:
 			surf = RandomRotation(surf)
 
-		if args.save_label:
-			# surf = OrientLabel_vector(surf, args.save_label)
-			surf = OrientLabel(surf, flyby.sphere, args.save_label, args.save_AA)
-
 		if args.property:
 			surf_actor = GetPropertyActor(surf, args.property)
 		else:
@@ -349,10 +345,6 @@ if __name__ == '__main__':
 	sphere_params.add_argument('--turns', type=int, default=4, help='Number of spiral turns')
 	sphere_params.add_argument('--resolution', type=int, help='Image resolution', default=256)
 	sphere_params.add_argument('--radius', type=float, help='Radius of the sphere for the view points', default=4)
-
-	training_orientation = parser.add_argument_group('training orientation')
-	training_orientation.add_argument('--save_label', type=str, help='save the label', default="")
-	training_orientation.add_argument('--save_AA', type=str, help='save the label', default="")
 
 	visu_params = parser.add_argument_group('Visualize')
 	visu_params.add_argument('--visualize', type=int, default=0, help='Visualize the sampling')
