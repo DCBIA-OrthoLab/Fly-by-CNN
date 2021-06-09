@@ -54,6 +54,12 @@ def main(args):
     split_obj["model"] = args.model_feature
     split_obj["out"] = args.out_feature
 
+    split_obj["n_rotations"] = 0
+    split_obj["out_point_id"] = 0
+    split_obj["verbose"] = 0
+    split_obj["extract_components"] = None
+    
+
     # We convert the dictionary to a namedtuple, a.k.a, python object, i.e., argparse object
     split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
     # Call the main of the script
