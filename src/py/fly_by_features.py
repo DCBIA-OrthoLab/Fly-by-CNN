@@ -1,6 +1,5 @@
 import os
 import re
-import tensorflow as tf
 import numpy as np
 import itk
 import vtk
@@ -17,7 +16,7 @@ from utils import *
 
 class FlyByGenerator():
 	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False):
-
+		vtk.vtkObject.GlobalWarningDisplayOff()
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
 		renderWindow.AddRenderer(renderer)		
@@ -32,8 +31,7 @@ class FlyByGenerator():
 		self.resolution = resolution
 		self.use_z = use_z
 		self.split_z = split_z
-
-		print("res", self.resolution)
+		
 		#sphere_actor = GetActor(sphere)
 		# print(sphere_actor)
 		#sphere_actor.GetProperty().SetRepresentationToWireFrame()
@@ -54,7 +52,6 @@ class FlyByGenerator():
 	def getFlyBy(self):
 
 		sphere_points = self.sphere.GetPoints()
-		print("Number of sphere points:", sphere_points.GetNumberOfPoints())
 		camera = self.renderer.GetActiveCamera()
 
 		if self.visualize:
@@ -179,7 +176,9 @@ def main(args):
 
 				out_name, out_ext = os.path.splitext(os.path.normpath(fobj["out"]))
 				fobj_rot["out"] = out_name + "_rot" + str(i) + out_ext
-				filenames.append(fobj_rot)
+
+				if args.ow or not os.path.exists(fobj_rot["out"]):
+					filenames.append(fobj_rot)
 
 	if(args.subdivision):
 		sphere = CreateIcosahedron(args.radius, args.subdivision)
@@ -188,6 +187,7 @@ def main(args):
 
 	model = None
 	if args.model is not None:
+		import tensorflow as tf
 		model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
 		model.summary()
 
@@ -198,11 +198,25 @@ def main(args):
 
 	for fobj in filenames:
 
+		if args.verbose:
+			print("Number of sphere points:", sphere.GetNumberOfPoints())
+			print("Reading:", fobj["surf"])
+
 		surf = ReadSurf(fobj["surf"])
 		surf = GetUnitSurf(surf)
 
 		if args.random_rotation:
-			surf = RandomRotation(surf)
+			surf, rotationAngle, rotationVector = RandomRotation(surf)
+			if args.verbose:
+				print("angle:", rotationAngle, "vector:", rotationVector)
+			if args.save_rotation:
+				transform = GetTransform(rotationAngle, rotationVector)
+				m = np.zeros(16)
+				vmatrix = transform.GetMatrix()
+				vmatrix.DeepCopy(m.ravel(), vmatrix)
+				out_filename = os.path.splitext(fobj["out"])[0] + "_transform.npy"
+				print("Saving rotation:", out_filename)
+				np.save(out_filename, m)
 
 		if args.property:
 			surf_actor = GetPropertyActor(surf, args.property)
@@ -214,6 +228,10 @@ def main(args):
 			flyby.addActor(surf_actor)
 			
 		out_np = flyby.getFlyBy()
+
+		if(args.extract_components != None):
+			out_np = out_np[:,:,:,args.extract_components[0]:args.extract_components[1]]
+			print(out_np.shape)
 
 		if model is not None:
 			out_np = model.predict(out_np)
@@ -327,12 +345,13 @@ if __name__ == '__main__':
 
 
 	features_group = parser.add_argument_group('Shape features/property to extract')
+	features_group.add_argument('--extract_components', type=int, nargs='+', help='Which components to extract', default = None)
 	features_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table', default = 1)
 	features_group.add_argument('--split_z', type=int, help='1 to split the z buffer as a separate channel. Otherwise, the normals are scaled by z buffer to create an rgb image.', default = 0)
 	features_group.add_argument('--use_z', type=int, help='1 to to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
 
 	features_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
-	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
+	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features. If name is coords or points, it extracts the x,y,z coordinates', default=None)
 	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
 	
@@ -355,6 +374,7 @@ if __name__ == '__main__':
 	output_params.add_argument('--uuid', type=bool, help='Use uuid to name the outputs', default=False)
 	output_params.add_argument('--ow', type=int, help='Overwrite outputs', default=1)
 	output_params.add_argument('--concatenate', type=int, help='0 for multiple output files, 1 for single output file', default=1)
+	output_params.add_argument('--verbose', type=int, help='Print messages', default=0)
 
 	args = parser.parse_args()
 
