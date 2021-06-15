@@ -204,7 +204,7 @@ def main(args):
 	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z, rescale_features=args.rescale_features)
 	
 	if args.point_features or args.out_point_id:
-		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, rescale_features=args.rescale_features)
+		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
 
 	for fobj in filenames:
 

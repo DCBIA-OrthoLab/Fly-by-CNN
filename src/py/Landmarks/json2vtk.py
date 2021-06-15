@@ -95,17 +95,17 @@ def main(args):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Predict an input with a trained neural network', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    input_parser = parser.add_argument_group('Sampling parameters')
-    input_parser.add_argument('--dir', type=str, help='input dir')
+    parser = argparse.ArgumentParser(description='Convert a json file with landmarks position in it into a vtk file', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    input_parser = parser.add_argument_group('Input parameters')
+    input_parser.add_argument('--dir', type=str, help='input dir', requiered=True)
 
-    param_parser = parser.add_argument_group('Sampling parameters')
-    param_parser.add_argument('--radius_sphere', type=float, help='output dir', default=0.5)
+    param_parser = parser.add_argument_group('Shere parameters')
+    param_parser.add_argument('--radius_sphere', type=float, help='sphere radius', default=0.5)
 
-    visualization_parser = parser.add_argument_group('Sampling parameters')
-    visualization_parser.add_argument('--visualize', type=bool, help='output dir', default=0)
+    visualization_parser = parser.add_argument_group('Visualization tool')
+    visualization_parser.add_argument('--visualize', type=bool, help='to visualize set 1', default=0)
 
-    out_parser = parser.add_argument_group('Sampling parameters')
+    out_parser = parser.add_argument_group('Output parameters')
     out_parser.add_argument('--out', type=str, help='output dir', default='')
 
     args = parser.parse_args()

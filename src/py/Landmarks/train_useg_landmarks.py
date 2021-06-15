@@ -14,17 +14,17 @@ import sys
 import pandas as pd
 import itk
 from sklearn.model_selection import train_test_split
-from tensorflow.keras.metrics import Accuracy, MeanAbsoluteError, MeanSquaredError
+from tensorflow.keras.metrics import MeanSquaredError, MeanAbsoluteError
 
 
 
-parser = argparse.ArgumentParser(description='create RootCanal object from a segmented file', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+parser = argparse.ArgumentParser(description='Training a Neural Network for automatic identification of landmarks', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-in_group_features = parser.add_argument_group("gh")
-in_group_features.add_argument('--train_dir', type=str, help='input file')
-in_group_features.add_argument('--val_dir', type=str, help='input dir')
+in_group_features = parser.add_argument_group("Input parameters")
+in_group_features.add_argument('--train_dir', type=str, help='directory for training files')
+in_group_features.add_argument('--val_dir', type=str, help='directory for validation files')
 
-in_group_features.add_argument('--checkpoint', type=str, help='output dir', default='')
+in_group_features.add_argument('--checkpoint', type=str, help='save the model', default='')
 
 args = parser.parse_args()
 
@@ -218,7 +218,7 @@ model = make_seg_model()
 model.summary()
 
 optimizer = tf.keras.optimizers.Adam(1e-4)
-model.compile(optimizer=optimizer, loss=tf.keras.losses.MeanAbsoluteError(), metrics=[[MeanSquaredError()]]) ###, Precision(), Recall(), MeanAbsoluteError(), MeanSquaredError()]])
+model.compile(optimizer=optimizer, loss=tf.keras.losses.MeanAbsoluteError(), metrics=[[MeanSquaredError()]])
 
 # ckpt = tf.train.Checkpoint(step=tf.Variable(1), optimizer=optimizer, model=model)
 # checkpoint_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=3, checkpoint_name=modelname)
