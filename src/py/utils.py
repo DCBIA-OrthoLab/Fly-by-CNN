@@ -152,7 +152,7 @@ def WriteSurf(surf, fileName):
     writer.Update()
 
 
-def ScaleSurf(surf, mean_arr = np.array([None, None, None]), scale_factor = -1):
+def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
     surf_copy = vtk.vtkPolyData()
     surf_copy.DeepCopy(surf)
     surf = surf_copy
@@ -178,7 +178,7 @@ def ScaleSurf(surf, mean_arr = np.array([None, None, None]), scale_factor = -1):
 
 
     #centering points of the shape
-    if (mean_arr.all() == np.array([None, None, None])).all():
+    if mean_arr is not None:
         shape_points = np.array(shape_points)
         mean_arr = np.array(mean_v)
         shape_points = shape_points - mean_arr
