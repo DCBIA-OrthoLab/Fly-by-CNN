@@ -15,7 +15,7 @@ import LinearSubdivisionFilter as lsf
 from utils import * 
 
 class FlyByGenerator():
-	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False):
+	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False, rescale_features=False):
 		vtk.vtkObject.GlobalWarningDisplayOff()
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
@@ -31,6 +31,7 @@ class FlyByGenerator():
 		self.resolution = resolution
 		self.use_z = use_z
 		self.split_z = split_z
+		self.rescale_features = rescale_features
 		
 		#sphere_actor = GetActor(sphere)
 		# print(sphere_actor)
@@ -89,6 +90,10 @@ class FlyByGenerator():
 			img_o = windowToImageN.GetOutput()
 
 			img_o_np = vtk_to_numpy(img_o.GetPointData().GetScalars())
+
+			if self.rescale_features:
+				img_o_np = 2*(img_o_np/255) - 1
+
 			num_components = img_o.GetNumberOfScalarComponents()
 
 			if self.use_z:
@@ -108,11 +113,16 @@ class FlyByGenerator():
 				img_z_np = 2.0*z_far*z_near / (z_far + z_near - (z_far - z_near)*(2.0*img_z_np - 1.0))
 				img_z_np[img_z_np > (z_far - 0.1)] = 0
 
+				if self.rescale_features:
+					img_z_np /= z_far
+
 				if(self.split_z):
 					img_np = np.concatenate([img_o_np, img_z_np], axis=-1)
 					num_components += 1
 				else:
-					img_z_np /= z_far
+					if not self.rescale_features:
+						img_z_np /= z_far
+						
 					img_np = np.multiply(img_o_np, img_z_np)
 			else:
 				img_np = img_o_np
@@ -191,7 +201,7 @@ def main(args):
 		model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
 		model.summary()
 
-	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z)
+	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z, rescale_features=args.rescale_features)
 	
 	if args.point_features or args.out_point_id:
 		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
@@ -348,14 +358,14 @@ if __name__ == '__main__':
 	features_group.add_argument('--extract_components', type=int, nargs='+', help='Which components to extract', default = None)
 	features_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table', default = 1)
 	features_group.add_argument('--split_z', type=int, help='1 to split the z buffer as a separate channel. Otherwise, the normals are scaled by z buffer to create an rgb image.', default = 0)
-	features_group.add_argument('--use_z', type=int, help='1 to to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
+	features_group.add_argument('--use_z', type=int, help='1 to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
+	features_group.add_argument('--rescale_features', type=int, help='1 to rescale features (Normals, Depth map) between 0 and 1', default = 0)
 
 	features_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
 	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features. If name is coords or points, it extracts the x,y,z coordinates', default=None)
 	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
 	
-
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
 	sphere_params_sampling.add_argument('--subdivision', type=int, help='Number of subdivisions for icosahedron')
@@ -366,7 +376,7 @@ if __name__ == '__main__':
 	sphere_params.add_argument('--radius', type=float, help='Radius of the sphere for the view points', default=4)
 
 	training_orientation = parser.add_argument_group('training orientation')
-	training_orientation.add_argument('--save_rotation', type=int, help='save the label', default=0)
+	training_orientation.add_argument('--save_rotation', type=int, help="save the orientation transform", default=0)
 
 	visu_params = parser.add_argument_group('Visualize')
 	visu_params.add_argument('--visualize', type=int, default=0, help='Visualize the sampling')

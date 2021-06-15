@@ -1,4 +1,4 @@
-
+import sys
 import numpy as np
 import time
 import itk
@@ -106,6 +106,10 @@ polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_islands)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
+
+print("Dilate...")
+#Re label the gum which is label 3 to label -1
+post_process.DilateLabel(surf, real_labels, 3, iterations=3)
 
 print("Relabel...")
 #Re label the gum which is label 3 to label -1
