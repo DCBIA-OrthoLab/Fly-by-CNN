@@ -152,7 +152,7 @@ def WriteSurf(surf, fileName):
     writer.Update()
 
 
-def ScaleSurf(surf, scale_factor = -1):
+def ScaleSurf(surf, mean_arr = np.array([-1, -1, -1]), scale_factor = -1):
     surf_copy = vtk.vtkPolyData()
     surf_copy.DeepCopy(surf)
     surf = surf_copy
@@ -178,9 +178,10 @@ def ScaleSurf(surf, scale_factor = -1):
 
 
     #centering points of the shape
-    shape_points = np.array(shape_points)
-    mean_arr = np.array(mean_v)
-    shape_points = shape_points - mean_arr
+    if (mean_arr == np.array([-1, -1, -1])).all():
+        shape_points = np.array(shape_points)
+        mean_arr = np.array(mean_v)
+        shape_points = shape_points - mean_arr
 
     #Computing scale factor if it is not provided
     if(scale_factor == -1):
@@ -320,7 +321,6 @@ def GetPropertyActor(surf, property_name):
     lut.Build()
 
     surfMapper.SetLookupTable(lut)
-
 
     return surfActor
 
