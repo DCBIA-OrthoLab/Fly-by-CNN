@@ -24,9 +24,21 @@ def ReadFile(filename):
     vtkdata = reader.GetOutput()
     return vtkdata
 
-def AssignLabelToRoots(root_canal, surf):
-    label_array = surf.GetPointData().GetArray('RegionId')
-      
+def AssignLabelToRoots(root_canal, surf, label_name):
+    if label_name==0:
+        label_name="RegionId"
+    elif label_name==1:
+        label_name="UniversalID"
+    else:
+        label_name="RegionId"
+
+    label_array = surf.GetPointData().GetArray(label_name)
+
+    RC_BoundingBox = root_canal.GetPoints().GetBounds()
+    x = (RC_BoundingBox[0] + RC_BoundingBox[1])/2
+    y = (RC_BoundingBox[2] + RC_BoundingBox[3])/2
+    z = (RC_BoundingBox[4] + RC_BoundingBox[5])/2
+
     surfID = vtk.vtkOctreePointLocator()
     surfID.SetDataSet(surf)
     surfID.BuildLocator()
@@ -34,12 +46,11 @@ def AssignLabelToRoots(root_canal, surf):
     labelID = vtk.vtkIntArray()
     labelID.SetNumberOfComponents(1)
     labelID.SetNumberOfTuples(root_canal.GetNumberOfPoints())
-    labelID.SetName("RegionId")
+    labelID.SetName(label_name)
     labelID.Fill(-1)
 
     for pid in range(labelID.GetNumberOfTuples()):
-        xyzCoord = root_canal.GetPoint(pid)
-        ID = surfID.FindClosestPoint(xyzCoord[0], xyzCoord[1], xyzCoord[2], vtk.reference(20))
+        ID = surfID.FindClosestPoint(x, y, z, vtk.reference(20))
         labelID.SetTuple(pid, (int(label_array.GetTuple(ID)[0]),))
 
     root_canal.GetPointData().AddArray(labelID)
@@ -73,9 +84,11 @@ def main(args):
 
         for i in range(len(root)):
             root_canal = ReadFile(root[i])
-            root_canal = AssignLabelToRoots(root_canal, surf)
+            root_canal = AssignLabelToRoots(root_canal, surf, args.label_name)
             merge.AddInputData(root_canal)
             merge.Update()
+        
+        # exit()
 
         Write(merge.GetOutput(), out)
 
@@ -84,7 +97,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='create RootCanal object from a segmented file', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--surf', type=str, help='input teeth', required=True)
-    parser.add_argument('--dir_root', type=str, help='input root canals', required=True)
+    parser.add_argument('--dir_root', type=str, help='input dir for the root canals', required=True)
+    
+    parser.add_argument('--label_name', type=int, help='label name, 0 = RegionId, 1 = UniversalID', default=0)
 
     parser.add_argument('--out', type=str, help='output', default='')
 

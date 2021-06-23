@@ -3,7 +3,6 @@ import numpy as np
 import argparse
 import sys
 import os
-import predict_LU
 from collections import namedtuple
 
 
@@ -400,149 +399,6 @@ def DilateLabel(vtkdata, labels, label, iterations=2):
 
 		iterations -= 1
 
-def MeanCoordinatesTeeth(surf,labels):
-	nlabels, pid_labels = [], []
-
-	for pid in range(labels.GetNumberOfTuples()):
-		nlabels.append(int(labels.GetTuple(pid)[0]))
-		pid_labels.append(pid)
-
-	currentlabel = 2
-	L = []
-
-	while currentlabel != np.max(nlabels)+1:
-		Lcoordinates = []
-		for i in range(len(nlabels)):
-			if nlabels[i]==currentlabel:
-				xyzCoordinates = surf.GetPoint(pid_labels[i])
-				Lcoordinates.append(xyzCoordinates)
-
-		meantuple = np.mean(Lcoordinates,axis=0)
-		L.append(meantuple)		
-		currentlabel+=1			
-
-	return L
-
-
-def Alignement(surf,surf_GT):
-	# CenterSurf = surf.GetCenter()
-	# print("center CenterSurf: ", CenterSurf)
-	# print(' ')
-	# CenterSurf_GT = surf_GT.GetCenter()
-	# print("center CenterSurf_GT: ", CenterSurf_GT)
-	# print(' ')
-	# direction = np.array(list(surf_GT.GetCenter())) - np.array(list(surf.GetCenter()))
-	# print('direction = ', direction)
-	# print(' ')
-
-	# trnf = vtk.vtkTransform()
-	# trnf.Translate(direction)
-
-	# tpd = vtk.vtkTransformPolyDataFilter()
-	# tpd.SetTransform(trnf)
-	# tpd.SetInputData(surf)
-	# tpd.Update()
-
-	# return tpd.GetOutput()
-
-	copy_surf = vtk.vtkPolyData()
-	copy_surf.DeepCopy(surf)
-
-
-	icp = vtk.vtkIterativeClosestPointTransform()
-	icp.StartByMatchingCentroidsOn()
-	icp.SetSource(copy_surf)
-	icp.SetTarget(surf_GT)
-	icp.GetLandmarkTransform().SetModeToRigidBody()
-	icp.SetMaximumNumberOfLandmarks(100)
-	icp.SetMaximumMeanDistance(.00001)
-	icp.SetMaximumNumberOfIterations(500)
-	icp.CheckMeanDistanceOn()
-	icp.StartByMatchingCentroidsOn()
-	icp.Update()
-
-	lmTransform = icp.GetLandmarkTransform()
-	transform = vtk.vtkTransformPolyDataFilter()
-	transform.SetInputData(copy_surf)
-	transform.SetTransform(lmTransform)
-	transform.SetTransform(icp)
-	transform.Update()
-
-	return surf, transform.GetOutput()
-
-
-def UniversalID(surf, labels, path_surf, model_feature, model_LU, out_feature):	
-	real_labels = vtk.vtkIntArray()
-	real_labels.SetNumberOfComponents(1)
-	real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
-	real_labels.SetName("UniversalID")
-	real_labels.Fill(-1)
-
-	# Load the code & prediction model to know if it is a lower or upper scan
-	split_obj = {}
-	split_obj["surf"] = path_surf
-	split_obj["spiral"] = 64
-	split_obj["model_feature"] = model_feature
-	split_obj["model_LU"] = model_LU
-	split_obj["out_feature"] = out_feature
-
-	split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
-	LowerOrUpper = predict_LU.main(split_args)
-	LowerOrUpper = LowerOrUpper[0][0]
-
-
-	for pid in range(labels.GetNumberOfTuples()):
-		if LowerOrUpper<=0.5: # Lower
-			real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])+15,))
-			
-		if LowerOrUpper>=0.5: # Upper
-			real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])-1,))
-			
-	surf.GetPointData().AddArray(real_labels)
-
-
-def Labelize(surf,labels, Lsurf, Lsurf_GT):
-	L_label, L_label_GT = [], []
-
-	for j in range(len(Lsurf)):
-		Ldist = []
-		for i in range (len(Lsurf_GT)):
-			Xdist = Lsurf_GT[i][0]-Lsurf[j][0]
-			Ydist = Lsurf_GT[i][1]-Lsurf[j][1]
-			Zdist = Lsurf_GT[i][2]-Lsurf[j][2]
-
-			dist = np.sqrt(pow(Xdist,2)+pow(Ydist,2)+pow(Zdist,2))		
-
-			if dist<10:
-				Ldist.append([dist,i+2,j+2])
-
-		if Ldist:
-			minDist = min(Ldist)
-			L_label.append(minDist[2])
-			L_label_GT.append(minDist[1])	
-
-
-	L_label_bias = [x+20 for x in L_label]
-
-	bias = 0
-	for i in range(len(Lsurf)):
-		if i+2 not in L_label:
-			print("label considered as artifact:", i+2)
-			ChangeLabel(surf, labels, i+2, -2)
-			# bias = 1
-
-	for i in range(len(L_label_GT)):
-		ChangeLabel(surf, labels, L_label[i], L_label_bias[i])
-
-	for i in range(len(L_label_GT)):
-		# if bias:
-		# 	ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
-		# else:
-		ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
-
-	ChangeLabel(surf, labels, -2, 0)
-
-
 def ReLabel(surf, labels, label, relabel):
 	for pid in range(labels.GetNumberOfTuples()):
 		if labels.GetTuple(pid)[0] == label:
@@ -577,18 +433,9 @@ if __name__ == '__main__':
 	parser.add_argument('--threshold_min', type=int, help='Threshold min value', default=2)
 	parser.add_argument('--threshold_max', type=int, help='Threshold max value', default=100)
 	parser.add_argument('--min_count', type=int, help='Minimum count to remove', default=500)
-	
-	labelize_parser = parser.add_argument_group('Universal ID parameters')
-	labelize_parser.add_argument('--labelize', type=bool, help='label the teeth', default=False)
-	labelize_parser.add_argument('--label_groundtruth', type=str, help='groundtruth of the label', default="groundtruth.vtk")
-
-	universalID_parser = parser.add_argument_group('Universal ID parameters')
-	universalID_parser.add_argument('--universalID', type=bool, help='label the teeth with Universal ID', default=False)
-	universalID_parser.add_argument('--model_feature', type=str, help='path of the VGG19 model', default='')
-	universalID_parser.add_argument('--model_LU', type=str, help='path of the LowerUpper model', default='')
-	universalID_parser.add_argument('--out_feature', type=str, help='out of the feature', default='')
 
 	parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
+
 
 	args = parser.parse_args()
 	surf, labels = ReadFile(args.surf)
@@ -620,27 +467,9 @@ if __name__ == '__main__':
 		print("Thresholding...")
 		surf = Threshold(surf, labels, args.threshold_min, args.threshold_max)
 
-	if(args.labelize):
-		print("Labelizing...")
-		surf_groundtruth, labels_groundtruth = ReadFile(args.label_groundtruth)
-		surf, copy_surf = Alignement(surf,surf_groundtruth)
-		Lsurf = MeanCoordinatesTeeth(copy_surf,labels)
-		Lsurf_GT = MeanCoordinatesTeeth(surf_groundtruth,labels_groundtruth)
-		Labelize(surf,labels,Lsurf,Lsurf_GT)
-
-	if(args.universalID):
-		print("UniversalID...")
-		UniversalID(surf, labels, args.surf, args.model_feature, args.model_LU, args.out_feature)
-
-
 	Write(surf, args.out)
 
 
-# mesh, mesh_label = ReadFile(arg.mesh)
-# mesh, mesh_label = Post_processing(mesh)
-# mesh = Label_Teeth(mesh, mesh_label)
-# Write(mesh, arg.out)
 
-# python3 post_process.py --mesh /Users/mdumont/Downloads/scan2_test.vtk --out /Users/mdumont/Desktop/DCBIA-projects/Output/scan2_PP.vtk
 
 

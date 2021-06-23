@@ -178,7 +178,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
 
 
     #centering points of the shape
-    if mean_arr is not None:
+    if mean_arr is None:
         shape_points = np.array(shape_points)
         mean_arr = np.array(mean_v)
         shape_points = shape_points - mean_arr

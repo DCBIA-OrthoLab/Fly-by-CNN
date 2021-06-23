@@ -145,14 +145,12 @@ class DatasetGenerator:
             img_read.Update()
             img_np = itk.GetArrayViewFromImage(img_read.GetOutput())
             img_np = img_np.reshape([16, 256, 256, 7])
-            # print("Inputs shape:", np.shape(img_np), "min:", np.amin(img_np), "max:", np.amax(img_np), "unique:", len(np.unique(img_np)))
 
             ImageType = itk.VectorImage[itk.F, 3]
             img_read_seg = itk.ImageFileReader[ImageType].New(FileName=lb)
             img_read_seg.Update()
             seg_np = itk.GetArrayViewFromImage(img_read_seg.GetOutput())
             seg_np = seg_np.reshape([16, 256, 256, 7])
-            # print("Labels shape:", np.shape(seg_np), "min:", np.amin(seg_np), "max:", np.amax(seg_np), "unique:", len(np.unique(seg_np)))
 
             yield img_np, seg_np
 

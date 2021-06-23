@@ -5,7 +5,6 @@ import itk
 import argparse
 import glob
 import os
-import post_process
 import fly_by_features as fbf
 import tensorflow as tf
 import vtk
@@ -15,7 +14,7 @@ from utils import *
 
 def ComputeFeatures(unit_surf):
     sphere = CreateSpiral(sphereRadius=4, numberOfSpiralSamples=16)
-    flyby = fbf.FlyByGenerator(sphere, resolution=256, visualize=False, use_z=True, split_z=True)
+    flyby = fbf.FlyByGenerator(sphere, resolution=256, visualize=False, use_z=True, split_z=True, rescale_features=args.rescale_features)
 
     surf_actor = GetNormalsActor(unit_surf)
     flyby.addActor(surf_actor)
@@ -93,16 +92,19 @@ def main(args):
 
 
 if __name__ == '__main__' :
-    parser = argparse.ArgumentParser(description='Predict an input with a trained neural network', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--landmarks_dir', type=str, help='Input surface mesh to label', required=True)
-    parser.add_argument('--merged_dir', type=str, help='Input surface mesh to label')
+    parser = argparse.ArgumentParser(description='Pre-processing the landmarks and the mesh + apply same rotations', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument('--landmarks_dir', type=str, help='landmarks directory', required=True)
+    parser.add_argument('--merged_dir', type=str, help='merged file directory', required=True)
 
-    data_augment = parser.add_argument_group('Sampling parameters')
-    data_augment.add_argument('--n_rotations', type=int, help='', default=1)
-    data_augment.add_argument('--random_rotation', type=bool, help='Number of subdivisions for icosahedron')
+    data_augment_parser = parser.add_argument_group('Data augment parameters')
+    data_augment_parser.add_argument('--n_rotations', type=int, help='Number of random rotations', default=1)
+    data_augment_parser.add_argument('--random_rotation', type=bool, help='activate or not a random rotation')
 
-    parser.add_argument('--out_features', type=str, help='Output model with labels', default="out.vtk")
-    parser.add_argument('--out_labels', type=str, help='Output model with labels', default="out.vtk")
+    param_parser = parser.add_argument_group('Parameters')
+    param_parser.add_argument('--rescale_features', type=int, help='1 to rescale features (Normals, Depth map) between 0 and 1', default = 1)
+    
+    parser.add_argument('--out_features', type=str, help='output features', default="out_f.vtk")
+    parser.add_argument('--out_labels', type=str, help='output labels', default="out_l.vtk")
 
     args = parser.parse_args()
 
