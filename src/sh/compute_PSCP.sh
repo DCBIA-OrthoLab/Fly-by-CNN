@@ -8,6 +8,9 @@ out_merge=$4
 dir_roots=($input_dir_root/*)
 dir_surf=($input_dir_surf/*)
 
+# 0 = RegionId // 1 = UniversalID
+label_name=1
+
 
 echo "==================================="
 echo 
@@ -47,7 +50,7 @@ for root in "${dir_roots[@]}"; do
     output_filename=$out_merge/$(basename $dirname_root)_merged.vtk
 
     python3 src/py/PSCP/vtkRT.py --dir $out_tmp/$(basename $dirname_root) --out $out_tmp/$(basename $dirname_root)
-    python3 src/py/PSCP/merge.py --surf $surf_path --dir_root $dirname_root --out $output_filename
+    python3 src/py/PSCP/merge.py --surf $surf_path --dir_root $dirname_root --label_name $label_name --out $output_filename
 done
 
 

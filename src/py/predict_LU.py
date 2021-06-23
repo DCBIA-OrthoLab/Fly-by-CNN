@@ -58,6 +58,7 @@ def main(args):
     split_obj["out_point_id"] = 0
     split_obj["verbose"] = 0
     split_obj["extract_components"] = None
+    split_obj["rescale_features"] = 0
     
 
     # We convert the dictionary to a namedtuple, a.k.a, python object, i.e., argparse object
