@@ -175,7 +175,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
     for i in range(shapedatapoints.GetNumberOfPoints()):
         p = shapedatapoints.GetPoint(i)
         shape_points.append(p)
-
+    shape_points = np.array(shape_points)
 
     #centering points of the shape
     if mean_arr is None:
@@ -189,7 +189,6 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
         # print(scale_factor)
 
     #scale points of the shape by scale factor
-    shape_points = np.array(shape_points)
     shape_points_scaled = np.multiply(shape_points, scale_factor)
 
     #assigning scaled points back to shape
@@ -257,11 +256,10 @@ def GetColoredActor(surf, property_name):
     range_scalars = surf.GetPointData().GetScalars(property_name).GetRange()
 
     hueLut = vtk.vtkLookupTable()
-    print("Scalar range", range_scalars)
     hueLut.SetTableRange(0, range_scalars[1])
-    hueLut.SetHueRange(0.0, 1.0)
-    hueLut.SetSaturationRange(0.9, 1.0)
-    hueLut.SetValueRange(0.9, 1)
+    hueLut.SetHueRange(0.0, 0.9)
+    hueLut.SetSaturationRange(1.0, 1.0)
+    hueLut.SetValueRange(1.0, 1.0)
     hueLut.Build()
 
     surf.GetPointData().SetActiveScalars(property_name)
@@ -321,7 +319,8 @@ def GetPropertyActor(surf, property_name):
 
     surfMapper.SetLookupTable(lut)
 
-    return surfActor
+    # return surfActor
+    return surfMapper
 
 def GetNormalsActor(surf):
 
