@@ -13,6 +13,7 @@ import vtk
 parser = argparse.ArgumentParser(description='Predict an input with a trained neural network', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('--surf', type=str, help='Input surface mesh to label', required=True)
 parser.add_argument('--model', type=str, help='Model to do segmentation', default="/app/u_seg_nn_v3.1")
+parser.add_argument('--dilate', type=int, help='Number of iterations to dilate the boundary', default=0)
 parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
 args = parser.parse_args()
@@ -87,15 +88,16 @@ polydatawriter.SetFileName(outfilename_pre)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
 
-print("Dilate...")
-#Dilate GUM label
-post_process.DilateLabel(surf, real_labels, 3, iterations=4)
+if args.dilate:
+	print("Dilate...")
+	Dilate GUM label
+	post_process.DilateLabel(surf, real_labels, 3, iterations=args.dilate)
 
 labels_range = np.zeros(2)
 real_labels.GetRange(labels_range)
 for label in range(int(labels_range[0]), int(labels_range[1]) + 1):
 	print("Removing islands:", label)
-	post_process.RemoveIslands(surf, real_labels, label, 500)
+	post_process.RemoveIslands(surf, real_labels, label, 200)
 
 
 out_filename = args.out
@@ -106,10 +108,6 @@ polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_islands)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
-
-print("Dilate...")
-#Re label the gum which is label 3 to label -1
-post_process.DilateLabel(surf, real_labels, 3, iterations=3)
 
 print("Relabel...")
 #Re label the gum which is label 3 to label -1
