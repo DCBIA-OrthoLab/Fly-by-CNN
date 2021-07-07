@@ -90,7 +90,7 @@ polydatawriter.Write()
 
 if args.dilate:
 	print("Dilate...")
-	Dilate GUM label
+	# Dilate GUM label
 	post_process.DilateLabel(surf, real_labels, 3, iterations=args.dilate)
 
 labels_range = np.zeros(2)

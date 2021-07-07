@@ -1,9 +1,10 @@
-#!/bin/sh
+!/bin/sh
 
 
 input_dir=$1
 model=$2
 output_dir=$3
+dilate=$4
 
 
 
@@ -14,8 +15,11 @@ for file in "${files[@]}"; do
     filename=$(basename $file)
     filename="${filename%.*}"
     mkdir $output_dir/$filename/
-    python3 src/py/predict_v3.py --surf $file --model $model --out $output_dir/$filename/$filename.vtk
+    python3 src/py/predict_v3.py --surf $file --dilate $dilate --model $model --out $output_dir/$filename/$filename.vtk
 done
+
+
+
 
 
 

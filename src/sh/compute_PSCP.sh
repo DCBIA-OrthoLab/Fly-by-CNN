@@ -21,11 +21,11 @@ echo "==================================="
 python3 src/py/PSCP/itkRT.py --dir $input_dir_root --out $out_tmp
 python3 src/py/PSCP/nii2nrrd.py --dir $out_tmp --out $out_tmp
 
-echo echo "==================================="
+echo "==================================="
 echo 
 echo "Merging files..."
 echo
-echo echo "==================================="
+echo "==================================="
 
 for root in "${dir_roots[@]}"; do
     for surf in "${dir_surf[@]}"; do
