@@ -53,8 +53,8 @@ def process_scan(path):
 
 
 if (args.dir_features):
-    features_paths = [os.path.join(inputdirFeatures, x) for x in os.listdir(inputdirFeatures)]
-    features_name = [y for y in os.listdir(inputdirFeatures)]
+    features_paths = [os.path.join(inputdirFeatures, x) for x in os.listdir(inputdirFeatures) if not x.startswith(".")]
+    features_name = [y for y in os.listdir(inputdirFeatures) if not y.startswith(".")]
     features = np.array([process_scan(path) for path in features_paths])
 
 if (args.features):

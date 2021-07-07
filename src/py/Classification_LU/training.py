@@ -51,8 +51,8 @@ def process_scan(path):
 
 
 
-Lower_paths = [os.path.join(InputdirLower, x) for x in os.listdir(InputdirLower)]
-Upper_paths = [os.path.join(InputdirUpper, x) for x in os.listdir(InputdirUpper)]
+Lower_paths = [os.path.join(InputdirLower, path) for path in os.listdir(InputdirLower) if not path.startswith(".")]
+Upper_paths = [os.path.join(InputdirUpper, path) for path in os.listdir(InputdirUpper) if not path.startswith(".")]
 
 LowerTeeth = np.array([process_scan(path) for path in Lower_paths])
 UpperTeeth = np.array([process_scan(path) for path in Upper_paths])
