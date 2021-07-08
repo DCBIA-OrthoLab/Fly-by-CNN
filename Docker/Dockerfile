@@ -20,7 +20,7 @@ RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/archive/refs/tags/2.3.zip
 RUN unzip 2.3.zip
 
 RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.3/u_seg_nn_3.2.zip
-RUN unzip u_seg_nn_v3.2.zip
+RUN unzip u_seg_nn_3.2.zip
 
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.6/dist-packages/vtkmodules/
