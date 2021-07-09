@@ -13,41 +13,10 @@ import uuid
 
 import LinearSubdivisionFilter as lsf
 from utils import * 
-from scaling import *
-
-# class ShapeAlignment(tf.keras.Model):
-
-# 	def __init__(self, dimension=2):
-# 		super(ShapeAlignment, self).__init__()
-
-# 		self.transform = tf.Variable(tf.eye(4), dtype=tf.float32)
-# 		self.loss = tf.keras.losses.MeanAbsoluteError()
-
-# 		# lr = tf.keras.optimizers.schedules.ExponentialDecay(1e-3, 100, 0.96, 1)
-# 		self.optimizer = tf.keras.optimizers.SGD(1e-3)
-
-# 	# @tf.function
-# 	def train_step(self, logits, target):
-
-# 		with tf.GradientTape() as tape:
-			
-# 			loss = self.loss(logits, target)
-			
-# 			var_list = self.trainable_variables
-
-# 			gradients = tape.gradient(loss, var_list)
-# 			self.optimizer.apply_gradients(zip(gradients, var_list))
-
-# 			return loss
-
-# 	def get_transform(self):
-# 		return self.transform.get_weights()
-	
-# from orientation import *
 
 class FlyByGenerator():
-	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False):
-
+	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False, rescale_features=False):
+		vtk.vtkObject.GlobalWarningDisplayOff()
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
 		renderWindow.AddRenderer(renderer)		
@@ -62,7 +31,8 @@ class FlyByGenerator():
 		self.resolution = resolution
 		self.use_z = use_z
 		self.split_z = split_z
-
+		self.rescale_features = rescale_features
+		
 		#sphere_actor = GetActor(sphere)
 		# print(sphere_actor)
 		#sphere_actor.GetProperty().SetRepresentationToWireFrame()
@@ -83,10 +53,10 @@ class FlyByGenerator():
 	def getFlyBy(self):
 
 		sphere_points = self.sphere.GetPoints()
-		print(sphere_points.GetNumberOfPoints())
 		camera = self.renderer.GetActiveCamera()
 
 		if self.visualize:
+			self.renderer.SetBackground(1, 1, 1)
 			self.renderWindow.OffScreenRenderingOff()
 			interactor = vtk.vtkRenderWindowInteractor()
 			interactor.SetRenderWindow(self.renderWindow)
@@ -120,6 +90,10 @@ class FlyByGenerator():
 			img_o = windowToImageN.GetOutput()
 
 			img_o_np = vtk_to_numpy(img_o.GetPointData().GetScalars())
+
+			if self.rescale_features:
+				img_o_np = 2*(img_o_np/255) - 1
+
 			num_components = img_o.GetNumberOfScalarComponents()
 
 			if self.use_z:
@@ -139,11 +113,16 @@ class FlyByGenerator():
 				img_z_np = 2.0*z_far*z_near / (z_far + z_near - (z_far - z_near)*(2.0*img_z_np - 1.0))
 				img_z_np[img_z_np > (z_far - 0.1)] = 0
 
+				if self.rescale_features:
+					img_z_np /= z_far
+
 				if(self.split_z):
 					img_np = np.concatenate([img_o_np, img_z_np], axis=-1)
 					num_components += 1
 				else:
-					img_z_np /= z_far
+					if not self.rescale_features:
+						img_z_np /= z_far
+						
 					img_np = np.multiply(img_o_np, img_z_np)
 			else:
 				img_np = img_o_np
@@ -161,7 +140,6 @@ def main(args):
 		fobj["surf"] = args.surf
 		fobj["out"] = args.out
 		filenames.append(fobj)
-		print(filenames)
 			
 	else:
 		surf_filenames = []
@@ -185,8 +163,6 @@ def main(args):
 			fobj = {}
 			fobj["surf"] = surf
 
-			# don't want n output for n files
-			# if(not args.fiberBundle):
 			dir_filename = os.path.splitext(surf.replace(replace_dir_name, ''))[0] +  ".nrrd"
 			fobj["out"] = os.path.normpath("/".join([args.out, dir_filename]))
 	
@@ -199,26 +175,42 @@ def main(args):
 			if args.ow or not os.path.exists(fobj["out"]):
 				filenames.append(fobj)
 
+	if args.n_rotations:
+
+		filenames_orig = filenames.copy()
+
+		for fobj in filenames_orig:
+			for i in range(args.n_rotations):
+				fobj_rot = {}
+				fobj_rot["surf"] = fobj["surf"]
+
+				out_name, out_ext = os.path.splitext(os.path.normpath(fobj["out"]))
+				fobj_rot["out"] = out_name + "_rot" + str(i) + out_ext
+
+				if args.ow or not os.path.exists(fobj_rot["out"]):
+					filenames.append(fobj_rot)
 
 	if(args.subdivision):
 		sphere = CreateIcosahedron(args.radius, args.subdivision)
 	else:
 		sphere = CreateSpiral(args.radius, args.spiral, args.turns)
 
-	# model = None
-	# if args.model is not None:
-		# model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
-		# model.summary()
+	model = None
+	if args.model is not None:
+		import tensorflow as tf
+		model = tf.keras.models.load_model(args.model, custom_objects={'tf': tf})
+		model.summary()
 
-	flyby = FlyByGenerator(sphere, args.resolution, args.visualize, use_z=args.use_z, split_z=args.split_z)
+	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z, rescale_features=args.rescale_features)
 	
-	if args.point_features:
+	if args.point_features or args.out_point_id:
 		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
 
-
-
-
 	for fobj in filenames:
+
+		if args.verbose:
+			print("Number of sphere points:", sphere.GetNumberOfPoints())
+			print("Reading:", fobj["surf"])
 
 		surf = ReadSurf(fobj["surf"])
 		
@@ -235,14 +227,10 @@ def main(args):
 				surf_actor = GetNormalsActor(fiber_surf)
 
 				if surf_actor:
-
+          
 					flyby.addActor(surf_actor)
 					
 					out_np = flyby.getFlyBy()
-
-					# if model is not None:
-					# 	out_np = model.predict(out_np)
-
 					out_img = GetImage(out_np)
 
 					fiberName = "fiber_" + str(i_cell) + ".nrrd"
@@ -258,7 +246,17 @@ def main(args):
 
 
 			if args.random_rotation:
-				surf = RandomRotation(surf)
+				surf, rotationAngle, rotationVector = RandomRotation(surf)
+        if args.verbose:
+          print("angle:", rotationAngle, "vector:", rotationVector)
+        if args.save_rotation:
+          transform = GetTransform(rotationAngle, rotationVector)
+          m = np.zeros(16)
+          vmatrix = transform.GetMatrix()
+          vmatrix.DeepCopy(m.ravel(), vmatrix)
+          out_filename = os.path.splitext(fobj["out"])[0] + "_transform.npy"
+          print("Saving rotation:", out_filename)
+          np.save(out_filename, m)
 
 			if args.fiber :
 				surf = GetTubeFilter(surf)
@@ -274,32 +272,95 @@ def main(args):
 		
 #Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
 		
-			if surf_actor is not None:
-				flyby.addActor(surf_actor)
-				
-			out_np = flyby.getFlyBy()
+      if surf_actor is not None:
+        flyby.addActor(surf_actor)
 
-			# if model is not None:
-			# 	out_np = model.predict(out_np)
-		
+      out_np = flyby.getFlyBy()
 
-			if ( not args.concatenate ):
-				for i in range(out_np.shape[0]):
-					out_img = GetImage(out_np[i])
+      if(args.extract_components != None):
+        out_np = out_np[:,:,:,args.extract_components[0]:args.extract_components[1]]
+        print(out_np.shape)
 
-	                #use os.path.splitext(fobj["out"])[0] <- parse the file name
-					p = ".*(?=\.)"
-					prefix = re.findall(p, fobj["out"])
-					
-					s ="([^\.]+$)" 
-					suffix = re.findall(s, fobj["out"])
+      if model is not None:
+        out_np = model.predict(out_np)
 
-					filename=prefix[0]+"_"+str(i)+"."+suffix[0]
-					print("Writing:", filename)
-			
-					writer = itk.ImageFileWriter.New(FileName=filename, Input=out_img)
-					writer.UseCompressionOn()
-					writer.Update()
+      if args.point_features or args.out_point_id:
+
+        surf_actor = GetPointIdMapActor(surf)
+        flyby_features.addActor(surf_actor)
+        out_point_ids_rgb_np = flyby_features.getFlyBy()
+
+        if(args.out_point_id):
+          if ( not args.concatenate ):
+
+            if not os.path.exists(fobj["out"]):
+              os.makedirs(fobj["out"])
+
+            for i in range(out_point_ids_rgb_np.shape[0]):
+              out_point_id_img = GetImage(out_point_ids_rgb_np[i])
+
+              out_filename = os.path.join(fobj["out"], str(i) + "_point_id_map.nrrd")
+              print("Writing:", out_filename)
+
+              writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_point_id_img)
+              writer.UseCompressionOn()
+              writer.Update()
+          else:
+            out_filename = os.path.splitext(fobj["out"])
+            out_filename = out_filename[0] + "_point_id_map" + out_filename[1]
+
+            out_point_id_img = GetImage(out_point_ids_rgb_np)
+            print("Writing:", out_filename)
+            writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_point_id_img)
+            writer.UseCompressionOn()
+            writer.Update()
+
+
+        if(args.point_features):
+
+          for point_features_name in args.point_features:
+            print("Extracting:", point_features_name)
+            out_features_np = ExtractPointFeatures(surf, out_point_ids_rgb_np, point_features_name, args.zero)
+
+            if(args.point_features_concat):
+              out_np = np.concatenate([out_np, out_features_np], axis=-1)
+            else:
+              if ( not args.concatenate ):
+
+                if not os.path.exists(fobj["out"]):
+                  os.makedirs(fobj["out"])
+
+                for i in range(out_features_np.shape[0]):
+                  out_img = GetImage(out_features_np[i])
+
+                  out_filename = os.path.join(fobj["out"], str(i) + "_" + point_features_name + ".nrrd")
+                  print("Writing:", out_filename)
+
+                  writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
+                  writer.UseCompressionOn()
+                  writer.Update()
+              else:
+                out_features_name = os.path.splitext(fobj["out"])
+                out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
+                print("Writing:", out_features_name)
+                out_features = GetImage(out_features_np)
+                writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
+                writer.UseCompressionOn()
+                writer.Update()
+          flyby_features.removeActors()
+
+      if ( not args.concatenate ):
+        if not os.path.exists(fobj["out"]):
+          os.makedirs(fobj["out"])
+
+        for i in range(out_np.shape[0]):
+          out_img = GetImage(out_np[i])
+
+          out_filename = os.path.join(fobj["out"], str(i) + ".nrrd")
+          print("Writing:", out_filename)
+
+          writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
+          
 			else:
 				out_img = GetImage(out_np)
 
@@ -307,24 +368,8 @@ def main(args):
 				writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
 				writer.UseCompressionOn()
 				writer.Update()
-
-			if args.point_features:
-				surf_actor = GetPointIdMapActor(surf)
-				flyby_features.addActor(surf_actor)
-				out_pointids_rgb_np = flyby_features.getFlyBy(False)
-
-				for point_features_name in args.point_features:
-					print("Extracting:", point_features_name)
-					out_features_np = ExtractPointFeatures(surf, out_pointids_rgb_np, point_features_name)
-					out_features_name = os.path.splitext(fobj["out"])
-					out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
-					print("Writing:", out_features_name)
-					out_features = GetImage(out_features_np)
-					writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
-					writer.UseCompressionOn()
-					writer.Update()
-
-			flyby.removeActors()
+			
+		flyby.removeActors()
 
 
 if __name__ == '__main__':
@@ -342,6 +387,8 @@ if __name__ == '__main__':
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 
+	input_group.add_argument('--n_rotations', type=int, help='Number of additional random rotations', default=0)
+	input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
 	input_group.add_argument('--fiberBundle', type=bool, help='If input directory is a fiber tract', default=False)
 	input_group.add_argument('--fiber', type=bool, help='If input surface is a fiber', default=False)
 	input_group.add_argument('--nbFiber', type=float, help='extract a percentage of fibers per cluster (value between 0 and 1)', default=0.05)
@@ -349,20 +396,16 @@ if __name__ == '__main__':
 	input_group.add_argument('--translate', nargs="+", type=float, help='Translation vector computed with scaling.py', default=None)
 	input_group.add_argument('--shape', nargs="+", type=int, help='Shape of the matrix computed with scaling.py', default=None)
 
-	# input_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table',default = 1)
-	# input_group.add_argument('--use_z', type=int, help='1 to scale normals by z buffer',default = 1)
-	# input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
-	# input_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
-	# input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
-
-
 	features_group = parser.add_argument_group('Shape features/property to extract')
+	features_group.add_argument('--extract_components', type=int, nargs='+', help='Which components to extract', default = None)
 	features_group.add_argument('--norm_shader', type=int, help='1 to color surface with normal shader, 0 to color with look up table', default = 1)
 	features_group.add_argument('--split_z', type=int, help='1 to split the z buffer as a separate channel. Otherwise, the normals are scaled by z buffer to create an rgb image.', default = 0)
-	features_group.add_argument('--use_z', type=int, help='1 to to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
+	features_group.add_argument('--use_z', type=int, help='1 to use the z_buffer and compute the depth buffer (distance of camera to shape at every location).', default = 1)
+	features_group.add_argument('--rescale_features', type=int, help='1 to rescale features (Normals, Depth map) between 0 and 1', default = 0)
 
 	features_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
-	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features', default=None)
+	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features. If name is coords or points, it extracts the x,y,z coordinates', default=None)
+	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
@@ -375,17 +418,18 @@ if __name__ == '__main__':
 	sphere_params.add_argument('--radius', type=float, help='Radius of the sphere for the view points', default=4)
 
 	training_orientation = parser.add_argument_group('training orientation')
-	training_orientation.add_argument('--save_label', type=str, help='save the label', default="")
-	training_orientation.add_argument('--save_AA', type=str, help='save the label', default="")
+	training_orientation.add_argument('--save_rotation', type=int, help="save the orientation transform", default=0)
 
 	visu_params = parser.add_argument_group('Visualize')
 	visu_params.add_argument('--visualize', type=int, default=0, help='Visualize the sampling')
 
 	output_params = parser.add_argument_group('Output parameters')
 	output_params.add_argument('--out', type=str, help='Output filename or directory', default="out.nrrd")
+	output_params.add_argument('--out_point_id', type=int, help='Output the point id map. Point ids are encoded in the rgb components', default=0)
 	output_params.add_argument('--uuid', type=bool, help='Use uuid to name the outputs', default=False)
 	output_params.add_argument('--ow', type=int, help='Overwrite outputs', default=1)
 	output_params.add_argument('--concatenate', type=int, help='0 for multiple output files, 1 for single output file', default=1)
+	output_params.add_argument('--verbose', type=int, help='Print messages', default=0)
 
 	args = parser.parse_args()
 
