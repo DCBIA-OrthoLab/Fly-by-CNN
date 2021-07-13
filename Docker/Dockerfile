@@ -16,10 +16,10 @@ RUN pip install itk sklearn pandas matplotlib
 
 WORKDIR /app
 
-RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/archive/refs/tags/2.3.zip
-RUN unzip 2.3.zip
+RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/archive/refs/tags/2.4.zip
+RUN unzip 2.4.zip
 
-RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.3/u_seg_nn_3.2.zip
+RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.4/u_seg_nn_3.2.zip
 RUN unzip u_seg_nn_3.2.zip
 
 
