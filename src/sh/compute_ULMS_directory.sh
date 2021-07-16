@@ -88,6 +88,7 @@ echo "==================================="
 dir_roots=($input_dir_root/*)
 dir_surf=($output_dir_uid/*)
 universalID=1
+name_property="UniversalID"
 
 for root in "${dir_roots[@]}"; do
     for surf in "${dir_surf[@]}"; do
@@ -111,7 +112,7 @@ for root in "${dir_roots[@]}"; do
     output_filename=$out_merge/$(basename $dirname_root)_merged.vtk
 
     python3 src/py/PSCP/create_3D_RC.py --dir $out_tmp/$(basename $dirname_root) --out $out_tmp/$(basename $dirname_root)
-    python3 src/py/PSCP/merge.py --surf $surf_path --dir_root $dirname_root --label_name $universalID --out $output_filename
+    python3 src/py/PSCP/merge.py --surf $surf_path --dir_root $dirname_root --label_name $name_property --out $output_filename
 done
 
 

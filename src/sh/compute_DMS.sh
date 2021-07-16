@@ -1,4 +1,4 @@
-!/bin/sh
+#!/bin/sh
 
 
 input_dir=$1
