@@ -45,7 +45,7 @@ python /app/fly-by-cnn/src/py/fly_by_features.py --surf my_surf.(vtk,.stl,.obj) 
 ## Running Universal Labeling, Merging and Separating algorithm
 
 The easiest way to use the docker container.
-[Docker/README.md](https://github.com/DCBIA-OrthoLab/fly-by-cnn/tree/master/Docker)
+[Docker/README.md](https://github.com/RomainUSA/fly-by-cnn/tree/master/Docker)
 
 Here are the command lines to run the scripts:
 
