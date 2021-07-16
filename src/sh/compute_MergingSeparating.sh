@@ -7,8 +7,9 @@ echo "Program to run the Universal Labeling and Merging algorithm"
 echo
 echo "Syntax: compute_ULM.sh [--options]"
 echo "options:"
-echo "--input_file_uid               Output directory of the teeth with the universal labels."
-echo "--input_file_root              Input directory with the root canal segmentation files."
+echo "--src_code                    Path of the source code "
+echo "--input_file_uid              Output directory of the teeth with the universal labels."
+echo "--input_file_root             Input directory with the root canal segmentation files."
 echo "--out_tmp                     Temporary output folder."
 echo "--out_merge                   Output directory of the merged surfaces."
 echo "--out_separate                Output directory of the separated surfaces."
@@ -16,6 +17,8 @@ echo "--out_separate                Output directory of the separated surfaces."
 
 while [ "$1" != "" ]; do
     case $1 in
+        --src_code )  shift
+            src_code=$1;;
         --input_file_uid )  shift
             input_file_uid=$1;;
         --input_file_root )  shift
@@ -48,8 +51,8 @@ output=$out_tmp/$(basename $input_file_root)
 output="${output%.*}"
 output="${output%.*}"
 
-python3 src/py/PSCP/create_RC_object.py --image $input_file_root --out $output
-python3 src/py/PSCP/nii2nrrd.py --dir $out_tmp --out $out_tmp
+python3 $src_code/py/PSCP/create_RC_object.py --image $input_file_root --out $output
+python3 $src_code/py/PSCP/nii2nrrd.py --dir $out_tmp --out $out_tmp
 
 
 echo "==================================="
@@ -63,8 +66,8 @@ universalID=1
 name_property="UniversalID"
 output_filename=$out_merge/$(basename $output)_merged.vtk
 
-python3 src/py/PSCP/create_3D_RC.py --dir $out_tmp/$(basename $output)  --out $out_tmp/$(basename $output)
-python3 src/py/PSCP/merge.py --surf $input_file_uid --dir_root $out_tmp/$filename --label_name $name_property --out $output_filename
+python3 $src_code/py/PSCP/create_3D_RC.py --dir $out_tmp/$(basename $output)  --out $out_tmp/$(basename $output)
+python3 $src_code/py/PSCP/merge.py --surf $input_file_uid --dir_root $out_tmp/$filename --label_name $name_property --out $output_filename
 
 
 echo "==================================="
@@ -80,7 +83,7 @@ for file in "${merged_files[@]}"; do
     filename="${filename%.*}"
     mkdir $out_separate/$filename/
 
-    python3 src/py/PSCP/separate.py --surf $file --universalID $universalID --out $out_separate/$filename
+    python3 $src_code/py/PSCP/separate.py --surf $file --universalID $universalID --out $out_separate/$filename
 done
 
 
