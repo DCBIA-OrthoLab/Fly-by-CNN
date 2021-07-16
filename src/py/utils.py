@@ -319,7 +319,8 @@ def GetPropertyActor(surf, property_name):
 
     surfMapper.SetLookupTable(lut)
 
-    return surfActor
+    # return surfActor
+    return surfMapper
 
 def GetNormalsActor(surf):
 

@@ -94,7 +94,7 @@ def plot_confusion_matrix(cm, classes,
 
 cnf_matrix = confusion_matrix(y_true_arr, y_pred_arr)
 fig = plt.figure()
-plot_confusion_matrix(cnf_matrix, classes=["Gum", "Teeth", "Boundary"], title="Confusion Matrix Segmentation")
+plot_confusion_matrix(cnf_matrix, classes=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"], title="Confusion Matrix Segmentation")
 confusion_filename = os.path.splitext(args.csv)[0] + "_confusion.png"
 fig.savefig(confusion_filename)
 
@@ -143,7 +143,7 @@ print("dice:", 2.0*jaccard/(1.0 + jaccard))
 
 # Plot normalized confusion matrix
 fig2 = plt.figure()
-cm = plot_confusion_matrix(cnf_matrix, classes=["Gum", "Teeth", "Boundary"], normalize=True, title="Confusion Matrix Segmentation - normalized")
+cm = plot_confusion_matrix(cnf_matrix, classes=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"], normalize=True, title="Confusion Matrix Segmentation - normalized")
 norm_confusion_filename = os.path.splitext(args.csv)[0] + "_norm_confusion.png"
 fig2.savefig(norm_confusion_filename)
 
@@ -151,7 +151,7 @@ fig2.savefig(norm_confusion_filename)
 fig3 = plt.figure() 
 # Creating plot
 s = sns.violinplot(data=dice_arr)
-plt.xticks([0, 1, 2], ["Gum", "Teeth", "Boundary"])
+plt.xticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"])
 s.set_title('Dice coefficients')
 box_plot_filename = os.path.splitext(args.csv)[0] + "_violin_plot.png"
 fig3.savefig(box_plot_filename)

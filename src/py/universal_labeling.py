@@ -102,48 +102,31 @@ def Labelize(surf,labels, Lsurf, Lsurf_GT):
 
     L_label_bias = [x+20 for x in L_label]
 
-    bias = 0
     for i in range(len(Lsurf)):
         if i+2 not in L_label:
             print("label considered as artifact:", i+2)
             ChangeLabel(surf, labels, i+2, -2)
-            # bias = 1
 
     for i in range(len(L_label_GT)):
         ChangeLabel(surf, labels, L_label[i], L_label_bias[i])
 
     for i in range(len(L_label_GT)):
-        # if bias:
-        # 	ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
-        # else:
         ChangeLabel(surf, labels, L_label_bias[i], L_label_GT[i])
 
     ChangeLabel(surf, labels, -2, 0)
 
-def UniversalID(surf, labels, path_surf, model_feature, model_LU, out_feature):	
+def UniversalID(surf, labels, LowerOrUpper):	
     real_labels = vtk.vtkIntArray()
     real_labels.SetNumberOfComponents(1)
     real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
     real_labels.SetName("UniversalID")
     real_labels.Fill(-1)
 
-    # Load the code & prediction model to know if it is a lower or upper scan
-    split_obj = {}
-    split_obj["surf"] = path_surf
-    split_obj["spiral"] = 64
-    split_obj["model_feature"] = model_feature
-    split_obj["model_LU"] = model_LU
-    split_obj["out_feature"] = out_feature
-
-    split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
-    LowerOrUpper = predict_LU.main(split_args)
-    LowerOrUpper = LowerOrUpper[0][0]
-
     for pid in range(labels.GetNumberOfTuples()):
         if LowerOrUpper<=0.5: # Lower
             real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])+15,))
             
-        if LowerOrUpper>=0.5: # Upper
+        if LowerOrUpper>0.5: # Upper
             real_labels.SetTuple(pid, (int(labels.GetTuple(pid)[0])-1,))
             
     surf.GetPointData().AddArray(real_labels)
@@ -153,16 +136,39 @@ def UniversalID(surf, labels, path_surf, model_feature, model_LU, out_feature):
 def main(args):
     surf, labels = ReadFile(args.surf)
 
+    print("Prediction...")
+    # Load the code & prediction model to know if it is a lower or upper scan
+    split_obj = {}
+    split_obj["surf"] = args.surf
+    split_obj["spiral"] = 64
+    split_obj["model_feature"] = args.model_feature
+    split_obj["model_LU"] = args.model_LU
+    split_obj["out_feature"] = args.out_feature
+
+    split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
+    LowerOrUpper = predict_LU.main(split_args)
+    LowerOrUpper = LowerOrUpper[0][0]
+
+    # LowerOrUpper = 0.8
+
+    if LowerOrUpper<=0.5: 
+        print("Lower:", LowerOrUpper)
+        path_groundtruth = [os.path.join(args.label_groundtruth,path) for path in os.listdir(args.label_groundtruth) if "Lower" in path][0]
+        print(path_groundtruth)
+    else:
+        print("Upper:" ,LowerOrUpper)
+        path_groundtruth = [os.path.join(args.label_groundtruth,path) for path in os.listdir(args.label_groundtruth) if "Upper" in path][0]
+        print(path_groundtruth)
+
     print("Labelizing...")
-    surf_groundtruth, labels_groundtruth = ReadFile(args.label_groundtruth)
+    surf_groundtruth, labels_groundtruth = ReadFile(path_groundtruth)
     surf, copy_surf = Alignement(surf,surf_groundtruth)
     Lsurf = MeanCoordinatesTeeth(copy_surf,labels)
     Lsurf_GT = MeanCoordinatesTeeth(surf_groundtruth,labels_groundtruth)
     Labelize(surf,labels,Lsurf,Lsurf_GT)
 
-    if(args.universalID):
-        print("UniversalID...")
-        UniversalID(surf, labels, args.surf, args.model_feature, args.model_LU, args.out_feature)
+    print("UniversalID...")
+    UniversalID(surf, labels, LowerOrUpper)
 
     WriteSurf(surf, args.out)
 
@@ -173,13 +179,12 @@ if __name__ == '__main__':
     parser.add_argument('--surf', type=str, help='Input surface mesh to label', required=True)
 
     labelize_parser = parser.add_argument_group('Label parameters')
-    labelize_parser.add_argument('--label_groundtruth', type=str, help='groundtruth of the label', required=True)
+    labelize_parser.add_argument('--label_groundtruth', type=str, help='directory of the template labels', required=True)
 
-    universalID_parser = parser.add_argument_group('Universal ID parameters')
-    universalID_parser.add_argument('--universalID', type=bool, help='label the teeth with Universal ID', default=False)
-    universalID_parser.add_argument('--model_feature', type=str, help='path of the VGG19 model', default='')
-    universalID_parser.add_argument('--model_LU', type=str, help='path of the LowerUpper model', default='')
-    universalID_parser.add_argument('--out_feature', type=str, help='out of the feature', default='')
+    prediction_parser = parser.add_argument_group('Prediction parameters')
+    prediction_parser.add_argument('--model_feature', type=str, help='path of the VGG19 model', required=True)
+    prediction_parser.add_argument('--model_LU', type=str, help='path of the LowerUpper model', required=True)
+    prediction_parser.add_argument('--out_feature', type=str, help='out of the feature', required=True)
 
     parser.add_argument('--out', type=str, help='Output model with labels', default="out.vtk")
 
