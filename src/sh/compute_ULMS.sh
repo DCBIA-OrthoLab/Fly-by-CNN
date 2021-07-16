@@ -7,6 +7,7 @@ echo "Program to run the Universal Labeling and Merging algorithm"
 echo
 echo "Syntax: compute_ULM.sh [--options]"
 echo "options:"
+echo "--src_code                    Path of the source code "
 echo "--input_file_surf             Input file surface with only the teeth."
 echo "--label_GT_dir                Folder containing the template for the Upper/Lower classification."
 echo "--model_ft                    Path to the feature model ."
@@ -21,6 +22,8 @@ echo "--out_separate                Output directory of the separated surfaces."
 
 while [ "$1" != "" ]; do
     case $1 in
+        --src_code )  shift
+            src_code=$1;;
         --input_file_surf )  shift
             input_file_surf=$1;;
         --label_GT_dir )  shift
@@ -63,7 +66,7 @@ filename=$(basename $input_file_surf)
 filename="${filename%.*}"
 filename="${filename%.*}"
 
-python3 src/py/universal_labeling.py --surf $input_file_surf --label_groundtruth $label_GT_dir --model_feature $model_ft --model_LU $model_LU --out_feature $out_ft --out $output_dir_uid/$filename"_uid.vtk"
+python3 $src_code/py/universal_labeling.py --surf $input_file_surf --label_groundtruth $label_GT_dir --model_feature $model_ft --model_LU $model_LU --out_feature $out_ft --out $output_dir_uid/$filename"_uid.vtk"
 
 
 echo "==================================="
@@ -76,8 +79,8 @@ output=$out_tmp/$(basename $input_file_root)
 output="${output%.*}"
 output="${output%.*}"
 
-python3 src/py/PSCP/create_RC_object.py --image $input_file_root --out $output
-python3 src/py/PSCP/nii2nrrd.py --dir $out_tmp --out $out_tmp
+python3 $src_code/py/PSCP/create_RC_object.py --image $input_file_root --out $output
+python3 $src_code/py/PSCP/nii2nrrd.py --dir $out_tmp --out $out_tmp
 
 
 echo "==================================="
@@ -92,11 +95,11 @@ output_filename=$out_merge/$(basename $output)_merged.vtk
 dir_surf_uid=($output_dir_uid/*)
 
 
-python3 src/py/PSCP/create_3D_RC.py --dir $out_tmp/$(basename $output)  --out $out_tmp/$(basename $output)
+python3 $src_code/py/PSCP/create_3D_RC.py --dir $out_tmp/$(basename $output)  --out $out_tmp/$(basename $output)
 
 for surf_uid in "${dir_surf_uid[@]}"; do
 
-    python3 src/py/PSCP/merge.py --surf $surf_uid --dir_root $out_tmp/$(basename $output) --label_name $name_property --out $output_filename
+    python3 $src_code/py/PSCP/merge.py --surf $surf_uid --dir_root $out_tmp/$(basename $output) --label_name $name_property --out $output_filename
 done
 
 
@@ -113,7 +116,7 @@ for file in "${merged_files[@]}"; do
     filename="${filename%.*}"
     mkdir $out_separate/$filename/
 
-    python3 src/py/PSCP/separate.py --surf $file --universalID $universalID --out $out_separate/$filename
+    python3 $src_code/py/PSCP/separate.py --surf $file --universalID $universalID --out $out_separate/$filename
 done
 
 
