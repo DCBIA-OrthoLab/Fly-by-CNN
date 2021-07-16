@@ -3,9 +3,9 @@
 Help()
 {
 # Display Help
-echo "Program to run the Universal Labeling and Merging algorithm"
+echo "Program to run the Universal Labeling Merging and Separated algorithm"
 echo
-echo "Syntax: compute_ULM.sh [--options]"
+echo "Syntax: compute_ULMS.sh [--options]"
 echo "options:"
 echo "--src_code                    Path of the source code "
 echo "--input_file_surf             Input file surface with only the teeth."

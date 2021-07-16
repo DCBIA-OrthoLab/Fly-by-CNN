@@ -3,9 +3,9 @@
 Help()
 {
 # Display Help
-echo "Program to run the Universal Labeling and Merging algorithm"
+echo "Program to run the Universal Labeling Merging and Separated algorithm"
 echo
-echo "Syntax: compute_ULM.sh [--options]"
+echo "Syntax: compute_ULMS_directory.sh [--options]"
 echo "options:"
 echo "--input_dir_surf              Input directory where there are the surfaces with only the teeth."
 echo "--label_GT_dir                Folder containing the template for the Upper/Lower classification."
