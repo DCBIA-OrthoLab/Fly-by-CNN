@@ -1,59 +1,56 @@
-import numpy as np
 import argparse
-import nibabel as ni
-import vtk
-
-
-def scalingSurf(vtkdata, scale, centering, shape):
-	polypoints = vtkdata.GetPoints()
-	
-	born_sup =scale*np.array(shape) + np.array(centering)
-
-	for pid in range(polypoints.GetNumberOfPoints()):
-		spoint = np.array(polypoints.GetPoint(pid))
-		new_point = normalize(spoint, centering, born_sup)
-
-		vtkdata.GetPoints().SetPoint(pid,new_point)
-
-	return vtkdata
-
-
-def normalize(x, xmin, xmax) :
-
-	return 2*(x - xmin)/(xmax-xmin) - np.ones(x.size, dtype=float)
-
-def readNiiFiles(niiFile, scaleFactor, translateVector, shape):
-
-	image = ni.load(niiFile)
-
-	scaleFactor += image.affine[0][0]
-	translateVector += np.array([image.affine[0][3], image.affine[1][3], image.affine[2][3]])
-	shape += np.array(image.shape)
-
-	return scaleFactor, translateVector, shape
-
+import itk
+import numpy as np
 
 def main(args):
 
-	meanScale = 0.
-	meanCentering = np.zeros(3)
-	meanShape = np.zeros(3)
+	file_name = args.nii
 
-	for niiFile in args.nii :
-		meanScale, meanCentering, meanShape = readNiiFiles(niiFile, meanScale, meanCentering, meanShape)
+	ImageType = itk.VectorImage[itk.F,3]
+	reader = itk.ImageFileReader[ImageType].New()
+	reader.SetFileName(args.nii)
+	reader.Update()
+	img = reader.GetOutput()
 
-	meanScale/=len(args.nii)
-	meanCentering/=len(args.nii)
-	meanShape = np.array( meanShape/len(args.nii), dtype=int )
+	ImageMaskType = itk.Image[itk.UC, 3]
+	img_mask = ImageMaskType.New()
+	img_mask.SetLargestPossibleRegion(img.GetLargestPossibleRegion())
+	img_mask.SetDirection(img.GetDirection())
+	img_mask.SetSpacing(img.GetSpacing())
+	img_mask.SetOrigin(img.GetOrigin())
+	img_mask.Allocate()
+	img_mask.FillBuffer(1)
 
-	print("scale factor: ", meanScale)
-	print("centering vector: ", meanCentering)
-	print("matrix shape: ", meanShape)
+	so = itk.ImageSpatialObject[3, itk.UC].New()
+	so.SetImage(img_mask)
+	so.Update()
+	so.GetMyBoundingBoxInWorldSpace().GetBounds()
+
+	print("scale factor: ", img.GetSpacing())
+	print("centering vector: ", img.GetOrigin())
+	print("Bounding box:", so.GetMyBoundingBoxInWorldSpace().GetBounds())
+	mean_v = [0.0] * 3
+	bounds_max_v = [0.0] * 3
+
+	bounds = so.GetMyBoundingBoxInWorldSpace().GetBounds() 
+
+	mean_v[0] = (bounds[0] + bounds[1])/2.0
+	mean_v[1] = (bounds[2] + bounds[3])/2.0
+	mean_v[2] = (bounds[4] + bounds[5])/2.0
+	bounds_max_v[0] = max(bounds[0], bounds[1])
+	bounds_max_v[1] = max(bounds[2], bounds[3])
+	bounds_max_v[2] = max(bounds[4], bounds[5])
+
+	bounds_max_arr = np.array(bounds_max_v)
+	scale_factor = 1/np.linalg.norm(bounds_max_arr - np.array(mean_v))
+
+	print("mean:", mean_v)
+	print("scale factor:", scale_factor)
 
 
 if __name__ == '__main__':
-	parser = argparse.ArgumentParser(description='Compute the average of the scale factor, centering vector and shape of a nifti file')
-	parser.add_argument('--nii', type=str, nargs="+", help='NIfTI files', required=True)
+	parser = argparse.ArgumentParser(description='Compute the average of the scale factor, centering vector of a nifti file')
+	parser.add_argument('--nii', type=str, help='NIfTI file', required=True)
 
 	args = parser.parse_args()	
 	main(args)
