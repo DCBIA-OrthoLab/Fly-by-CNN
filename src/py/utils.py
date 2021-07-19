@@ -99,6 +99,11 @@ def ReadSurf(fileName):
         reader.SetFileName(fileName)
         reader.Update()
         surf = reader.GetOutput()
+    elif extension == ".vtp":
+        reader = vtk.vtkXMLPolyDataReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()    
     elif extension == ".stl":
         reader = vtk.vtkSTLReader()
         reader.SetFileName(fileName)
@@ -160,10 +165,11 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
     shapedatapoints = surf.GetPoints()
     
     #calculate bounding box
-    bounds = [0.0] * 6
     mean_v = [0.0] * 3
     bounds_max_v = [0.0] * 3
+
     bounds = shapedatapoints.GetBounds()
+
     mean_v[0] = (bounds[0] + bounds[1])/2.0
     mean_v[1] = (bounds[2] + bounds[3])/2.0
     mean_v[2] = (bounds[4] + bounds[5])/2.0
@@ -248,6 +254,7 @@ def RandomRotation(surf):
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
 def GetUnitSurf(surf, mean_arr = None, scale_factor = -1):
+  print(mean_arr, scale_factor)
   surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor)
   return surf
 
@@ -567,7 +574,7 @@ def GetTubeFilter(vtkpolydata):
 
     tubeFilter = vtk.vtkTubeFilter()
     tubeFilter.SetNumberOfSides(50)
-    tubeFilter.SetRadius(0.008)
+    tubeFilter.SetRadius(0.01)
     tubeFilter.SetInputData(vtkpolydata)
     tubeFilter.Update()
 
