@@ -40,7 +40,7 @@ Output:
 - Dental crown model with the universal labels on each tooth (vtk file)
 
 ```
-docker run --rm -v */my/input/file*:/app/data/input/P1_teeth.vtk -v */my/output/folder*:/app/data/out python3 fly-by-cnn-2.1.0/src/py/universal_labeling.py --surf /app/data/input/P1_teeth.vtk --label_GT_dir /app/groundtruth --model_ft /app/models/model_features --model_LU /app/models/nnLU_model_5.hdf5 --out_feature /app/data/feature.nrrd --out /app/data/out
+docker run --rm -v */my/input/file*:/app/data/input/P1_teeth.vtk -v */my/output/folder*:/app/data/out ulms:latest python3 fly-by-cnn-2.1.0/src/py/universal_labeling.py --surf /app/data/input/P1_teeth.vtk --label_groundtruth /app/groundtruth --model_feature /app/models/model_features --model_LU /app/models/nnLU_model_5.hdf5 --out_feature /app/data/feature.nrrd --out /app/data/out
 ```
 
 **For the Merging and Separating:**
