@@ -1,36 +1,26 @@
-FROM python:3.7
+FROM dcbia/fly-by-cnn:latest
 
-RUN apt-get update && apt-get install -y \
-    git \
-    libx11-6 \
-    libgl1 \
-    libopengl0 \
-    libegl1 \
-    wget
-
-
-RUN mkdir /app
 WORKDIR /app
 
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.0/requirements.txt
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.3/requirements.txt
 RUN pip3 install -r /app/requirements.txt
 
-RUN wget https://github.com/RomainUSA/fly-by-cnn/archive/refs/tags/2.1.0.zip
-RUN unzip 2.1.0.zip
-RUN rm -rf 2.1.0.zip 
+RUN wget https://github.com/RomainUSA/fly-by-cnn/archive/refs/tags/2.1.3.zip
+RUN unzip 2.1.3.zip
+RUN rm -rf 2.1.3.zip 
 
 
 RUN mkdir /app/models
 WORKDIR /app/models
 
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.0/nnLU_model_5.hdf5
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.0/model_features.zip
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.3/nnLU_model_5.hdf5
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.3/model_features.zip
 RUN unzip model_features.zip
 RUN rm -rf model_features.zip
 
 
 WORKDIR /app
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.0/groundtruth.zip
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.3/groundtruth.zip
 RUN unzip groundtruth.zip
 RUN rm -rf groundtruth.zip
 
