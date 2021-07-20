@@ -157,7 +157,7 @@ def WriteSurf(surf, fileName):
     writer.Update()
 
 
-def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
+def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     surf_copy = vtk.vtkPolyData()
     surf_copy.DeepCopy(surf)
     surf = surf_copy
@@ -189,7 +189,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
         shape_points = shape_points - mean_arr
 
     #Computing scale factor if it is not provided
-    if(scale_factor == -1):
+    if(scale_factor == None):
         bounds_max_arr = np.array(bounds_max_v)
         scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
         # print(scale_factor)
@@ -253,7 +253,7 @@ def RandomRotation(surf):
     rotationVector = rotationVector/np.linalg.norm(rotationVector)
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
-def GetUnitSurf(surf, mean_arr = None, scale_factor = -1):
+def GetUnitSurf(surf, mean_arr = None, scale_factor = None):
   print(mean_arr, scale_factor)
   surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor)
   return surf

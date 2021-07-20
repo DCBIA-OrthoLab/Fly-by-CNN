@@ -61,6 +61,9 @@ def main(args):
     split_obj["rescale_features"] = 0
     split_obj["scale_factor"] = None
     split_obj["translate"] = None
+    split_obj["fiberBundle"] = False
+    split_obj["fiber"] = False
+    split_obj["save_rotation"] = 0
     
 
     # We convert the dictionary to a namedtuple, a.k.a, python object, i.e., argparse object
