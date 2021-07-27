@@ -25,4 +25,4 @@ x = model(x)
 model_full = tf.keras.Model(inputs=x0, outputs=x)
 
 model_full.summary()
-model.save("/SIRIUS_STOR/lumargot/data/data_spiral/spiral_16/model/saved/vgg19_full_model")
+model_full.save("/SIRIUS_STOR/lumargot/data/data_spiral/spiral_16/model/saved/vgg19_full_model")
