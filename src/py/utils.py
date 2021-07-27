@@ -609,6 +609,6 @@ def ExtractFiber(surf, list_random_id) :
     geometryFilter.Update()
 
 
-    tubefilter = GetTubeFilter(geometryFilter.GetOutput())
+    # tubefilter = GetTubeFilter(geometryFilter.GetOutput())
 
-    return tubefilter
+    return geometryFilter.GetOutput()
