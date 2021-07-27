@@ -47,11 +47,13 @@ def main(args):
 
         filename, _ = os.path.splitext(os.path.basename(img_obj["surf"]))
         output_dir = img_obj["out_dir"]
-        if not os.path.exists(output_dir):
-                os.makedirs(output_dir)
-        else:
-            shutil.rmtree(output_dir)
-            os.makedirs(output_dir)
+
+        # if not os.path.exists(output_dir):
+        #     os.makedirs(output_dir)
+
+        # else:
+        #     shutil.rmtree(output_dir)
+        #     os.makedirs(output_dir)
 
         if args.regionID:
             ScalarName = "RegionId"

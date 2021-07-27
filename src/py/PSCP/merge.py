@@ -25,13 +25,6 @@ def ReadFile(filename):
     return vtkdata
 
 def AssignLabelToRoots(root_canal, surf, label_name):
-    if label_name==0:
-        label_name="RegionId"
-    elif label_name==1:
-        label_name="UniversalID"
-    else:
-        label_name="RegionId"
-
     label_array = surf.GetPointData().GetArray(label_name)
 
     RC_BoundingBox = root_canal.GetPoints().GetBounds()
@@ -78,17 +71,16 @@ def main(args):
         out = img_obj["out"]
 
         surf = ReadFile(surf)
- 
+
         merge = vtk.vtkAppendPolyData()
         merge.AddInputData(surf)
 
         for i in range(len(root)):
             root_canal = ReadFile(root[i])
             root_canal = AssignLabelToRoots(root_canal, surf, args.label_name)
+            root_canal.GetPointData().SetActiveScalars(args.label_name)
             merge.AddInputData(root_canal)
-            merge.Update()
-        
-        # exit()
+        merge.Update()
 
         Write(merge.GetOutput(), out)
 
@@ -99,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument('--surf', type=str, help='input teeth', required=True)
     parser.add_argument('--dir_root', type=str, help='input dir for the root canals', required=True)
     
-    parser.add_argument('--label_name', type=int, help='label name, 0 = RegionId, 1 = UniversalID', default=0)
+    parser.add_argument('--label_name', type=str, help='Name of the property', default='RegionId')
 
     parser.add_argument('--out', type=str, help='output', default='')
 

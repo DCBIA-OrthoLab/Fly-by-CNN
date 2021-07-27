@@ -19,7 +19,7 @@ class FlyByGenerator():
 		vtk.vtkObject.GlobalWarningDisplayOff()
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
-		renderWindow.AddRenderer(renderer)		
+		renderWindow.AddRenderer(renderer)        
 		renderWindow.SetSize(resolution, resolution)
 		renderWindow.SetMultiSamples(0)
 		renderWindow.OffScreenRenderingOn()
@@ -102,7 +102,7 @@ class FlyByGenerator():
 				windowFilterZ.SetInput(self.renderWindow)
 				windowFilterZ.SetScale(1)
 
-				windowFilterZ.Update()				
+				windowFilterZ.Update()                
 				img_z = windowFilterZ.GetOutput()
 				
 				img_z_np = vtk_to_numpy(img_z.GetPointData().GetScalars())
@@ -260,7 +260,6 @@ def main(args):
 					flyby.removeActor(surf_actor)
 		else:
 
-
 			if args.random_rotation:
 				surf, rotationAngle, rotationVector = RandomRotation(surf)
 			if args.verbose:
@@ -285,7 +284,7 @@ def main(args):
 				surf_actor = GetPropertyActor(surf, args.property)
 			else:
 				surf_actor = GetNormalsActor(surf)
-		
+
 			#Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
 			
 			if surf_actor is not None:
@@ -331,6 +330,11 @@ def main(args):
 					writer.UseCompressionOn()
 					writer.Update()
 
+				out_point_id_img = GetImage(out_point_ids_rgb_np)
+				print("Writing:", out_filename)
+				writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_point_id_img)
+				writer.UseCompressionOn()
+				writer.Update()
 
 			if(args.point_features):
 

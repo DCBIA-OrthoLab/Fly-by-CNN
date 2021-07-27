@@ -42,3 +42,104 @@ This example will extract the normals and the depth map as a separate component 
 python /app/fly-by-cnn/src/py/fly_by_features.py --surf my_surf.(vtk,.stl,.obj) --subdivision 2 --resolution 512 --out out.nrrd --radius 2 --use_z 1 --split_z 1"
 ```
 
+## Running Universal Labeling, Merging and Separating algorithm
+
+The easiest way to use the docker container.
+[Docker/README.md](https://github.com/RomainUSA/fly-by-cnn/tree/master/Docker)
+
+Here are the command lines to run the scripts:
+
+**Universal Labeling:**
+
+Input: 
+- Dental crown model that contains the teeth of a patient (vtk file)
+
+Output: 
+- Dental crown model with the universal labels on each tooth (vtk file)
+
+```
+python3 fly-by-cnn/src/py/universal_labeling.py --help
+```
+
+```
+usage: universal_labeling.py [-h] --surf SURF --label_groundtruth
+                             LABEL_GROUNDTRUTH --model_feature MODEL_FEATURE
+                             --model_LU MODEL_LU --out_feature OUT_FEATURE
+                             [--out OUT]
+
+Label the teeth from 2 to 16 or with the universal IDs used by clinicians
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --surf SURF           Input surface mesh to label (default: None)
+  --out OUT             Output model with labels (default: out.vtk)
+
+Label parameters:
+  --label_groundtruth LABEL_GROUNDTRUTH
+                        directory of the template labels (default: None)
+
+Prediction parameters:
+  --model_feature MODEL_FEATURE
+                        path of the VGG19 model (default: None)
+  --model_LU MODEL_LU   path of the LowerUpper model (default: None)
+  --out_feature OUT_FEATURE
+                        out of the feature (default: None)
+```
+
+**Merging and Separating:**
+
+Inputs: 
+- Dental crown model that contains the teeth of a patient with the universal labels on each tooth (vtk file)
+- The root canal segmentation file (.nii)
+
+Output: 
+- A merged model with the teeth and roots labeled based on the universal labels and individual teeth and roots (vtk files)
+
+```
+bash fly-by-cnn/src/sh/compute_MergingSeparating.sh --help
+```
+
+```
+Program to run the Merging and Separating algorithm
+
+Syntax: compute_MergingSeparating.sh [--options]
+options:
+--src_code                    Path of the source code 
+--input_file_uid              Output directory of the teeth with the universal labels.
+--input_file_root             Input directory with the root canal segmentation files.
+--out_tmp                     Temporary output folder.
+--out_merge                   Output directory of the merged surfaces.
+--out_separate                Output directory of the separated surfaces.
+```
+
+**ULMS algortihm:**
+
+Inputs: 
+- Dental crown model that contains the teeth of a patient (vtk file)
+- The root canal segmentation file (.nii)
+
+Output: 
+- A merged model with the teeth and roots labeled based on the universal labels and individual teeth and roots (vtk files)
+
+```
+bash fly-by-cnn/src/sh/compute_ULMS.sh --help
+```
+
+```
+Program to run the Universal Labeling Merging and Separated algorithm
+
+Syntax: compute_ULMS.sh [--options]
+options:
+--src_code                    Path of the source code 
+--input_file_surf             Input file surface with only the teeth.
+--label_GT_dir                Folder containing the template for the Upper/Lower classification.
+--model_ft                    Path to the feature model .
+--model_LU                    Path to the LowerUpper classification model.
+--out_feature                 Output of the feature.
+--output_dir_uid              Output directory of the teeth with the universal labels.
+--input_file_root             Root canal segmentation file.
+--out_tmp                     Temporary output folder.
+--out_merge                   Output directory of the merged surfaces.
+--out_separate                Output directory of the separated surfaces.
+```
+
