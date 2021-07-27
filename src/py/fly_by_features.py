@@ -220,13 +220,29 @@ def main(args):
 			nbCell = surf.GetNumberOfCells()
 			print("number of fibers:", nbCell, "number of exctracted fiber:", args.nbFiber)
 			list_random_id = np.random.default_rng().choice(nbCell, size=args.nbFiber, replace=False)
+			extract_vtk = True
 			for i_cell in list_random_id:
-				fiber_surf = ExtractFiber(surf, i_cell)
 
+				if extract_vtk:
+
+					vtkfiber = ReadSurf(fobj["surf"])
+					vtkfiber = ExtractFiber(vtkfiber, i_cell)
+
+					vtkName = "fiber_" +args.subject + "_" + str(i_cell) + ".vtk"
+					vtk_file = os.path.normpath("/".join([args.out, vtkName]))
+
+					writer = vtk.vtkPolyDataWriter()
+					writer.SetFileName(vtk_file)
+					writer.SetInputData(vtkfiber)
+					writer.Update()
+					writer.Write()
+				
+				fiber = ExtractFiber(surf, i_cell)
+				fiber_surf = GetTubeFilter(fiber)
 				surf_actor = GetNormalsActor(fiber_surf)
 
 				if surf_actor:
-		  
+		
 					flyby.addActor(surf_actor)
 					
 					out_np = flyby.getFlyBy()
@@ -239,6 +255,7 @@ def main(args):
 					writer = itk.ImageFileWriter.New(FileName=path_file, Input=out_img)
 					writer.UseCompressionOn()
 					writer.Update()
+
 
 					flyby.removeActor(surf_actor)
 		else:
