@@ -212,6 +212,7 @@ def GetActor(surf):
     surfActor = vtk.vtkActor()
     surfActor.SetMapper(surfMapper)
 
+
     return surfActor
 def GetTransform(rotationAngle, rotationVector):
     transform = vtk.vtkTransform()
@@ -330,7 +331,6 @@ def GetPropertyActor(surf, property_name):
     return surfMapper
 
 def GetNormalsActor(surf):
-
     try:
 
         normals = vtk.vtkPolyDataNormals()
@@ -340,7 +340,6 @@ def GetNormalsActor(surf):
         normals.SplittingOff();
         normals.Update()
         surf = normals.GetOutput()
-
         # mapper
         surf_actor = GetActor(surf)
 
@@ -391,6 +390,7 @@ def GetNormalsActor(surf):
             colored_points.SetNumberOfComponents(3)
 
             normals = surf.GetPointData().GetArray('Normals')
+
             for pid in range(surf.GetNumberOfPoints()):
                 normal = np.array(normals.GetTuple(pid))
                 rgb = (normal*0.5 + 0.5)*255.0
