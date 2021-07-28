@@ -32,7 +32,7 @@ RUN mkdir /app/data/merged
 RUN mkdir /app/data/out
 
 RUN chmod +x fly-by-cnn-2.1.4/src/sh/compute_ULMS.sh
-RUN chmod +x fly-by-cnn-2.1.4/src/sh/MergingSeparating.sh
+RUN chmod +x fly-by-cnn-2.1.4/src/sh/compute_MergingSeparating.sh
 
 ENV PATH=/app/fly-by-cnn-2.1.4/src/sh/:$PATH
 
