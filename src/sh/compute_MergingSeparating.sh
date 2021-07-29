@@ -85,7 +85,7 @@ merged_files=($out_merge/*)
 for file in "${merged_files[@]}"; do
     filename=$(basename $file)
     filename="${filename%.*}"
-    mkdir $out_separate/$filename/
+    mkdir $out_separate/$filename
 
     python3 $src_code/py/PSCP/separate.py --surf $file --universalID $universalID --out $out_separate/$filename
 done
