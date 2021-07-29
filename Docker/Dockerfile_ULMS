@@ -2,25 +2,25 @@ FROM dcbia/fly-by-cnn:latest
 
 WORKDIR /app
 
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.4/requirements.txt
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.8/requirements.txt
 RUN pip3 install -r /app/requirements.txt
 
-RUN wget https://github.com/RomainUSA/fly-by-cnn/archive/refs/tags/2.1.4.zip
-RUN unzip 2.1.4.zip
-RUN rm -rf 2.1.4.zip 
+RUN wget https://github.com/RomainUSA/fly-by-cnn/archive/refs/tags/2.1.8.zip
+RUN unzip 2.1.8.zip
+RUN rm -rf 2.1.8.zip 
 
 
 RUN mkdir /app/models
 WORKDIR /app/models
 
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.4/nnLU_model_5.hdf5
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.4/model_features.zip
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.8/nnLU_model_5.hdf5
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.8/model_features.zip
 RUN unzip model_features.zip
 RUN rm -rf model_features.zip
 
 
 WORKDIR /app
-RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.4/groundtruth.zip
+RUN wget https://github.com/RomainUSA/fly-by-cnn/releases/download/2.1.8/groundtruth.zip
 RUN unzip groundtruth.zip
 RUN rm -rf groundtruth.zip
 
@@ -31,10 +31,10 @@ RUN mkdir /app/data/out_tmp
 RUN mkdir /app/data/merged
 RUN mkdir /app/data/out
 
-RUN chmod +x fly-by-cnn-2.1.4/src/sh/compute_ULMS.sh
-RUN chmod +x fly-by-cnn-2.1.4/src/sh/compute_MergingSeparating.sh
+RUN chmod +x fly-by-cnn-2.1.8/src/sh/compute_ULMS.sh
+RUN chmod +x fly-by-cnn-2.1.8/src/sh/compute_MergingSeparating.sh
 
-ENV PATH=/app/fly-by-cnn-2.1.4/src/sh/:$PATH
+ENV PATH=/app/fly-by-cnn-2.1.8/src/sh/:$PATH
 
 
 

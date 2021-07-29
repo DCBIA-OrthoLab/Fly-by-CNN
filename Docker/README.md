@@ -40,7 +40,7 @@ Output:
 - Dental crown model with the universal labels on each tooth (vtk file)
 
 ```
-docker run --rm -v */my/input/file*:/app/data/input/P1_teeth.vtk -v */my/output/folder*:/app/data/out ulms:latest python3 fly-by-cnn-2.1.4/src/py/universal_labeling.py --surf /app/data/input/P1_teeth.vtk --label_groundtruth /app/groundtruth --model_feature /app/models/model_features --model_LU /app/models/nnLU_model_5.hdf5 --out_feature /app/data/feature.nrrd --out /app/data/out
+docker run --rm -v */my/input/file*:/app/data/input/P1_teeth.vtk -v */my/output/folder*:/app/data/out ulms:latest python3 fly-by-cnn-2.1.8/src/py/universal_labeling.py --surf /app/data/input/P1_teeth.vtk --label_groundtruth /app/groundtruth --model_feature /app/models/model_features --model_LU /app/models/nnLU_model_5.hdf5 --out_feature /app/data/feature.nrrd --out /app/data/out
 ```
 
 **For the Merging and Separating:**
@@ -53,7 +53,7 @@ Output:
 - A merged model with the teeth and roots labeled based on the universal labels and individual teeth and roots (vtk files)
 
 ```
-docker run --rm -v */my/input/file*:/app/data/input/P1_teeth_uid.vtk -v */my/input/file*:/app/data/input/lower_P1_scan_lower_RCSeg.nii.gz -v */my/output/folder*:/app/data/out ulms:latest bash fly-by-cnn-2.1.4/src/sh/compute_MergingSeparating.sh --src_code fly-by-cnn-2.1.4/src --input_file_uid /app/data/input/P1_teeth_uid.vtk --input_file_root /app/data/input/lower_P1_scan_lower_RCSeg.nii.gz --out_tmp /app/data/out_tmp --out_merge /app/data/merged --out_separate /app/data/out
+docker run --rm -v */my/input/file*:/app/data/input/P1_teeth_uid.vtk -v */my/input/file*:/app/data/input/lower_P1_scan_lower_RCSeg.nii.gz -v */my/output/folder*:/app/data/out ulms:latest bash fly-by-cnn-2.1.8/src/sh/compute_MergingSeparating.sh --src_code fly-by-cnn-2.1.8/src --input_file_uid /app/data/input/P1_teeth_uid.vtk --input_file_root /app/data/input/lower_P1_scan_lower_RCSeg.nii.gz --out_tmp /app/data/out_tmp --out_merge /app/data/merged --out_separate /app/data/out
 ```
 
 **For the ULMS:**
@@ -66,5 +66,5 @@ Output:
 - A merged model with the teeth and roots labeled based on the universal labels and individual teeth and roots (vtk files)
 
 ```
-docker run --rm -v */my/input/file*:/app/data/input/P1_teeth.vtk -v */my/input/file*:/app/data/input/lower_P1_scan_lower_RCSeg.nii.gz -v */my/output/folder*:/app/data/out ulms:latest bash fly-by-cnn-2.1.4/src/sh/compute_ULMS.sh --src_code fly-by-cnn-2.1.4/src --input_file_surf /app/data/input/P1_teeth.vtk --label_GT_dir /app/groundtruth --model_ft /app/models/model_features --model_LU /app/models/nnLU_model_5.hdf5 --out_feature /app/data/feature.nrrd --output_dir_uid /app/data/uid --input_file_root /app/data/input/lower_P1_scan_lower_RCSeg.nii.gz --out_tmp /app/data/out_tmp --out_merge /app/data/merged --out_separate /app/data/out
+docker run --rm -v */my/input/file*:/app/data/input/P1_teeth.vtk -v */my/input/file*:/app/data/input/lower_P1_scan_lower_RCSeg.nii.gz -v */my/output/folder*:/app/data/out ulms:latest bash fly-by-cnn-2.1.8/src/sh/compute_ULMS.sh --src_code fly-by-cnn-2.1.8/src --input_file_surf /app/data/input/P1_teeth.vtk --label_GT_dir /app/groundtruth --model_ft /app/models/model_features --model_LU /app/models/nnLU_model_5.hdf5 --out_feature /app/data/feature.nrrd --output_dir_uid /app/data/uid --input_file_root /app/data/input/lower_P1_scan_lower_RCSeg.nii.gz --out_tmp /app/data/out_tmp --out_merge /app/data/merged --out_separate /app/data/out
 ```

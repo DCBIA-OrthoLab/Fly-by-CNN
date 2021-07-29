@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 
 input_dir_json=$1
