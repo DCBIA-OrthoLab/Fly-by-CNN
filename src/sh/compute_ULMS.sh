@@ -62,7 +62,7 @@ model_LU="${model_LU:-/app/models/nnLU_model_5.hdf5 }"
 out_feature="${out_feature:-/app/data/feature.nrrd}"
 output_dir_uid="${output_dir_uid:-/app/data/uid}"
 out_tmp="${out_tmp:-/app/data/out_tmp}"
-out_merge="${out_merge:-/app/data/out}"
+out_merge="${out_merge:-/app/data/merged}"
 
 
 echo "==================================="
@@ -123,7 +123,7 @@ merged_files=($out_merge/*)
 for file in "${merged_files[@]}"; do
     filename=$(basename $file)
     filename="${filename%.*}"
-    mkdir $out_separate/$filename
+    mkdir $out_separate/$filename/
 
     python3 $src_code/py/PSCP/separate.py --surf $file --universalID $universalID --out $out_separate/$filename
 done
