@@ -41,6 +41,10 @@ while [ "$1" != "" ]; do
 done
 
 
+out_tmp="${out_tmp:-/app/data/out_tmp}"
+out_merge="${out_merge:-/app/data/out}"
+
+
 echo "==================================="
 echo 
 echo "Transforming itk files to vtk files..."

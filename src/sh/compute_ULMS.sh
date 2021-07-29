@@ -56,6 +56,15 @@ while [ "$1" != "" ]; do
 done
 
 
+label_GT_dir="${label_GT_dir:-/app/groundtruth}"
+model_ft="${model_ft:-/app/models/model_features}"
+model_LU="${model_LU:-/app/models/nnLU_model_5.hdf5 }"
+out_feature="${out_feature:-/app/data/feature.nrrd}"
+output_dir_uid="${output_dir_uid:-/app/data/uid}"
+out_tmp="${out_tmp:-/app/data/out_tmp}"
+out_merge="${out_merge:-/app/data/out}"
+
+
 echo "==================================="
 echo 
 echo "Universal Labeling"
