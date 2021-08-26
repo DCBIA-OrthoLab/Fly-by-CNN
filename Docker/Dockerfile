@@ -1,6 +1,7 @@
 FROM tensorflow/tensorflow:2.4.1-gpu
 
 RUN apt-get update && apt-get install -y \
+	git \
 	libx11-6 \
 	libgl1 \
 	libopengl0 \
@@ -16,8 +17,7 @@ RUN pip install itk sklearn pandas matplotlib
 
 WORKDIR /app
 
-RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/archive/refs/tags/2.4.zip
-RUN unzip 2.4.zip
+RUN git clone --branch 2.5 https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
 
 RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.4/u_seg_nn_3.2.zip
 RUN unzip u_seg_nn_3.2.zip
