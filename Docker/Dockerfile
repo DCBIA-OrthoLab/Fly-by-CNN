@@ -17,11 +17,10 @@ RUN pip install itk sklearn pandas matplotlib
 
 WORKDIR /app
 
-RUN git clone --branch 2.5 https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
+RUN git clone --branch 2.6 https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
 
 RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.4/u_seg_nn_3.2.zip
 RUN unzip u_seg_nn_3.2.zip
-
 
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.6/dist-packages/vtkmodules/
 ENV MESA_GL_VERSION_OVERRIDE=3.2

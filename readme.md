@@ -135,7 +135,7 @@ options:
 --label_GT_dir                Folder containing the template for the Upper/Lower classification.
 --model_ft                    Path to the feature model .
 --model_LU                    Path to the LowerUpper classification model.
---out_ft                      Output of the fearure.
+--out_feature                 Output of the feature.
 --output_dir_uid              Output directory of the teeth with the universal labels.
 --input_file_root             Root canal segmentation file.
 --out_tmp                     Temporary output folder.

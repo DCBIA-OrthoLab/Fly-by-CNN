@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 Help()
 {
@@ -12,7 +12,7 @@ echo "--input_file_surf             Input file surface with only the teeth."
 echo "--label_GT_dir                Folder containing the template for the Upper/Lower classification."
 echo "--model_ft                    Path to the feature model ."
 echo "--model_LU                    Path to the LowerUpper classification model."
-echo "--out_ft                      Output of the fearure."
+echo "--out_feature                 Output of the feature."
 echo "--output_dir_uid              Output directory of the teeth with the universal labels."
 echo "--input_file_root             Root canal segmentation file."
 echo "--out_tmp                     Temporary output folder."
@@ -32,8 +32,8 @@ while [ "$1" != "" ]; do
             model_ft=$1;;
         --model_LU )  shift
             model_LU=$1;;
-        --out_ft )  shift
-            out_ft=$1;;
+        --out_feature )  shift
+            out_feature=$1;;
         --output_dir_uid )  shift
             output_dir_uid=$1;;
         --input_file_root )  shift
@@ -56,6 +56,15 @@ while [ "$1" != "" ]; do
 done
 
 
+label_GT_dir="${label_GT_dir:-/app/groundtruth}"
+model_ft="${model_ft:-/app/models/model_features}"
+model_LU="${model_LU:-/app/models/nnLU_model_5.hdf5 }"
+out_feature="${out_feature:-/app/data/feature.nrrd}"
+output_dir_uid="${output_dir_uid:-/app/data/uid}"
+out_tmp="${out_tmp:-/app/data/out_tmp}"
+out_merge="${out_merge:-/app/data/merged}"
+
+
 echo "==================================="
 echo 
 echo "Universal Labeling"
@@ -66,7 +75,7 @@ filename=$(basename $input_file_surf)
 filename="${filename%.*}"
 filename="${filename%.*}"
 
-python3 $src_code/py/universal_labeling.py --surf $input_file_surf --label_groundtruth $label_GT_dir --model_feature $model_ft --model_LU $model_LU --out_feature $out_ft --out $output_dir_uid/$filename"_uid.vtk"
+python3 $src_code/py/universal_labeling.py --surf $input_file_surf --label_groundtruth $label_GT_dir --model_feature $model_ft --model_LU $model_LU --out_feature $out_feature --out $output_dir_uid/$filename"_uid.vtk"
 
 
 echo "==================================="

@@ -99,6 +99,11 @@ def ReadSurf(fileName):
         reader.SetFileName(fileName)
         reader.Update()
         surf = reader.GetOutput()
+    elif extension == ".vtp":
+        reader = vtk.vtkXMLPolyDataReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()    
     elif extension == ".stl":
         reader = vtk.vtkSTLReader()
         reader.SetFileName(fileName)
@@ -152,7 +157,7 @@ def WriteSurf(surf, fileName):
     writer.Update()
 
 
-def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
+def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     surf_copy = vtk.vtkPolyData()
     surf_copy.DeepCopy(surf)
     surf = surf_copy
@@ -160,10 +165,11 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
     shapedatapoints = surf.GetPoints()
     
     #calculate bounding box
-    bounds = [0.0] * 6
     mean_v = [0.0] * 3
     bounds_max_v = [0.0] * 3
+
     bounds = shapedatapoints.GetBounds()
+
     mean_v[0] = (bounds[0] + bounds[1])/2.0
     mean_v[1] = (bounds[2] + bounds[3])/2.0
     mean_v[2] = (bounds[4] + bounds[5])/2.0
@@ -183,7 +189,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = -1):
         shape_points = shape_points - mean_arr
 
     #Computing scale factor if it is not provided
-    if(scale_factor == -1):
+    if(scale_factor == None):
         bounds_max_arr = np.array(bounds_max_v)
         scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
         # print(scale_factor)
@@ -205,6 +211,7 @@ def GetActor(surf):
 
     surfActor = vtk.vtkActor()
     surfActor.SetMapper(surfMapper)
+
 
     return surfActor
 def GetTransform(rotationAngle, rotationVector):
@@ -247,7 +254,8 @@ def RandomRotation(surf):
     rotationVector = rotationVector/np.linalg.norm(rotationVector)
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
-def GetUnitSurf(surf, mean_arr = None, scale_factor = -1):
+def GetUnitSurf(surf, mean_arr = None, scale_factor = None):
+  print(mean_arr, scale_factor)
   surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor)
   return surf
 
@@ -323,7 +331,6 @@ def GetPropertyActor(surf, property_name):
     return surfMapper
 
 def GetNormalsActor(surf):
-
     try:
 
         normals = vtk.vtkPolyDataNormals()
@@ -333,7 +340,6 @@ def GetNormalsActor(surf):
         normals.SplittingOff();
         normals.Update()
         surf = normals.GetOutput()
-
         # mapper
         surf_actor = GetActor(surf)
 
@@ -384,6 +390,7 @@ def GetNormalsActor(surf):
             colored_points.SetNumberOfComponents(3)
 
             normals = surf.GetPointData().GetArray('Normals')
+
             for pid in range(surf.GetNumberOfPoints()):
                 normal = np.array(normals.GetTuple(pid))
                 rgb = (normal*0.5 + 0.5)*255.0
@@ -568,7 +575,7 @@ def GetTubeFilter(vtkpolydata):
 
     tubeFilter = vtk.vtkTubeFilter()
     tubeFilter.SetNumberOfSides(50)
-    tubeFilter.SetRadius(0.008)
+    tubeFilter.SetRadius(0.01)
     tubeFilter.SetInputData(vtkpolydata)
     tubeFilter.Update()
 
