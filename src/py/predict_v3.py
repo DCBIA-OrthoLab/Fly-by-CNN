@@ -70,7 +70,7 @@ real_labels = vtk.vtkIntArray()
 real_labels.SetNumberOfComponents(1)
 real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
 real_labels.SetName("RegionId")
-real_labels.Fill(0)
+real_labels.Fill(-1)
 
 for pointId,prediction in enumerate(prediction_array_count):
 	if np.max(prediction) > 0:
