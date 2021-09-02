@@ -70,7 +70,7 @@ real_labels = vtk.vtkIntArray()
 real_labels.SetNumberOfComponents(1)
 real_labels.SetNumberOfTuples(surf.GetNumberOfPoints())
 real_labels.SetName("RegionId")
-real_labels.Fill(-1)
+real_labels.Fill(0)
 
 for pointId,prediction in enumerate(prediction_array_count):
 	if np.max(prediction) > 0:
@@ -128,7 +128,7 @@ polydatawriter.Write()
 
 print("Eroding...")
 #Erode the gum label 
-post_process.ErodeLabel(surf, real_labels, -1)
+post_process.ErodeLabel(surf, real_labels, -1, ignore_label=0)
 
 print("Writting:", outfilename)
 polydatawriter = vtk.vtkPolyDataWriter()

@@ -338,7 +338,7 @@ def ConnectivityLabeling(vtkdata, labels, label, start_label):
 				labels.SetTuple(int(cpid), (start_label,))
 			start_label += 1
 
-def ErodeLabel(vtkdata, labels, label):
+def ErodeLabel(vtkdata, labels, label, ignore_label=None):
 	
 	pid_labels = []
 	for pid in range(labels.GetNumberOfTuples()):
@@ -361,7 +361,7 @@ def ErodeLabel(vtkdata, labels, label):
 
 			for npid in neighbor_pids:
 				neighbor_label = labels.GetTuple(npid)[0]
-				if neighbor_label != label:
+				if neighbor_label != label and (ignore_label == None or neighbor_label != ignore_label):
 					all_neighbor_pids.append(pid)
 					all_neighbor_labels.append(neighbor_label)
 					is_neighbor = True
@@ -424,6 +424,7 @@ if __name__ == '__main__':
 	parser.add_argument('--connectivity', type=bool, help='Label all elements with unique labels', default=False)
 	parser.add_argument('--connectivity_label', type=int, help='Connectivity label', default=2)
 	parser.add_argument('--erode', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
+	parser.add_argument('--ignore', type=int, help='Ignore label when eroding', default=None)
 	parser.add_argument('--dilate', type=bool, help='Erode label until it dissapears changing it with the neighboring label', default=False)
 	parser.add_argument('--dilate_iterations', type=int, help='Number of dilate iterations', default=2)
 	parser.add_argument('--label', type=int, help='Eroding/dilating/ReLabel label', default=0)
@@ -457,7 +458,7 @@ if __name__ == '__main__':
 
 	if(args.erode):
 		print("Eroding...")
-		ErodeLabel(surf, labels, args.label)
+		ErodeLabel(surf, labels, args.label, args.ignore)
 
 	if(args.dilate):
 		print("Dilate...")
