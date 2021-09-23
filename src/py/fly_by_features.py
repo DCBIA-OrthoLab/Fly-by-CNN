@@ -410,7 +410,7 @@ if __name__ == '__main__':
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
 
 	input_group.add_argument('--n_rotations', type=int, help='Number of additional random rotations', default=0)
-	input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= -1)
+	input_group.add_argument('--scale_factor', type=float, help='Scale the surface by this vale', default= None)
 	input_group.add_argument('--bounds', type=float,  nargs="+", help='Scale the surface in this box', default= None)
 	input_group.add_argument('--translate', nargs="+", type=float, help='Center the surface at this point', default=None)
 	input_group.add_argument('--fiberBundle', type=bool, help='If input directory is a fiber tract', default=False)

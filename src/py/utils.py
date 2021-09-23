@@ -186,15 +186,16 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     #centering points of the shape
     if mean_arr is None:
         mean_arr = np.array(mean_v)
-        shape_points = shape_points - mean_arr
+    print("Mean:", mean_arr)
+    shape_points = shape_points - mean_arr
 
     #Computing scale factor if it is not provided
-    if(scale_factor == None):
+    if(scale_factor is None):
         bounds_max_arr = np.array(bounds_max_v)
         scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
-        # print(scale_factor)
 
     #scale points of the shape by scale factor
+    print("Scale:", scale_factor)
     shape_points_scaled = np.multiply(shape_points, scale_factor)
 
     #assigning scaled points back to shape
@@ -255,7 +256,6 @@ def RandomRotation(surf):
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
 def GetUnitSurf(surf, mean_arr = None, scale_factor = None):
-  print(mean_arr, scale_factor)
   surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor)
   return surf
 
