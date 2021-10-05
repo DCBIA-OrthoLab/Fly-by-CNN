@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<executable>
+  <category>Examples</category>
+  <index>0</index>
+  <title>flybyscripte</title>
+  <description><![CDATA[CLI module that can be built into an extension]]></description>
+  <version>0.1.0.</version>
+  <documentation-url>https://github.com/username/project</documentation-url>
+  <license/>
+  <contributor>Mathieu Leclercq</contributor>
+  <acknowledgements><![CDATA[...]]></acknowledgements>
+
+  <parameters>
+
+
+    <label>IO</label>
+    <description><![CDATA[Input/output parameters]]></description>
+
+    <string>
+      <name>surfaceFolder</name>
+      <label>surfaceFolder</label>
+      <index>0</index>
+      <description>directory for surface files.</description>
+    </string>
+
+    <string>
+      <name>outputFolder</name>
+      <label>outputFolder</label>
+      <index>1</index>
+      <description>directory for output files.</description>
+    </string>
+
+    <string>
+      <name>prop</name>
+      <label>prop</label>
+      <index>2</index>
+      <description>name of property</description>
+    </string>
+
+    <integer>
+      <name>nbRotation</name>
+      <label>nbRotation</label>
+      <index>3</index>
+      <description>Number of rotations</description>
+    </integer>
+
+
+
+  </parameters>
+</executable>
