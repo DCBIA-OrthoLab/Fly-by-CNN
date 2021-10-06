@@ -404,10 +404,22 @@ def ReLabel(surf, labels, label, relabel):
 		if labels.GetTuple(pid)[0] == label:
 			labels.SetTuple(pid, (relabel,))
 
-def Threshold(vtkdata, labels, threshold_min, threshold_max):
+def ThresholdPoints(vtkdata, array_name, threshold_min, threshold_max):
+	threshold = vtk.vtkThresholdPoints()
+	threshold.SetInputData(vtkdata)
+	threshold.ThresholdBetween(threshold_min, threshold_max)
+	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, array_name)
+	threshold.Update()
+
+	return threshold.GetOutput()
+
+def Threshold(vtkdata, array_name, threshold_min, threshold_max):
 	
+	if type(array_name) != str:
+		raise Exception("array_name is not a string")
+
 	threshold = vtk.vtkThreshold()
-	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, "RegionId")
+	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, array_name)
 	threshold.SetInputData(vtkdata)
 	threshold.ThresholdBetween(threshold_min,threshold_max)
 	threshold.Update()

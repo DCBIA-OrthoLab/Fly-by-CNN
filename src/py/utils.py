@@ -6,9 +6,10 @@ import os
 import sys
 import itk
 from readers import OFFReader
-
+import pandas as pd
 from multiprocessing import Pool, cpu_count
 from vtk.util.numpy_support import vtk_to_numpy
+import fly_by_features as fbf
 
 def normalize_points(poly, radius):
     polypoints = poly.GetPoints()
@@ -613,3 +614,42 @@ def ExtractFiber(surf, list_random_id) :
     tubefilter = GetTubeFilter(geometryFilter.GetOutput())
 
     return tubefilter
+
+def Write(vtkdata, output_name):
+    outfilename = output_name
+    print("Writting:", outfilename)
+    polydatawriter = vtk.vtkPolyDataWriter()
+    polydatawriter.SetFileName(outfilename)
+    polydatawriter.SetInputData(vtkdata)
+    polydatawriter.Write()
+
+def json2vtk(jsonfile,number_landmarks,radius_sphere,outdir):
+    
+    json_file = pd.read_json(jsonfile)
+    json_file.head()
+    markups = json_file.loc[0,'markups']
+    controlPoints = markups['controlPoints']
+    number_landmarks = len(controlPoints)
+    L_landmark_position = []
+    
+    for i in range(number_landmarks):
+        L_landmark_position.append(controlPoints[i]["position"])
+        # Create a sphere
+        sphereSource = vtk.vtkSphereSource()
+        sphereSource.SetCenter(L_landmark_position[i][0],L_landmark_position[i][1],L_landmark_position[i][2])
+        sphereSource.SetRadius(radius_sphere)
+
+        # Make the surface smooth.
+        sphereSource.SetPhiResolution(100)
+        sphereSource.SetThetaResolution(100)
+        sphereSource.Update()
+        vtk_landmarks = vtk.vtkAppendPolyData()
+        vtk_landmarks.AddInputData(sphereSource.GetOutput())
+        vtk_landmarks.Update()
+
+        basename = os.path.basename(jsonfile).split(".")[0]
+        filename = basename + "_landmarks.vtk"
+        output = os.path.join(outdir, filename)
+        Write(vtk_landmarks.GetOutput(), output)
+    return output
+    
