@@ -33,14 +33,7 @@ def main():
   print("Done")
   return
 
-def GetArguments():  
-  parser = argparse.ArgumentParser(description="Apply fly-by features")
-  parser.add_argument("surfaceFolder")
-  parser.add_argument("outputFolder")
-  parser.add_argument("prop")
-  parser.add_argument("nbRotation")
-  args = parser.parse_args()
-  return args
+
 
 def GetFiles(path):
   filesList = os.listdir(path)
@@ -108,7 +101,6 @@ def ApplyFlyby2(flyby_features,surf,index,indexRotation, outputFolder, prop):
   img = GetImage(out_features_np)
 
   fileName = outputFolder+"/out"+ str(index+1)+"_rot"+str(indexRotation+1) + "_" + prop 
-
   if os.path.isfile(fileName+".nrrd"):
     fileName += '(1)'
   fileName += ".nrrd"
@@ -118,6 +110,14 @@ def ApplyFlyby2(flyby_features,surf,index,indexRotation, outputFolder, prop):
 
   
 
+def GetArguments():  
+  parser = argparse.ArgumentParser(description="Apply fly-by features")
+  parser.add_argument("surfaceFolder")
+  parser.add_argument("outputFolder")
+  parser.add_argument("prop")
+  parser.add_argument("nbRotation")
+  args = parser.parse_args()
+  return args
 
 def BlockPrint():
   sys.stdout = open(os.devnull, 'w')

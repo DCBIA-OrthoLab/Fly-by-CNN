@@ -59,7 +59,11 @@ class first_moduleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self._updatingGUIFromParameterNode = False
     self.fileName = ""
     self.surfaceFolder = ""
-    self.outputFolder = ""
+    self.outputFolder  = ""
+    self.lArrays = []
+    self.property = "" 
+
+
 
   def setup(self):
     """
@@ -97,6 +101,8 @@ class first_moduleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.rotationSlider.valueChanged.connect(self.onRotationSlider)
     self.ui.browseSurfaceButton.connect('clicked(bool)',self.onBrowseSurfaceButton)
     self.ui.surfaceLineEdit.textChanged.connect(self.onEditSurfaceLine)
+    self.ui.extractButton.connect('clicked(bool)',self.onExtractButton)
+    self.ui.propertyComboBox.currentTextChanged.connect(self.onPropertyChanged)
 
     # Outputs 
     self.ui.browseOutputButton.connect('clicked(bool)',self.onBrowseOutputButton)
@@ -109,6 +115,8 @@ class first_moduleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.successLabel.setHidden(True)
     self.ui.openOutButton.setHidden(True)
     self.ui.cancelButton.setHidden(True)
+    self.ui.propertyComboBox.setHidden(True)
+
 
 
     # Make sure parameter node is initialized (needed for module reload)
@@ -220,7 +228,7 @@ class first_moduleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.logic.progress = self.logic.GetProgress()
     if self.logic.progress == 100:
       self.onProcessDone()
-    self.ui.progressBar.setValue(self.logic.progress)
+    self.ui.progressBar.setValue(self.logic.progress) 
 
   def onProcessDone(self):
     self.ui.applyChangesButton.setEnabled(True)
@@ -235,10 +243,35 @@ class first_moduleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def onOutButton(self):
     webbrowser.open(self.outputFolder)
 
+  def onExtractButton(self):
+    try:
+      path = self.surfaceFolder + '/'+ os.listdir(self.surfaceFolder)[0]
+      surf = ReadSurf(path)
+      print(path)
+
+      nbArrays  = surf.GetPointData().GetNumberOfArrays()
+      self.lArrays = []
+      for array in range (nbArrays):
+        self.lArrays.append(surf.GetPointData().GetArrayName(array))
+      self.ui.propertyComboBox.addItems(self.lArrays)
+      self.ui.propertyComboBox.setHidden(False)
+
+    except:
+      print('error')
+      msg = qt.QMessageBox()       
+      msg.setText("Could not find valid files. Surface directory must contain only compatible surfaces.")
+      print('Error: Check surface directory.')
+      msg.setWindowTitle("Error")
+      msg.exec_()
+
+
+  def onPropertyChanged(self):
+    self.property = self.ui.propertyComboBox.currentText
+    print(self.property)
 
   def onApplyChangesButton(self):
 
-    if os.path.isdir(self.surfaceFolder) and os.path.isdir(self.outputFolder):
+    if os.path.isdir(self.surfaceFolder) and os.path.isdir(self.outputFolder) and self.property != '':
       self.ui.applyChangesButton.setEnabled(False)
       self.ui.progressBar.setEnabled(True)
       self.logic = first_moduleLogic(self.surfaceFolder,self.outputFolder,self.ui.propertyComboBox.currentText, self.ui.rotationSpinBox.value)
@@ -261,7 +294,11 @@ class first_moduleWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         msg.setText("Output directory : \nIncorrect path.")
         print('Error: Incorrect path for output directory.')
         self.ui.outputLineEdit.setText('')
-        print(f'output folder : {self.surfaceFolder}')        
+        print(f'output folder : {self.surfaceFolder}')
+
+      elif self.property == '':
+        msg.setText("Please select a property.")
+        print('Error: please select a property.')
 
       msg.setWindowTitle("Error")
       msg.exec_()
@@ -417,9 +454,9 @@ class first_moduleLogic(ScriptedLoadableModuleLogic):
     self.GetNbOperation()
     print('nb operation : ', self.nbOperation)
 
-    flybyProcess = slicer.modules.flybyscripte
-    self.cliNode = slicer.cli.run(flybyProcess,None, parameters)
-    
+    flybyProcess = slicer.modules.flyby_cli
+    self.cliNode = slicer.cli.run(flybyProcess,None, parameters)    
+    return flybyProcess
 
 
   def GetProgress(self):
@@ -429,7 +466,10 @@ class first_moduleLogic(ScriptedLoadableModuleLogic):
 
   def GetNbOperation(self):
     filesList = os.listdir(self.surfaceFolder)
-    self.nbOperation = len(filesList) * self.nbRotation
+    if self.prop != "":
+      self.nbOperation =  2 * len(filesList) * self.nbRotation
+    else: 
+      self.nbOperation = len(filesList) * self.nbRotation
 
 
 
@@ -491,8 +531,57 @@ class first_moduleTest(ScriptedLoadableModuleTest):
 
     self.delayDisplay('Test passed')
 
-def BlockPrint():
-  sys.stdout = open(os.devnull, 'w')
+def ReadSurf(fileName):   # Copied from utils.py (https://github.com/DCBIA-OrthoLab/fly-by-cnn/tree/master/src/py)
 
-def EnablePrint():
-  sys.stdout = sys.__stdout__
+    fname, extension = os.path.splitext(fileName)
+    extension = extension.lower()
+    if extension == ".vtk":
+        
+        reader = vtk.vtkPolyDataReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()
+    elif extension == ".vtp":
+        reader = vtk.vtkXMLPolyDataReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()    
+    elif extension == ".stl":
+        reader = vtk.vtkSTLReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()
+    elif extension == ".off":
+        reader = OFFReader()
+        reader.SetFileName(fileName)
+        reader.Update()
+        surf = reader.GetOutput()
+    elif extension == ".obj":
+        if os.path.exists(fname + ".mtl"):
+            obj_import = vtk.vtkOBJImporter()
+            obj_import.SetFileName(fileName)
+            obj_import.SetFileNameMTL(fname + ".mtl")
+            textures_path = os.path.normpath(os.path.dirname(fname) + "/../images")
+            if os.path.exists(textures_path):
+                obj_import.SetTexturePath(textures_path)
+            obj_import.Read()
+
+            actors = obj_import.GetRenderer().GetActors()
+            actors.InitTraversal()
+            append = vtk.vtkAppendPolyData()
+
+            for i in range(actors.GetNumberOfItems()):
+                surfActor = actors.GetNextActor()
+                append.AddInputData(surfActor.GetMapper().GetInputAsDataSet())
+            
+            append.Update()
+            surf = append.GetOutput()
+            
+        else:
+            print('unknown extension')
+            reader = vtk.vtkOBJReader()
+            reader.SetFileName(fileName)
+            reader.Update()
+            surf = reader.GetOutput()
+
+    return surf
