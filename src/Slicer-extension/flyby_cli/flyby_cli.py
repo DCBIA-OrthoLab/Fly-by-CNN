@@ -15,7 +15,9 @@ def main():
   nbRotation = int(args.nbRotation)
   filesList = GetFiles(surfaceFolder)
   nbOperation = len(filesList) * nbRotation
-  flyby = GenerateFB()
+  sphere = fbf.CreateIcosahedron(radius=2.75, sl=3)
+  flyby = fbf.FlyByGenerator(sphere, resolution=512, visualize=False, use_z=True, split_z=True)
+  flyby_features = fbf.FlyByGenerator(sphere, 512, visualize=False)
   a = 0
   for index in range(len(filesList)): 
     surf = GetSurf(surfaceFolder,filesList,index)
@@ -23,6 +25,7 @@ def main():
       a += 1
       surfRot = fbf.RandomRotation(surf)
       ApplyFlyby(flyby,surfRot[0],index,indexRotation, outputFolder)
+      ApplyFlyby2(flyby_features,surfRot[0],index,indexRotation, outputFolder, prop)
       progress = math.floor(100 * (a/nbOperation)) # percentage
       print(f'Progress: {progress}%')
       print('\n\n')
@@ -66,16 +69,55 @@ def ApplyFlyby(flyby,surf,index,indexRotation, outputFolder):
   
   flyby.removeActors()
 
-  BlockPrint()
   img = fbf.GetImage(img_np)
-  EnablePrint()
 
-  fileName =  outputFolder+"/out_"+str(index+1)+"_rot_"+str(indexRotation+1)
+  fileName = outputFolder+"/out"+ str(index+1)+"_rot"+str(indexRotation+1) + "_"
   if os.path.isfile(fileName+".nrrd"):
     fileName += '(1)'
   fileName += ".nrrd"
   print(f'Output file Name : {fileName}')
   fbf.WriteNrrd(img, fileName)
+
+
+
+def ApplyFlyby2(flyby_features,surf,index,indexRotation, outputFolder, prop): 
+  unit_surf = fbf.GetUnitSurf(surf)
+  surf_actor = fbf.GetPointIdMapActor(unit_surf)
+  flyby_features.addActor(surf_actor)
+
+  out_point_ids_rgb_np = flyby_features.getFlyBy()
+
+  flyby_features.removeActors()
+  
+  """
+  out_point_id_img = fbf.GetImage(out_point_ids_rgb_np)
+  
+  out_filename = outputFolder+"/out_"+ "_point_id_map" + str(index+1)+"_rot_"+str(indexRotation+1)
+  if os.path.isfile(out_filename + ".nrrd"):
+    out_filename += '(1)'
+  out_filename += ".nrrd"
+
+  print("Writing:", out_filename)
+
+  fbf.WriteNrrd(out_point_id_img)
+
+  """
+
+  out_features_np = ExtractPointFeatures(surf, out_point_ids_rgb_np, prop,0)
+
+  img = GetImage(out_features_np)
+
+  fileName = outputFolder+"/out"+ str(index+1)+"_rot"+str(indexRotation+1) + "_" + prop 
+
+  if os.path.isfile(fileName+".nrrd"):
+    fileName += '(1)'
+  fileName += ".nrrd"
+  
+  
+  fbf.WriteNrrd(img,fileName)
+
+  
+
 
 def BlockPrint():
   sys.stdout = open(os.devnull, 'w')
@@ -85,6 +127,6 @@ def EnablePrint():
 
 if __name__ == "__main__":
     if len (sys.argv) < 5:
-        print("Usage: flybyscripte <surfaceFolder> <outputFolder> <prop> <nbRotation>")
+        print("Usage: flyby_cli <surfaceFolder> <outputFolder> <prop> <nbRotation>")
         sys.exit (1)
     main()
