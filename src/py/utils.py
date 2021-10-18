@@ -164,7 +164,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     surf = surf_copy
 
     shapedatapoints = surf.GetPoints()
-    
+
     #calculate bounding box
     mean_v = [0.0] * 3
     bounds_max_v = [0.0] * 3
@@ -183,7 +183,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
         p = shapedatapoints.GetPoint(i)
         shape_points.append(p)
     shape_points = np.array(shape_points)
-
+    
     #centering points of the shape
     if mean_arr is None:
         mean_arr = np.array(mean_v)
