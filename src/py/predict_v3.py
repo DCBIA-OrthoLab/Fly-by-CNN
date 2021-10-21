@@ -82,7 +82,7 @@ surf.GetPointData().AddArray(real_labels)
 outfilename = args.out
 outfilename_pre = outfilename
 outfilename_pre = os.path.splitext(outfilename_pre)[0] + "_pre.vtk"
-print("Writting:", outfilename_pre)
+print("Writing:", outfilename_pre)
 polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_pre)
 polydatawriter.SetInputData(surf)
@@ -120,7 +120,7 @@ post_process.ConnectivityLabeling(surf, real_labels, 2, 2)
 out_filename = args.out
 outfilename_connectivity = out_filename
 outfilename_connectivity = os.path.splitext(outfilename_connectivity)[0] + "_connectivity.vtk"
-print("Writting:", outfilename_connectivity)
+print("Writing:", outfilename_connectivity)
 polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_connectivity)
 polydatawriter.SetInputData(surf)
@@ -130,28 +130,30 @@ print("Eroding...")
 #Erode the gum label 
 post_process.ErodeLabel(surf, real_labels, -1, ignore_label=0)
 
-print("Writting:", outfilename)
+print("Writing:", outfilename)
 polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename)
 polydatawriter.SetInputData(surf)
 polydatawriter.Write()
 
-gum_surf = post_process.Threshold(surf, real_labels, 0, 1)
-outfilename_gum = outfilename
-outfilename_gum = os.path.splitext(outfilename_gum)[0] + "_gum.vtk"
-print("Writting:", outfilename_gum)
-polydatawriter = vtk.vtkPolyDataWriter()
-polydatawriter.SetFileName(outfilename_gum)
-polydatawriter.SetInputData(gum_surf)
-polydatawriter.Write()
-
 teeth_surf = post_process.Threshold(surf, real_labels, 2, 999999)
 outfilename_teeth = outfilename
 outfilename_teeth = os.path.splitext(outfilename_teeth)[0] + "_teeth.vtk"
-print("Writting:", outfilename_teeth)
+print("Writing:", outfilename_teeth)
 polydatawriter = vtk.vtkPolyDataWriter()
 polydatawriter.SetFileName(outfilename_teeth)
 polydatawriter.SetInputData(teeth_surf)
+polydatawriter.Write()
+
+print("dilating gum...")
+gum_surf = post_process.DilateLabel(surf, real_labels, 1, iterations=2)
+gum_surf = post_process.Threshold(gum_surf, real_labels, 0, 1)
+outfilename_gum = outfilename
+outfilename_gum = os.path.splitext(outfilename_gum)[0] + "_gum.vtk"
+print("Writing:", outfilename_gum)
+polydatawriter = vtk.vtkPolyDataWriter()
+polydatawriter.SetFileName(outfilename_gum)
+polydatawriter.SetInputData(gum_surf)
 polydatawriter.Write()
 
 end_time = time.time()
