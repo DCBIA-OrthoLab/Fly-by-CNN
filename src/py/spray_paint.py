@@ -70,7 +70,7 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 
     def char_event(self, obj, event):
         key = self.GetInteractor().GetKeySym()
-        print(key)
+        #print(key)
         if key.isnumeric():
             self.value = int(key)
             print("Label is now:", self.value)
