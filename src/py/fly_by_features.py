@@ -15,7 +15,7 @@ import LinearSubdivisionFilter as lsf
 from utils import * 
 
 class FlyByGenerator():
-	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False, rescale_features=False):
+	def __init__(self, sphere=None, resolution=224, visualize=False, use_z=False, split_z=False, rescale_features=False):
 		vtk.vtkObject.GlobalWarningDisplayOff()
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
@@ -32,11 +32,6 @@ class FlyByGenerator():
 		self.use_z = use_z
 		self.split_z = split_z
 		self.rescale_features = rescale_features
-		
-		#sphere_actor = GetActor(sphere)
-		# print(sphere_actor)
-		#sphere_actor.GetProperty().SetRepresentationToWireFrame()
-		#self.renderer.AddActor(sphere_actor)
 
 	def removeActor(self, actor):
 		self.renderer.RemoveActor(actor)
@@ -50,9 +45,15 @@ class FlyByGenerator():
 	def addActor(self, actor):
 		self.renderer.AddActor(actor)
 
-	def getFlyBy(self):
+	def getFlyBy(self, sphere_points = None, view_up_points = None, focal_points = None):
 
-		sphere_points = self.sphere.GetPoints()
+		number_of_points = 0
+		if sphere_points is None:
+			sphere_points = vtk_to_numpy(self.sphere.GetPoints().GetData()) 
+			number_of_points = self.sphere.GetNumberOfPoints()
+		else:
+			number_of_points = len(sphere_points)
+
 		camera = self.renderer.GetActiveCamera()
 
 		if self.visualize:
@@ -65,20 +66,31 @@ class FlyByGenerator():
 
 		img_seq = []
 
-		for i in range(sphere_points.GetNumberOfPoints()):
+		for i in range(number_of_points):
 
-			sphere_point = sphere_points.GetPoint(i)
-			sphere_point_v = normalize_vector(sphere_point)
-
-			if(abs(sphere_point_v[2]) != 1):
-				camera.SetViewUp(0, 0, -1)
-			elif(sphere_point_v[2] == 1):
-				camera.SetViewUp(1, 0, 0)
-			elif(sphere_point_v[2] == -1):
-				camera.SetViewUp(-1, 0, 0)
-
+			sphere_point = sphere_points[i]
 			camera.SetPosition(sphere_point[0], sphere_point[1], sphere_point[2])
-			camera.SetFocalPoint(0, 0, 0)
+
+			if(view_up_points is None):
+				sphere_point_v = normalize_vector(sphere_point)
+
+				if(abs(sphere_point_v[2]) != 1):
+					camera.SetViewUp(0, 0, -1)
+				elif(sphere_point_v[2] == 1):
+					camera.SetViewUp(1, 0, 0)
+				elif(sphere_point_v[2] == -1):
+					camera.SetViewUp(-1, 0, 0)
+			else:
+				view_up_point = view_up_points[i]
+				camera.SetViewUp(view_up_point[0], view_up_point[1], view_up_point[2])
+
+			
+			if focal_points is None:
+				camera.SetFocalPoint(0, 0, 0)
+			else:
+				focal_point = focal_points[i]
+				camera.SetFocalPoint(focal_point[0], focal_point[1], focal_point[2])
+				
 
 			self.renderer.ResetCameraClippingRange()
 
@@ -143,7 +155,6 @@ def main(args):
 			
 	else:
 		surf_filenames = []
-		surf_filenames2 = []
 
 		if(args.dir):
 			replace_dir_name = args.dir
@@ -151,13 +162,7 @@ def main(args):
 			for surf in glob.iglob(normpath, recursive=True):
 				if os.path.isfile(surf) and True in [ext in surf for ext in [".vtk", ".obj", ".stl"]]:
 					surf_filenames.append(os.path.realpath(surf))
-			
-			if(args.dir2):
-				replace_dir_name2 = args.dir2
-				normpath2 = os.path.normpath("/".join([args.dir2, '**', '*']))
-				for surf in sorted(glob.iglob(normpath2, recursive=True)):
-					if os.path.isfile(surf) and True in [ext in surf for ext in [".vtk", ".obj", ".stl"]]:
-						surf_filenames2.append(os.path.realpath(surf))
+
 		elif(args.csv):
 			replace_dir_name = args.csv_root_path
 			with open(args.csv) as csvfile:
@@ -166,11 +171,11 @@ def main(args):
 			for index, row in df.iterrows():
 				surf_filenames.append(row["surf"])
 
-		for index in range(0,len(surf_filenames)):
+		for surf in surf_filenames:
 			fobj = {}
-			fobj["surf"] = surf_filenames[index]
+			fobj["surf"] = surf
 
-			dir_filename = os.path.splitext(surf_filenames[index].replace(replace_dir_name, ''))[0] +  ".nrrd"
+			dir_filename = os.path.splitext(surf.replace(replace_dir_name, ''))[0] +  ".nrrd"
 			fobj["out"] = os.path.normpath("/".join([args.out, dir_filename]))
 	
 			if(args.uuid):
@@ -179,24 +184,8 @@ def main(args):
 			if not os.path.exists(os.path.dirname(fobj["out"])):
 				os.makedirs(os.path.dirname(fobj["out"]))
 			
-			# if args.ow or not os.path.exists(fobj["out"]):
-			# filenames.append(fobj)
-
-
-			if args.dir2:
-			
-				fobj["surf2"] = surf_filenames2[index]
-
-				dir_filename2 = os.path.splitext(surf_filenames2[index].replace(replace_dir_name2, ''))[0] +  ".nrrd"
-				fobj["out2"] = os.path.normpath("/".join([args.out2, dir_filename2]))
-		
-				if(args.uuid):
-					fobj["out2"] = fobj["out2"].replace(".nrrd", "-" + str(uuid.uuid1()).split('-')[0] + ".nrrd")
-
-				if not os.path.exists(os.path.dirname(fobj["out2"])):
-					os.makedirs(os.path.dirname(fobj["out2"]))
-					
-			filenames.append(fobj)
+			if args.ow or not os.path.exists(fobj["out"]):
+				filenames.append(fobj)
 
 	if args.n_rotations:
 
@@ -210,23 +199,14 @@ def main(args):
 				out_name, out_ext = os.path.splitext(os.path.normpath(fobj["out"]))
 				fobj_rot["out"] = out_name + "_rot" + str(i) + out_ext
 
-				# if args.ow or not os.path.exists(fobj_rot["out"]):
-				# 	filenames.append(fobj_rot)
-
-				if args.dir2:
-				
-					fobj_rot["surf2"] = fobj["surf2"]
-				
-					out_name2, out_ext2 = os.path.splitext(os.path.normpath(fobj["out2"]))
-					fobj_rot["out2"] = out_name2 + "_rot" + str(i) + out_ext2
-					
-				if args.ow or not os.path.exists(fobj_rot["out2"]) or not os.path.exists(fobj_rot["out"]):
+				if args.ow or not os.path.exists(fobj_rot["out"]):
 					filenames.append(fobj_rot)
 
 	if(args.subdivision):
 		sphere = CreateIcosahedron(args.radius, args.subdivision)
 	else:
 		sphere = CreateSpiral(args.radius, args.spiral, args.turns)
+
 
 	model = None
 	if args.model is not None:
@@ -235,7 +215,7 @@ def main(args):
 		model.summary()
 
 	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z, rescale_features=args.rescale_features)
-	
+
 	if args.point_features or args.out_point_id:
 		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
 
@@ -248,10 +228,6 @@ def main(args):
 		surf = ReadSurf(fobj["surf"])
 		
 		surf = GetUnitSurf(surf, args.translate, args.scale_factor)
-		
-		if args.dir2:
-			surf2 = ReadSurf(fobj["surf2"])
-			surf2 = GetUnitSurf(surf2, args.translate, args.scale_factor)
 		
 		if args.fiberBundle:
 			nbCell = surf.GetNumberOfCells()
@@ -299,10 +275,8 @@ def main(args):
 
 			if args.random_rotation:
 				surf, rotationAngle, rotationVector = RandomRotation(surf)
-				if args.dir2:
-					surf2 = RotateSurf(fobj['surf2'],rotationAngle,rotationVector)
-			if args.verbose:
-				print("angle:", rotationAngle, "vector:", rotationVector)
+				if args.verbose:
+					print("angle:", rotationAngle, "vector:", rotationVector)
 			if args.save_rotation:
 				transform = GetTransform(rotationAngle, rotationVector)
 				m = np.zeros(16)
@@ -314,8 +288,6 @@ def main(args):
 
 			if args.fiber :
 				surf = GetTubeFilter(surf)
-				if args.dir2 :
-					surf2 = GetTubeFilter(surf2)
 
 			# if args.save_label:
 			# 	# surf = OrientLabel_vector(surf, args.save_label)
@@ -323,21 +295,15 @@ def main(args):
 
 			if args.property:
 				surf_actor = GetPropertyActor(surf, args.property)
-				if args.dir2 :
-					surf_actor2 = GetPropertyActor(surf2, args.property)
 			else:
-				surf_actor = GetNormalsActor(surf)
-				if args.dir2 :
-					surf_actor2 = GetNormalsActor(surf2)
-
+				if args.view_features:
+					surf_actor = GetColoredActor(surf, args.view_features)
+				else:
+					surf_actor = GetNormalsActor(surf)
 			#Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
 			
 			if surf_actor is not None:
 				flyby.addActor(surf_actor)
-			if args.dir2:
-				if surf_actor2 is not None:
-					flyby.addActor(surf_actor2)
-
 			out_np = flyby.getFlyBy()
 
 			if(args.extract_components != None):
@@ -352,20 +318,13 @@ def main(args):
 				surf_actor = GetPointIdMapActor(surf)
 				flyby_features.addActor(surf_actor)
 				out_point_ids_rgb_np = flyby_features.getFlyBy()
-				
-				if args.dir2:
-					surf_actor2 = GetPointIdMapActor(surf2)
-					flyby_features.addActor(surf_actor2)
-					out_point_ids_rgb_np2 = flyby_features.getFlyBy()
 
 				if(args.out_point_id):
 					if ( not args.concatenate ):
 
 						if not os.path.exists(fobj["out"]):
 							os.makedirs(fobj["out"])
-						if args.dir2:
-							if not os.path.exists(fobj["out2"]):
-								os.makedirs(fobj["out2"])
+
 						for i in range(out_point_ids_rgb_np.shape[0]):
 							out_point_id_img = GetImage(out_point_ids_rgb_np[i])
 
@@ -375,18 +334,6 @@ def main(args):
 							writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_point_id_img)
 							writer.UseCompressionOn()
 							writer.Update()
-						
-						if args.dir2:
-							for i in range(out_point_ids_rgb_np2.shape[0]):
-								out_point_id_img2 = GetImage(out_point_ids_rgb_np2[i])
-
-								out_filename2 = os.path.join(fobj["out2"], str(i) + "_point_id_map.nrrd")
-								print("Writing:", out_filename2)
-
-								writer = itk.ImageFileWriter.New(FileName=out_filename2, Input=out_point_id_img2)
-								writer.UseCompressionOn()
-								writer.Update()
-
 				else:
 					out_filename = os.path.splitext(fobj["out"])
 					out_filename = out_filename[0] + "_point_id_map" + out_filename[1]
@@ -397,49 +344,25 @@ def main(args):
 					writer.UseCompressionOn()
 					writer.Update()
 
-					if args.dir2:
-						out_filename2 = os.path.splitext(fobj["out2"])
-						out_filename2 = out_filename2[0] + "_point_id_map" + out_filename2[1]
-
-						out_point_id_img2 = GetImage(out_point_ids_rgb_np2)
-						print("Writing:", out_filename2)
-						writer = itk.ImageFileWriter.New(FileName=out_filename2, Input=out_point_id_img2)
-						writer.UseCompressionOn()
-						writer.Update()
-
 				out_point_id_img = GetImage(out_point_ids_rgb_np)
 				print("Writing:", out_filename)
 				writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_point_id_img)
 				writer.UseCompressionOn()
 				writer.Update()
 
-				if args.dir2:
-					out_point_id_img2 = GetImage(out_point_ids_rgb_np2)
-					print("Writing:", out_filename2)
-					writer = itk.ImageFileWriter.New(FileName=out_filename2, Input=out_point_id_img2)
-					writer.UseCompressionOn()
-					writer.Update()
-
 			if(args.point_features):
 
 				for point_features_name in args.point_features:
 					print("Extracting:", point_features_name)
 					out_features_np = ExtractPointFeatures(surf, out_point_ids_rgb_np, point_features_name, args.zero)
-					if args.dir2:
-						out_features_np2 = ExtractPointFeatures(surf2, out_point_ids_rgb_np2, point_features_name, args.zero)
 
 					if(args.point_features_concat):
 						out_np = np.concatenate([out_np, out_features_np], axis=-1)
-						if args.dir2:
-							out_np2 = np.concatenate([out_np2, out_features_np2], axis=-1)
 					else:
 						if ( not args.concatenate ):
 
 							if not os.path.exists(fobj["out"]):
-							  	os.makedirs(fobj["out"])
-							if args.dir2:
-								if not os.path.exists(fobj["out2"]):
-							  		os.makedirs(fobj["out2"])
+							  os.makedirs(fobj["out"])
 
 							for i in range(out_features_np.shape[0]):
 							  out_img = GetImage(out_features_np[i])
@@ -450,18 +373,6 @@ def main(args):
 							  writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
 							  writer.UseCompressionOn()
 							  writer.Update()
-
-							if args.dir2:
-								for i in range(out_features_np2.shape[0]):
-									out_img2 = GetImage(out_features_np2[i])
-
-									out_filename2 = os.path.join(fobj["out2"], str(i) + "_" + point_features_name + ".nrrd")
-									print("Writing:", out_filename2)
-
-									writer = itk.ImageFileWriter.New(FileName=out_filename2, Input=out_img2)
-									writer.UseCompressionOn()
-									writer.Update()
-
 						else:
 							out_features_name = os.path.splitext(fobj["out"])
 							out_features_name = out_features_name[0] + "_" + point_features_name + out_features_name[1]
@@ -470,16 +381,6 @@ def main(args):
 							writer = itk.ImageFileWriter.New(FileName=out_features_name, Input=out_features)
 							writer.UseCompressionOn()
 							writer.Update()
-							
-							if args.dir2:
-								out_features_name2 = os.path.splitext(fobj["out2"])
-								out_features_name2 = out_features_name2[0] + "_" + point_features_name + out_features_name2[1]
-								print("Writing:", out_features_name2)
-								out_features2 = GetImage(out_features_np2)
-								writer = itk.ImageFileWriter.New(FileName=out_features_name2, Input=out_features2)
-								writer.UseCompressionOn()
-								writer.Update()
-
 				flyby_features.removeActors()
 
 			if ( not args.concatenate ):
@@ -495,20 +396,6 @@ def main(args):
 					writer = itk.ImageFileWriter.New(FileName=out_filename, Input=out_img)
 					writer.UseCompressionOn()
 					writer.Update()
-				
-				if args.dir2:
-					if not os.path.exists(fobj["out2"]):
-						os.makedirs(fobj["out2"])
-
-					for i in range(out_np2.shape[0]):
-						out_img2 = GetImage(out_np2[i])
-
-						out_filename2 = os.path.join(fobj["out2"], str(i) + ".nrrd")
-						print("Writing:", out_filename2)
-
-						writer = itk.ImageFileWriter.New(FileName=out_filename2, Input=out_img2)
-						writer.UseCompressionOn()
-						writer.Update()
 					  
 			else:
 				out_img = GetImage(out_np)
@@ -517,13 +404,6 @@ def main(args):
 				writer = itk.ImageFileWriter.New(FileName=fobj["out"], Input=out_img)
 				writer.UseCompressionOn()
 				writer.Update()
-
-				if args.dir2:
-					out_img2 = GetImage(out_np2)
-					print("Writing:", fobj["out2"])
-					writer = itk.ImageFileWriter.New(FileName=fobj["out2"], Input=out_img2)
-					writer.UseCompressionOn()
-					writer.Update()
 					
 			flyby.removeActors()
 
@@ -538,8 +418,7 @@ if __name__ == '__main__':
 	input_params.add_argument('--surf', type=str, help='Target surface/mesh')
 	input_params.add_argument('--dir', type=str, help='Input directory with 3D models')
 	input_params.add_argument('--csv', type=str, help='Input csv with column "surf"')
-	
-	input_group.add_argument('--dir2', type=str, help='Input directory with 3D models of landmarks')
+
 	input_group.add_argument('--csv_root_path', type=str, help='CSV rooth path for replacement', default="")
 	input_group.add_argument('--model', type=str, help='Directory with saved model', default=None)
 	input_group.add_argument('--random_rotation', type=bool, help='Apply a random rotation', default=False)
@@ -564,6 +443,7 @@ if __name__ == '__main__':
 	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features. If name is coords or points, it extracts the x,y,z coordinates', default=None)
 	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
+	features_group.add_argument('--view_features', type=str, help='Name of array in point data to visualize features.', default=None)
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
@@ -582,7 +462,6 @@ if __name__ == '__main__':
 
 	output_params = parser.add_argument_group('Output parameters')
 	output_params.add_argument('--out', type=str, help='Output filename or directory', default="out.nrrd")
-	output_params.add_argument('--out2', type=str, help='Output of the second filename or directory', default="out.nrrd")
 	output_params.add_argument('--out_point_id', type=int, help='Output the point id map. Point ids are encoded in the rgb components', default=0)
 	output_params.add_argument('--uuid', type=bool, help='Use uuid to name the outputs', default=False)
 	output_params.add_argument('--ow', type=int, help='Overwrite outputs', default=1)

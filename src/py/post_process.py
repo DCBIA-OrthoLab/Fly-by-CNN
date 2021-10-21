@@ -4,8 +4,7 @@ import argparse
 import sys
 import os
 from collections import namedtuple
-
-
+from utils import * 
 
 # parser = argparse.ArgumentParser()
 # parser.add_argument('--mesh', help='Insert mesh path')
@@ -239,44 +238,6 @@ def Label_Teeth(vtkdata, label_array):
 		vtkdata = LocateLabels(vtkdata, label_array, predict_teeth, predict_teeth_label, label, label + 3) #Labels have to start at 3
 		
 	return vtkdata
-
-def GetAllNeighbors(vtkdata, pids):
-	all_neighbors = pids
-	for pid in pids:
-		neighbors = GetNeighbors(vtkdata, pid)
-		all_neighbors = np.concatenate((all_neighbors, neighbors))
-	return np.unique(all_neighbors)
-
-def GetNeighbors(vtkdata, pid):
-	cells_id = vtk.vtkIdList()
-	vtkdata.GetPointCells(pid, cells_id)
-	neighbor_pids = []
-
-	for ci in range(cells_id.GetNumberOfIds()):
-		points_id_inner = vtk.vtkIdList()
-		vtkdata.GetCellPoints(cells_id.GetId(ci), points_id_inner)
-		for pi in range(points_id_inner.GetNumberOfIds()):
-			pid_inner = points_id_inner.GetId(pi)
-			if pid_inner != pid:
-				neighbor_pids.append(pid_inner)
-
-	return np.unique(neighbor_pids).tolist()
-
-def GetNeighborIds(vtkdata, pid, labels, label, pid_visited):
-	cells_id = vtk.vtkIdList()
-	vtkdata.GetPointCells(pid, cells_id)
-	neighbor_pids = []
-
-	for ci in range(cells_id.GetNumberOfIds()):
-		points_id_inner = vtk.vtkIdList()
-		vtkdata.GetCellPoints(cells_id.GetId(ci), points_id_inner)
-		for pi in range(points_id_inner.GetNumberOfIds()):
-			pid_inner = points_id_inner.GetId(pi)
-			if labels.GetTuple(pid_inner)[0] == label and pid_inner != pid and pid_visited[pid_inner] == 0:
-				pid_visited[pid_inner] = 1
-				neighbor_pids.append(pid_inner)
-
-	return np.unique(neighbor_pids).tolist()
 
 def ConnectedRegion(vtkdata, pid, labels, label, pid_visited):
 
