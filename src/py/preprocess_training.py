@@ -58,51 +58,52 @@ def main(args):
     
     model_normpath = os.path.normpath("/".join([args.model_dir,'**','']))
     landmarks_normpath = os.path.normpath("/".join([args.landmarks_dir,'**','']))
-    
-    list_jonfile_L = []
-    list_jonfile_U= []
-    list_model_L = []
-    list_model_U = []
-    list_patients = []
+
     lenght = 41
     radius = 0.5
 
     if not os.path.exists(args.out):
         os.makedirs(args.out)
 
+    dic_patient = {}
+
+
     if args.landmarks_dir:
         for jsonfile in sorted(glob.iglob(landmarks_normpath, recursive=True)):
             if os.path.isfile(jsonfile) and True in [ext in jsonfile for ext in [".json"]]:
+                num = os.path.basename(jsonfile).split('_')[0][1:]
                 if True in ['P'+ str(ocl) + '_' in jsonfile for ocl in list(range(1,lenght))]:
-                    list_jonfile_L.append(jsonfile)
+                    # list_jonfile_L.append(jsonfile)
+                    if num in dic_patient.keys():
+                        dic_patient[num]['path_landmarks_L'] = jsonfile
+                    else:
+                        dic_patient[num] = {'path_landmarks_L' : jsonfile}
                 else :
-                    list_jonfile_U.append(jsonfile)   
+                    if str(int(num)-lenght+1) in dic_patient.keys():
+                        dic_patient[str(int(num)-lenght+1)]['path_landmarks_U'] = jsonfile                    
+                    else:
+                        dic_patient[str(int(num)-lenght+1)] = {'path_landmarks_U' : jsonfile}
+                   
 
     if args.model_dir:    
         for model in sorted(glob.iglob(model_normpath, recursive=True)):
             if os.path.isfile(model) and True in [ext in model for ext in [".vtk"]]:
+                num = os.path.basename(model).split('_')[0][1:]
                 if True in ['P'+ str(ocl) + "_" in model for ocl in list(range(1,lenght))]:
-                    list_model_L.append(model)              
+                    if num in dic_patient.keys():
+                        dic_patient[num]['path_model_L'] = model
+                    else:
+                        dic_patient[num] = {'path_model_L' : model}
                 else :
-                    list_model_U.append(model)
-        
-        # print(list_jonfile_L)
-        # print(list_jonfile_U)
-        # print(list_model_L)
-        # print(list_model_U) 
-    
-    # merge_jsonfile(list_jonfile_L)
-        
-    for object in range(0,len(list_jonfile_L)):
-        list_patients.append({'path_model_U':list_model_U[object],
-                                'path_model_L':list_model_L[object],
-                                'path_landmarks_U':list_jonfile_U[object],
-                                'path_landmarks_L':list_jonfile_L[object] 
-                                })
+                    if str(int(num)-lenght+1) in dic_patient.keys():
+                        dic_patient[str(int(num)-lenght+1)]['path_model_U'] = model                    
+                    else:
+                        dic_patient[str(int(num)-lenght+1)] = {'path_model_U' : model}
 
-    
-    for obj in list_patients:
-
+    # print(dic_patient)
+    for obj in dic_patient.items():
+        obj=obj[1]
+        # print('1er etape')
         surf_u = fbf.ReadSurf(obj["path_model_U"])
         surf_l = fbf.ReadSurf(obj["path_model_L"])
 
@@ -125,7 +126,6 @@ def main(args):
         if not os.path.exists(outdir_l):
             os.makedirs(outdir_l)
 
-
 ###################################################################################################################################
 #                                                   FOR UPPER JAW                                                                 #
 ###################################################################################################################################
@@ -133,7 +133,6 @@ def main(args):
 
 
         for teeth in range(np.min(real_labels_np_u),np.max(real_labels_np_u)+1):
-            # print(teeth)
             if teeth>1 and teeth<16:
                 outdir_teet_u = os.path.join(outdir_u,f"teeth_{teeth}")
                 if not os.path.exists(outdir_teet_u):
@@ -195,7 +194,7 @@ def main(args):
                 Write(vtk_landmarks.GetOutput(), output_LM_U_path)
 
 
-            ####################  apply same rotation to each landmarks ########################
+            ###################  apply same rotation to each landmarks ########################
 
     
                 for i in range (args.n_rotations):
@@ -232,106 +231,106 @@ def main(args):
                     writer.UseCompressionOn()
                     writer.Update()
             
-    ###################################################################################################################################
-    #                                                   FOR LOWER JAW                                                                 #
-    ###################################################################################################################################
+    ##################################################################################################################################
+                                                    #   FOR LOWER JAW                                                                 #
+    ##################################################################################################################################
 
-            for teeth in range(np.min(real_labels_np_l),np.max(real_labels_np_l)+1):
-                if teeth>17 and teeth<32:
-                    outdir_teet_l = os.path.join(outdir_l,f"teeth_{teeth}")
-                    if not os.path.exists(outdir_teet_l):
-                        os.makedirs(outdir_teet_l)
-                    outfilename_teeth_l = os.path.join(outdir_teet_l,os.path.basename(obj["path_model_L"]))
+        for teeth in range(np.min(real_labels_np_l),np.max(real_labels_np_l)+1):
+            if teeth>17 and teeth<32:
+                outdir_teet_l = os.path.join(outdir_l,f"teeth_{teeth}")
+                if not os.path.exists(outdir_teet_l):
+                    os.makedirs(outdir_teet_l)
+                outfilename_teeth_l = os.path.join(outdir_teet_l,os.path.basename(obj["path_model_L"]))
 
-                    teeth_surf_l = post_process.Threshold(surf_l, "UniversalID", teeth, teeth )
-                    outfilename_l = os.path.splitext(outfilename_teeth_l)[0] + f"_teeth_{teeth}.vtk"
-                    # print("Writting:", outfilename)
-                    polydatawriter = vtk.vtkPolyDataWriter()
-                    polydatawriter.SetFileName(outfilename_l)
-                    polydatawriter.SetInputData(teeth_surf_l)
-                    polydatawriter.Write()
+                teeth_surf_l = post_process.Threshold(surf_l, "UniversalID", teeth, teeth )
+                outfilename_l = os.path.splitext(outfilename_teeth_l)[0] + f"_teeth_{teeth}.vtk"
+                # print("Writting:", outfilename)
+                polydatawriter = vtk.vtkPolyDataWriter()
+                polydatawriter.SetFileName(outfilename_l)
+                polydatawriter.SetInputData(teeth_surf_l)
+                polydatawriter.Write()
 
-                    data_l = json.load(open(obj["path_landmarks_L"]))
-                    json_file = pd.read_json(obj["path_landmarks_L"])
-                    json_file.head()
-                    markups = json_file.loc[0,'markups']
-                    controlPoints = markups['controlPoints']
-                    number_landmarks = len(controlPoints)
+                data_l = json.load(open(obj["path_landmarks_L"]))
+                json_file = pd.read_json(obj["path_landmarks_L"])
+                json_file.head()
+                markups = json_file.loc[0,'markups']
+                controlPoints = markups['controlPoints']
+                number_landmarks = len(controlPoints)
 
-                    locator_l = vtk.vtkIncrementalOctreePointLocator()
-                    locator_l.SetDataSet(teeth_surf_l) 
-                    locator_l.BuildLocator()
-                    
-                    new_lst= []
-                    
-                    for i in range(number_landmarks):
-                        position = controlPoints[i]["position"]
-                        pid = locator_l.FindClosestPoint(position)
-                        point = teeth_surf_l.GetPoint(pid)
-                        distance = sqrt((list(point)[0]-position[0])**2+(list(point)[1]-position[1])**2+(list(point)[2]-position[2])**2)
-                        # print(distance)
-                        if distance < 0.5:
-                            new_lst.append(controlPoints[i])
-
-                    data_l['markups'][0]['controlPoints'] = new_lst
-
-                    # print(len(new_lst))
-                    vtk_landmarks = vtk.vtkAppendPolyData()
-                    for cp in new_lst:
-
-                        # Create a sphere
-                        sphereSource = vtk.vtkSphereSource()
-                        sphereSource.SetCenter(cp["position"][0],cp["position"][1],cp["position"][2])
-                        sphereSource.SetRadius(radius)
-
-                        # Make the surface smooth.
-                        sphereSource.SetPhiResolution(100)
-                        sphereSource.SetThetaResolution(100)
-                        sphereSource.Update()
-                        
-                        vtk_landmarks.AddInputData(sphereSource.GetOutput())
-                        vtk_landmarks.Update()
-                    
-                    basename = os.path.basename(obj["path_landmarks_L"]).split(".")[0]
-                    filename = basename + "_landmarks.vtk"
-                    output_LM_L_path = os.path.join(outdir_teet_l, filename)
-                    Write(vtk_landmarks.GetOutput(), output_LM_L_path)
+                locator_l = vtk.vtkIncrementalOctreePointLocator()
+                locator_l.SetDataSet(teeth_surf_l) 
+                locator_l.BuildLocator()
                 
-            #####################  apply same rotation to each landmarks ########################
+                new_lst= []
+                
+                for i in range(number_landmarks):
+                    position = controlPoints[i]["position"]
+                    pid = locator_l.FindClosestPoint(position)
+                    point = teeth_surf_l.GetPoint(pid)
+                    distance = sqrt((list(point)[0]-position[0])**2+(list(point)[1]-position[1])**2+(list(point)[2]-position[2])**2)
+                    # print(distance)
+                    if distance < 0.5:
+                        new_lst.append(controlPoints[i])
 
-        
-                    for i in range (args.n_rotations):
-                        surf_LM = ReadSurf(output_LM_L_path)
-                        surf_merged = ReadSurf(outfilename_l)
+                data_l['markups'][0]['controlPoints'] = new_lst
 
-                        unit_surf_LM, _, scale_factor = ScaleSurf(surf_LM, mean_arr=np.array([0,0,0]))
-                        unit_surf_merged, _, scale_factor = ScaleSurf(surf_merged, mean_arr=np.array([0,0,0]), scale_factor=scale_factor)
+                # print(len(new_lst))
+                vtk_landmarks = vtk.vtkAppendPolyData()
+                for cp in new_lst:
 
-                        if args.random_rotation:
-                            unit_surf_LM, rotationAngle, rotationVector = RandomRotation(unit_surf_LM)
-                            unit_surf_merged = RotateSurf(unit_surf_merged, rotationAngle, rotationVector)
+                    # Create a sphere
+                    sphereSource = vtk.vtkSphereSource()
+                    sphereSource.SetCenter(cp["position"][0],cp["position"][1],cp["position"][2])
+                    sphereSource.SetRadius(radius)
 
-                        out_img_LM = ComputeFeatures(unit_surf_LM)
-                        out_img_merged = ComputeFeatures(unit_surf_merged)
+                    # Make the surface smooth.
+                    sphereSource.SetPhiResolution(100)
+                    sphereSource.SetThetaResolution(100)
+                    sphereSource.Update()
+                    
+                    vtk_landmarks.AddInputData(sphereSource.GetOutput())
+                    vtk_landmarks.Update()
+                
+                basename = os.path.basename(obj["path_landmarks_L"]).split(".")[0]
+                filename = basename + "_landmarks.vtk"
+                output_LM_L_path = os.path.join(outdir_teet_l, filename)
+                Write(vtk_landmarks.GetOutput(), output_LM_L_path)
+            
+        ####################  apply same rotation to each landmarks ########################
 
-                        if args.n_rotations == 1:
-                            n_rot = ""
-                        else:
-                            n_rot = "_rot"+str(i)
+    
+                for i in range (args.n_rotations):
+                    surf_LM = ReadSurf(output_LM_L_path)
+                    surf_merged = ReadSurf(outfilename_l)
 
-                        Feature_filename = os.path.splitext(os.path.basename(outfilename_l))[0]
-                        output_filename_feature = os.path.join(outdir_teet_l,Feature_filename+n_rot+".nrrd")
-                        print("Writing:", output_filename_feature)
-                        writer = itk.ImageFileWriter.New(FileName=output_filename_feature, Input=out_img_merged)
-                        writer.UseCompressionOn()
-                        writer.Update()
+                    unit_surf_LM, _, scale_factor = ScaleSurf(surf_LM, mean_arr=np.array([0,0,0]))
+                    unit_surf_merged, _, scale_factor = ScaleSurf(surf_merged, mean_arr=np.array([0,0,0]), scale_factor=scale_factor)
 
-                        Label_filename = os.path.splitext(os.path.basename(output_LM_L_path))[0]
-                        output_filename_label = os.path.join(outdir_teet_l,Label_filename+n_rot+".nrrd")
-                        print("Writing:",output_filename_label)
-                        writer = itk.ImageFileWriter.New(FileName=output_filename_label, Input=out_img_LM)
-                        writer.UseCompressionOn()
-                        writer.Update()
+                    if args.random_rotation:
+                        unit_surf_LM, rotationAngle, rotationVector = RandomRotation(unit_surf_LM)
+                        unit_surf_merged = RotateSurf(unit_surf_merged, rotationAngle, rotationVector)
+
+                    out_img_LM = ComputeFeatures(unit_surf_LM)
+                    out_img_merged = ComputeFeatures(unit_surf_merged)
+
+                    if args.n_rotations == 1:
+                        n_rot = ""
+                    else:
+                        n_rot = "_rot"+str(i)
+
+                    Feature_filename = os.path.splitext(os.path.basename(outfilename_l))[0]
+                    output_filename_feature = os.path.join(outdir_teet_l,Feature_filename+n_rot+".nrrd")
+                    print("Writing:", output_filename_feature)
+                    writer = itk.ImageFileWriter.New(FileName=output_filename_feature, Input=out_img_merged)
+                    writer.UseCompressionOn()
+                    writer.Update()
+
+                    Label_filename = os.path.splitext(os.path.basename(output_LM_L_path))[0]
+                    output_filename_label = os.path.join(outdir_teet_l,Label_filename+n_rot+".nrrd")
+                    print("Writing:",output_filename_label)
+                    writer = itk.ImageFileWriter.New(FileName=output_filename_label, Input=out_img_LM)
+                    writer.UseCompressionOn()
+                    writer.Update()
 
 
 
@@ -339,13 +338,14 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='separAte all the teeth from a vtk file', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     input_param = parser.add_argument_group('input files')
-    input_param.add_argument('--dir_project', type=str, help='Directory with all the project', default='/Users/luciacev-admin/Documents/AutomatedLandmarks')
-    input_param.add_argument('--dir_data', type=str, help='Input directory with 3D images', default=parser.parse_args().dir_project+'/fly-by-cnn/data')
-    input_param.add_argument('--landmarks_dir', type=str, help='landmarks directory', default=parser.parse_args().dir_data+'/landmarks_upgrade_2')
-    input_param.add_argument('--model_dir', type=str, help='model file directory', default=parser.parse_args().dir_data+'/Universal_ID_template_2')
+    # input_param.add_argument('--dir_project', type=str, help='Directory with all the project', default='/Users/luciacev-admin/Documents/AutomatedLandmarks')
+    # input_param.add_argument('--dir_data', type=str, help='Input directory with 3D images', default=parser.parse_args().dir_project+'/fly-by-cnn/data')
+    input_param.add_argument('--dir_data', type=str, help='Input directory with 3D images', default='/Users/luciacev-admin/Desktop/test')
+    input_param.add_argument('--landmarks_dir', type=str, help='landmarks directory', default=parser.parse_args().dir_data+'/input_landmarks')
+    input_param.add_argument('--model_dir', type=str, help='model file directory', default=parser.parse_args().dir_data+'/input_model')
 
     data_augment_parser = parser.add_argument_group('Data augment parameters')
-    data_augment_parser.add_argument('--n_rotations', type=int, help='Number of random rotations', default=20)
+    data_augment_parser.add_argument('--n_rotations', type=int, help='Number of random rotations', default=2)
     data_augment_parser.add_argument('--random_rotation', type=bool, help='activate or not a random rotation', default=True)
 
     param_parser = parser.add_argument_group('Parameters')

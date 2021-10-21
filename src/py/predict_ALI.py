@@ -9,7 +9,7 @@ from monai.losses import DiceLoss
 from monai.metrics import DiceMetric
 from monai.metrics import ROCAUCMetric
 from monai.data import decollate_batch, partition_dataset_classes
-from utils_training import *
+import numpy as np
 
 from monai.config import print_config
 import SimpleITK as sitk
@@ -19,22 +19,34 @@ from monai.data import (
     load_decathlon_datalist,
     decollate_batch,
 )
-# def CreatePredictTransform(data):
-#             data_type = torch.float32
-#             pre_transforms = Compose([AddChanneld(),ScaleIntensityd(minv = 0.0, maxv = 1.0, factor = None)])
-#             input_img = sitk.ReadImage(data) 
-#             img = sitk.GetArrayFromImage(input_img)
-#             pre_img = torch.from_numpy(pre_transforms(img))
-#             pre_img = pre_img.type(data_type)
-#             return pre_img,input_img
 
-def SavePrediction(data,input_img, outpath):
+def SavePrediction(data, outpath):
     print("Saving prediction to : ", outpath)
-    img = data.numpy()[0][:]
+    img = data.numpy()
     output = sitk.GetImageFromArray(img)
+    
     writer = sitk.ImageFileWriter()
     writer.SetFileName(outpath)
     writer.Execute(output)
+
+def Loader(data):
+    list_img = []
+    for img in data:
+        # print(img["model"])
+        # input_img = sitk.ReadImage(img["model"])
+        # img_model = sitk.GetArrayFromImage(input_img)
+        input_img = sitk.ReadImage(img)
+        img_model = sitk.GetArrayFromImage(input_img) #rpz les 16 images 2D de 256x256
+        
+        for image in img_model:
+            # print(torch.from_numpy(image).size())
+            # dic={"model":torch.from_numpy(image).permute(2,0,1),"landmarks":torch.from_numpy(l_img[i]).permute(2,0,1)}
+            new_image = torch.from_numpy(image).permute(2,0,1)
+            list_img.append(new_image)
+            # print(list_img)
+    
+    return list_img
+
 
 def main(args):
 
@@ -43,23 +55,22 @@ def main(args):
     if args.dir:
         normpath = os.path.normpath("/".join([args.dir, '**', '']))
         for img_fn in sorted(glob.iglob(normpath, recursive=True)):
-            if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".vtk"]]:
-                img_obj = {}
-                img_obj["model"] = img_fn
-                img_obj["out"] = args.out
-                datalist.append(img_obj)
+            if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".nrrd"]]:
+                # img_obj = {}
+                # img_obj["model"] = img_fn
+                # img_obj["out"] = args.out
+                # datalist.append(img_obj)
+                datalist.append(img_fn)
     
     if not os.path.exists(args.out):
         os.makedirs(args.out)
     
-    
-    list_data = Loader(datalist)
-    
-    filename = os.path.splitext(os.path.basename(model_file))[0]
-    ouput_filename = os.path.join(args.dir_ft, filename + ".nrrd")
-    
+    # print(datalist)
+    list_data = Loader(datalist) # return a list
+    print("num data loaded",len(list_data))
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model = UNet(
+    net = UNet(
         spatial_dims=2,
         in_channels=7,
         out_channels=7,
@@ -68,30 +79,30 @@ def main(args):
     ).to(device)
 
     print("loading model :", args.load_model)
-    model.load_state_dict(torch.load(args.load_model,map_location=device))
-    model.eval()
-    print("Loading data from", args.dir)
-
+    net.load_state_dict(torch.load(args.load_model,map_location=device))
+    net.eval()
+    print("Loading data from :", args.dir)
+    
+ 
+    
     with torch.no_grad():
-        for data in list_data:
-            print("Reading:", data['model'])
-            val_outputs = model(data['model'])
-            # print(val_outputs.size())
-            # out_img = torch.argmax(val_outputs, dim=1).detach().cpu()
-            # out_img = out_img.type(torch.int16)
+        for img in datalist:
+            print("Reading:", datalist)
+            input_img = sitk.ReadImage(img)
+            img_model = sitk.GetArrayFromImage(input_img) #rpz les 16 images 2D de 256x256 array
+            output_filename = os.path.join(os.path.basename(img).split('.')[0] + '_predicted.nrrd')
+            output_path = os.path.join(args.out,output_filename)
             
-            baseName = os.path.basename(data["model"])
-            modelname= baseName.split(".")[0]
-            pred_name = ""
-            for i,element in enumerate(modelname):
-                if i == 0:
-                    pred_name += element.replace("scan","Pred")
-                else:
-                    pred_name += "." + element
-                        
-            input_dir = os.path.dirname(data["image"])
-            
-            SavePrediction(out_img ,input_image , os.path.join(input_dir,pred_name))
+            for image in img_model:
+                new_image = torch.from_numpy(image).permute(2,0,1) # convertion in tensor (7,258,258)
+                img_output = net(new_image)
+                # print(torch.from_numpy(img_output).size())
+                output = torch.cat(img_output,0)
+                # print(val_outputs.size())
+                # out_img = torch.argmax(val_outputs, dim=1).detach().cpu()
+                # out_img = out_img.type(torch.int16)
+                                        
+            SavePrediction(output, output_path)
             
 
     print("Done : " + str(len(datalist)) + " landmark predicted")
@@ -102,7 +113,7 @@ if __name__ == "__main__":
     input_group = parser.add_argument_group('directory')
     input_group.add_argument('--dir', type=str, help='Input directory with the scans',default=None, required=True)
 
-    input_group.add_argument('--load_model', type=str, help='Path of the model', default=None, required=True)
+    # input_group.add_argument('--load_model', type=str, help='Path of the model', default=None, required=True)
 
     input_group.add_argument('--out', type=str, help='Output directory with the landmarks',default=None)
 
