@@ -145,8 +145,7 @@ polydatawriter.SetFileName(outfilename_teeth)
 polydatawriter.SetInputData(teeth_surf)
 polydatawriter.Write()
 
-print("dilating gum...")
-gum_surf = post_process.DilateLabel(surf, real_labels, 1, iterations=2)
+
 gum_surf = post_process.Threshold(gum_surf, real_labels, 0, 1)
 outfilename_gum = outfilename
 outfilename_gum = os.path.splitext(outfilename_gum)[0] + "_gum.vtk"
