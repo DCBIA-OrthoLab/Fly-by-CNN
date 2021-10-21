@@ -10,6 +10,11 @@ from readers import OFFReader
 from multiprocessing import Pool, cpu_count
 from vtk.util.numpy_support import vtk_to_numpy
 
+import monai
+from monai.transforms import (
+    ToTensor
+)
+
 def normalize_points(poly, radius):
     polypoints = poly.GetPoints()
     for pid in range(polypoints.GetNumberOfPoints()):
@@ -156,6 +161,43 @@ def WriteSurf(surf, fileName):
     writer.SetInputData(surf)
     writer.Update()
 
+def GetAllNeighbors(vtkdata, pids):
+    all_neighbors = pids
+    for pid in pids:
+        neighbors = GetNeighbors(vtkdata, pid)
+        all_neighbors = np.concatenate((all_neighbors, neighbors))
+    return np.unique(all_neighbors)
+
+def GetNeighbors(vtkdata, pid):
+    cells_id = vtk.vtkIdList()
+    vtkdata.GetPointCells(pid, cells_id)
+    neighbor_pids = []
+
+    for ci in range(cells_id.GetNumberOfIds()):
+        points_id_inner = vtk.vtkIdList()
+        vtkdata.GetCellPoints(cells_id.GetId(ci), points_id_inner)
+        for pi in range(points_id_inner.GetNumberOfIds()):
+            pid_inner = points_id_inner.GetId(pi)
+            if pid_inner != pid:
+                neighbor_pids.append(pid_inner)
+
+    return np.unique(neighbor_pids).tolist()
+
+def GetNeighborIds(vtkdata, pid, labels, label, pid_visited):
+    cells_id = vtk.vtkIdList()
+    vtkdata.GetPointCells(pid, cells_id)
+    neighbor_pids = []
+
+    for ci in range(cells_id.GetNumberOfIds()):
+        points_id_inner = vtk.vtkIdList()
+        vtkdata.GetCellPoints(cells_id.GetId(ci), points_id_inner)
+        for pi in range(points_id_inner.GetNumberOfIds()):
+            pid_inner = points_id_inner.GetId(pi)
+            if labels.GetTuple(pid_inner)[0] == label and pid_inner != pid and pid_visited[pid_inner] == 0:
+                pid_visited[pid_inner] = 1
+                neighbor_pids.append(pid_inner)
+
+    return np.unique(neighbor_pids).tolist()
 
 def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     surf_copy = vtk.vtkPolyData()
@@ -186,7 +228,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     #centering points of the shape
     if mean_arr is None:
         mean_arr = np.array(mean_v)
-    print("Mean:", mean_arr)
+    # print("Mean:", mean_arr)
     shape_points = shape_points - mean_arr
 
     #Computing scale factor if it is not provided
@@ -195,7 +237,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
         scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
 
     #scale points of the shape by scale factor
-    print("Scale:", scale_factor)
+    # print("Scale:", scale_factor)
     shape_points_scaled = np.multiply(shape_points, scale_factor)
 
     #assigning scaled points back to shape
@@ -259,9 +301,10 @@ def GetUnitSurf(surf, mean_arr = None, scale_factor = None):
   surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor)
   return surf
 
-def GetColoredActor(surf, property_name):
+def GetColoredActor(surf, property_name, range_scalars = None):
 
-    range_scalars = surf.GetPointData().GetScalars(property_name).GetRange()
+    if range_scalars == None:
+        range_scalars = surf.GetPointData().GetScalars(property_name).GetRange()
 
     hueLut = vtk.vtkLookupTable()
     hueLut.SetTableRange(0, range_scalars[1])
@@ -330,16 +373,33 @@ def GetPropertyActor(surf, property_name):
     # return surfActor
     return surfMapper
 
+def ComputeNormals(surf):
+    normals = vtk.vtkPolyDataNormals()
+    normals.SetInputData(surf);
+    normals.ComputeCellNormalsOff();
+    normals.ComputePointNormalsOn();
+    normals.SplittingOff();
+    normals.Update()
+    
+    return normals.GetOutput()
+
+def GetColorArray(surf, array_name):
+    colored_points = vtk.vtkUnsignedCharArray()
+    colored_points.SetName('colors')
+    colored_points.SetNumberOfComponents(3)
+
+    normals = surf.GetPointData().GetArray(array_name)
+
+    for pid in range(surf.GetNumberOfPoints()):
+        normal = np.array(normals.GetTuple(pid))
+        rgb = (normal*0.5 + 0.5)*255.0
+        colored_points.InsertNextTuple3(rgb[0], rgb[1], rgb[2])
+    return colored_points
+
 def GetNormalsActor(surf):
     try:
-
-        normals = vtk.vtkPolyDataNormals()
-        normals.SetInputData(surf);
-        normals.ComputeCellNormalsOff();
-        normals.ComputePointNormalsOn();
-        normals.SplittingOff();
-        normals.Update()
-        surf = normals.GetOutput()
+        
+        surf = ComputeNormals(surf)
         # mapper
         surf_actor = GetActor(surf)
 
@@ -385,17 +445,8 @@ def GetNormalsActor(surf):
             )
 
         else:
-            colored_points = vtk.vtkUnsignedCharArray()
-            colored_points.SetName('colors')
-            colored_points.SetNumberOfComponents(3)
-
-            normals = surf.GetPointData().GetArray('Normals')
-
-            for pid in range(surf.GetNumberOfPoints()):
-                normal = np.array(normals.GetTuple(pid))
-                rgb = (normal*0.5 + 0.5)*255.0
-                colored_points.InsertNextTuple3(rgb[0], rgb[1], rgb[2])
-
+            
+            colored_points = GetColorArray(surf, "Normals")
             surf.GetPointData().SetScalars(colored_points)
 
             surf_actor = GetActor(surf)
@@ -433,8 +484,7 @@ def GetCellIdMapActor(surf):
 
     return surf_actor
 
-def GetPointIdMapActor(surf):
-
+def GetPointIdColors(surf):
     colored_points = vtk.vtkUnsignedCharArray()
     colored_points.SetName('point_ids')
     colored_points.SetNumberOfComponents(3)
@@ -450,8 +500,14 @@ def GetPointIdMapActor(surf):
         g = int(point_id / 255.0) % 255.0
         b = int(int(point_id / 255.0) / 255.0) % 255.0
         colored_points.InsertNextTuple3(r, g, b)
+    
+    return colored_points
 
-        # cell_id_color = int(b*255*255 + g*255 + r - 1)
+def GetPointIdMapActor(surf):
+
+    colored_points = GetPointIdColors(surf)
+
+    # cell_id_color = int(b*255*255 + g*255 + r - 1)
 
     surf.GetCellData().SetScalars(colored_points)
 
@@ -482,13 +538,13 @@ class ExtractPointFeaturesClass():
 
             point_features_np_shape = np.shape(self.point_features_np)
             if point_id >= 0 and point_id < point_features_np_shape[0]:
-                point_features.append(self.point_features_np[point_id])
+                point_features.append([self.point_features_np[point_id]])
             else:
                 point_features.append(self.zero)
 
         return point_features
 
-def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0):
+def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0, use_multi=True):
 
     point_ids_rgb_shape = point_ids_rgb.shape
 
@@ -503,8 +559,11 @@ def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0):
     
     zero = np.zeros(number_of_components) + zero
 
-    with Pool(cpu_count()) as p:
-    	feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
+    if use_multi:
+        with Pool(cpu_count()) as p:
+        	feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
+    else:
+        feat = ExtractPointFeaturesClass(point_features_np, zero)(point_ids_rgb)
     return np.array(feat).reshape(point_ids_rgb_shape[0:-1] + (number_of_components,))
 
 def ReadImage(fName, image_dimension=2, pixel_dimension=-1):
@@ -613,3 +672,13 @@ def ExtractFiber(surf, list_random_id) :
     tubefilter = GetTubeFilter(geometryFilter.GetOutput())
 
     return tubefilter
+
+def ArrayToTensor(vtkarray, device='cpu'):
+    return ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(vtkarray))
+
+def PolyDataToTensors(surf, device='cpu'):
+
+    verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))
+    faces = ToTensor(dtype=torch.int32, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
+    
+    return verts, faces

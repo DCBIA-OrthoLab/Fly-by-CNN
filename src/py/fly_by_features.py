@@ -15,7 +15,7 @@ import LinearSubdivisionFilter as lsf
 from utils import * 
 
 class FlyByGenerator():
-	def __init__(self, sphere, resolution, visualize=False, use_z=False, split_z=False, rescale_features=False):
+	def __init__(self, sphere=None, resolution=224, visualize=False, use_z=False, split_z=False, rescale_features=False):
 		vtk.vtkObject.GlobalWarningDisplayOff()
 		renderer = vtk.vtkRenderer()
 		renderWindow = vtk.vtkRenderWindow()
@@ -32,11 +32,6 @@ class FlyByGenerator():
 		self.use_z = use_z
 		self.split_z = split_z
 		self.rescale_features = rescale_features
-		
-		#sphere_actor = GetActor(sphere)
-		# print(sphere_actor)
-		#sphere_actor.GetProperty().SetRepresentationToWireFrame()
-		#self.renderer.AddActor(sphere_actor)
 
 	def removeActor(self, actor):
 		self.renderer.RemoveActor(actor)
@@ -50,9 +45,15 @@ class FlyByGenerator():
 	def addActor(self, actor):
 		self.renderer.AddActor(actor)
 
-	def getFlyBy(self):
+	def getFlyBy(self, sphere_points = None, view_up_points = None, focal_points = None):
 
-		sphere_points = self.sphere.GetPoints()
+		number_of_points = 0
+		if sphere_points is None:
+			sphere_points = vtk_to_numpy(self.sphere.GetPoints().GetData()) 
+			number_of_points = self.sphere.GetNumberOfPoints()
+		else:
+			number_of_points = len(sphere_points)
+
 		camera = self.renderer.GetActiveCamera()
 
 		if self.visualize:
@@ -65,20 +66,31 @@ class FlyByGenerator():
 
 		img_seq = []
 
-		for i in range(sphere_points.GetNumberOfPoints()):
+		for i in range(number_of_points):
 
-			sphere_point = sphere_points.GetPoint(i)
-			sphere_point_v = normalize_vector(sphere_point)
-
-			if(abs(sphere_point_v[2]) != 1):
-				camera.SetViewUp(0, 0, -1)
-			elif(sphere_point_v[2] == 1):
-				camera.SetViewUp(1, 0, 0)
-			elif(sphere_point_v[2] == -1):
-				camera.SetViewUp(-1, 0, 0)
-
+			sphere_point = sphere_points[i]
 			camera.SetPosition(sphere_point[0], sphere_point[1], sphere_point[2])
-			camera.SetFocalPoint(0, 0, 0)
+
+			if(view_up_points is None):
+				sphere_point_v = normalize_vector(sphere_point)
+
+				if(abs(sphere_point_v[2]) != 1):
+					camera.SetViewUp(0, 0, -1)
+				elif(sphere_point_v[2] == 1):
+					camera.SetViewUp(1, 0, 0)
+				elif(sphere_point_v[2] == -1):
+					camera.SetViewUp(-1, 0, 0)
+			else:
+				view_up_point = view_up_points[i]
+				camera.SetViewUp(view_up_point[0], view_up_point[1], view_up_point[2])
+
+			
+			if focal_points is None:
+				camera.SetFocalPoint(0, 0, 0)
+			else:
+				focal_point = focal_points[i]
+				camera.SetFocalPoint(focal_point[0], focal_point[1], focal_point[2])
+				
 
 			self.renderer.ResetCameraClippingRange()
 
@@ -195,6 +207,7 @@ def main(args):
 	else:
 		sphere = CreateSpiral(args.radius, args.spiral, args.turns)
 
+
 	model = None
 	if args.model is not None:
 		import tensorflow as tf
@@ -202,7 +215,7 @@ def main(args):
 		model.summary()
 
 	flyby = FlyByGenerator(sphere, args.resolution, visualize=args.visualize, use_z=args.use_z, split_z=args.split_z, rescale_features=args.rescale_features)
-	
+
 	if args.point_features or args.out_point_id:
 		flyby_features = FlyByGenerator(sphere, args.resolution, visualize=args.visualize)
 
@@ -262,8 +275,8 @@ def main(args):
 
 			if args.random_rotation:
 				surf, rotationAngle, rotationVector = RandomRotation(surf)
-			if args.verbose:
-				print("angle:", rotationAngle, "vector:", rotationVector)
+				if args.verbose:
+					print("angle:", rotationAngle, "vector:", rotationVector)
 			if args.save_rotation:
 				transform = GetTransform(rotationAngle, rotationVector)
 				m = np.zeros(16)
@@ -283,13 +296,14 @@ def main(args):
 			if args.property:
 				surf_actor = GetPropertyActor(surf, args.property)
 			else:
-				surf_actor = GetNormalsActor(surf)
-
+				if args.view_features:
+					surf_actor = GetColoredActor(surf, args.view_features)
+				else:
+					surf_actor = GetNormalsActor(surf)
 			#Split GetUnitActor function into 3 functions to make it more streamline: Read Surface, Rotate Surface, GetColorIdMap(apply property), GetNormalsActor(normal vector displayh)
 			
 			if surf_actor is not None:
 				flyby.addActor(surf_actor)
-
 			out_np = flyby.getFlyBy()
 
 			if(args.extract_components != None):
@@ -429,6 +443,7 @@ if __name__ == '__main__':
 	features_group.add_argument('--point_features', nargs='+', type=str, help='Name of array in point data to extract features. If name is coords or points, it extracts the x,y,z coordinates', default=None)
 	features_group.add_argument('--point_features_concat', type=int, help='Concatenate point features to the fly_by_features', default=0)
 	features_group.add_argument('--zero', type=float, help="Default zero value when extracting properties. This is used when there is no 'collision' with the surface", default=0)
+	features_group.add_argument('--view_features', type=str, help='Name of array in point data to visualize features.', default=None)
 
 	sphere_params = parser.add_argument_group('Sampling parameters')
 	sphere_params_sampling = sphere_params.add_mutually_exclusive_group(required=True)
