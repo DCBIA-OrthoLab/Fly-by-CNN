@@ -54,6 +54,7 @@ class FlyByGenerator():
 		else:
 			number_of_points = len(sphere_points)
 
+		print("number of points : ",number_of_points)
 		camera = self.renderer.GetActiveCamera()
 
 		if self.visualize:

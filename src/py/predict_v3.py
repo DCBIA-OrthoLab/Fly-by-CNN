@@ -51,6 +51,8 @@ else:
 
 print("Predict ...")
 img_predict_np = model.predict(tf.expand_dims(img_np, axis=0))
+print(np.shape(img_predict_np))
+
 img_predict_np = np.argmax(np.squeeze(img_predict_np, axis=0), axis=-1)
 img_predict_np = img_predict_np.reshape(-1)
 
@@ -146,7 +148,7 @@ polydatawriter.SetInputData(teeth_surf)
 polydatawriter.Write()
 
 
-gum_surf = post_process.Threshold(gum_surf, real_labels, 0, 1)
+gum_surf = post_process.Threshold(surf, real_labels, 0, 1)
 outfilename_gum = outfilename
 outfilename_gum = os.path.splitext(outfilename_gum)[0] + "_gum.vtk"
 print("Writing:", outfilename_gum)
