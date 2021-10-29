@@ -124,17 +124,19 @@ def main(tempdir):
     epoch_loss_values = list()
     metric_values = list()
     writer = SummaryWriter()
-    for epoch in range(10):
+    for epoch in range(2):
         print("-" * 10)
         print(f"epoch {epoch + 1}/{10}")
         model.train()
         epoch_loss = 0
         step = 0
         for batch_data in train_loader:
+            print ('shape batch_data: ', batch_data.shape)
 
             print("size batch_data[0] : ",batch_data[0].size())
             step += 1
             inputs, labels = batch_data[0].to(device), batch_data[1].to(device)
+            print(inputs.shape)
             optimizer.zero_grad()
             outputs = model(inputs)
             loss = loss_function(outputs, labels)
@@ -155,7 +157,9 @@ def main(tempdir):
                 val_labels = None
                 val_outputs = None
                 for val_data in val_loader:
+
                     val_images, val_labels = val_data[0].to(device), val_data[1].to(device)
+                    print (val_images.shape)
                     roi_size = (96, 96)
                     sw_batch_size = 4
                     val_outputs = sliding_window_inference(val_images, roi_size, sw_batch_size, model)
