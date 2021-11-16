@@ -68,17 +68,16 @@ def main(args):
     best_deplacment_epoch = 0
     test_interval = args.test_interval
     list_distance = []
-    list_distance_accuracy = []
 
-    # for epoch in range(args.num_epoch):
-    #     print('-------- TRAINING --------')
+    for epoch in range(args.num_epoch):
+        print('-------- TRAINING --------')
 
-    #     training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer, device)
+        training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer, device)
 
-    #     if (epoch +1 ) % test_interval == 0:
-    #         print('-------- VALIDATION --------')
-    #         print(epoch +1)
-    #         validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,args.out,device)
+        if (epoch +1 ) % test_interval == 0:
+            print('-------- VALIDATION --------')
+            print(epoch +1)
+            validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,args.out,device)
     
     print('-------- ACCURACY --------')
     Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function)

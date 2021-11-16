@@ -253,7 +253,7 @@ if __name__ == '__main__':
     input_param = parser.add_argument_group('input files')
     # input_param.add_argument('--dir_project', type=str, help='Directory with all the project', default='/Users/luciacev-admin/Documents/AutomatedLandmarks')
     # input_param.add_argument('--dir_data', type=str, help='Input directory with 3D images', default=parser.parse_args().dir_project+'/fly-by-cnn/data')
-    input_param.add_argument('--dir_data', type=str, help='Input directory with 3D images', default='/Users/luciacev-admin/Desktop/test')
+    input_param.add_argument('--dir_data', type=str, help='Input directory with 3D images', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--landmarks_dir', type=str, help='landmarks directory', default=parser.parse_args().dir_data+'/landmarks_upgrade')
     input_param.add_argument('--model_dir', type=str, help='model file directory', default=parser.parse_args().dir_data+'/Universal_ID_template')
 
