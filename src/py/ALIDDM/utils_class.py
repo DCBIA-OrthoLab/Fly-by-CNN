@@ -9,6 +9,9 @@ from vtk.util.numpy_support import vtk_to_numpy
 import fly_by_features as fbf
 from utils import *
 import json
+from collections import deque
+import statistics
+
 
 class Identity(nn.Module):
     def __init__(self):
@@ -38,21 +41,26 @@ class MoveNet(nn.Module):
         return x
     
 class CameraNet:
-    def __init__(self, meshes, renderer, radius=2.0):
+    def __init__(self, meshes, renderer, radius=2.0, lenque=5):
         self.meshes = meshes
         self.device = meshes.device
         self.renderer = renderer
         self.radius = radius
         # print(len(meshes))
         self.set_random_position()
-    
-    def forward(self):
-        
+        self.max_que = lenque
+        self.position_memory = deque(maxlen=self.max_que)
+
+    def move(self,x):
+        self.camera_position = x
+
         # Render the image using the updated camera position. Based on the new position of the 
         # camera we calculate the rotation and translation matrices
+    
+    def shot(self):
         R = look_at_rotation(self.camera_position, device=self.device)  # (1, 3, 3)
         T = -torch.bmm(R.transpose(1, 2), self.camera_position[:, :, None])[:, :, 0]   # (1, 3)
-        
+
         images = self.renderer(meshes_world=self.meshes.clone(), R=R, T=T)
         images = images.permute(0,3,1,2)
         images = images[:,:-1,:,:]
@@ -69,6 +77,28 @@ class CameraNet:
 
         self.camera_position = torch.from_numpy(np.array(list_random_pos_cam,dtype=np.float32)).to(self.device)
         # print(self.camera_position.size())
+
+    def found(self,min_variance):
+        found = False
+        # print(len(self.position_memory))
+        if len(self.position_memory) == self.max_que:
+            variance = np.mean(np.var(np.array(list(self.position_memory)),axis=0),axis=1) #list variance
+            print('variance :', variance)
+            if np.max(variance)<min_variance:
+                found = True     
+        return found   
+
+    def search(self,move_net,min_variance):
+        self.set_random_position()
+        while not self.found(min_variance):
+            images = self.shot().to(self.device)  #[batchsize,3,224,224]
+            # print(images.shape)
+            x = move_net(images)  # [batchsize,3]  return the deplacment 
+            x += self.camera_position
+            self.move(x.detach().clone())
+            self.position_memory.append(self.camera_position.numpy())
+        
+        
 
 class FlyByDataset(Dataset):
     def __init__(self, df, radius,device):
