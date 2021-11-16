@@ -184,10 +184,10 @@ def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function):
         # print(camera_net.camera_position)
         # print(IP.shape)
         print(distance)
-        camera_net.camera_position.numpy()
-        IP.numpy()
-        for index,element in enumerate(camera_net.camera_position):
-            distance = np.linalg.norm(element-IP[index])
+        cam_pos = camera_net.camera_position.cpu().numpy()
+        new_IP = IP.cpu().numpy()
+        for index,element in enumerate(cam_pos):
+            distance = np.linalg.norm(element-new_IP[index])
             # print(distance)
             list_distance['landmark'].append('Lower_O-1')
             list_distance['distance'].append(distance)

@@ -96,7 +96,7 @@ class CameraNet:
             x = move_net(images)  # [batchsize,3]  return the deplacment 
             x += self.camera_position
             self.move(x.detach().clone())
-            self.position_memory.append(self.camera_position.numpy())
+            self.position_memory.append(self.camera_position.cpu().numpy())
         
         
 
