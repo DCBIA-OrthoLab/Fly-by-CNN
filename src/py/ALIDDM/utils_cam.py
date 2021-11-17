@@ -104,8 +104,8 @@ def training( epoch, move_net, train_dataloader, phong_renderer, loss_function, 
             camera_net.move(x.detach().clone())
             camera_net.move_focal(x.detach().clone())
 
-        print("ideal focal :",IL,"current focal :",camera_net.focal_pos, "difference :",np.linalg.norm(IL-camera_net.focal_pos))
-        print("ideal cam pos :",IP," current cam pos",camera_net.camera_position, "difference :", np.linalg.norm(IP-camera_net.camera_position))
+        # print("ideal focal :",IL,"current focal :",camera_net.focal_pos.cpu(), "difference :",np.linalg.norm(IL-camera_net.focal_pos))
+        # print("ideal cam pos :",IP," current cam pos",camera_net.camera_position.cpu(), "difference :", np.linalg.norm(IP-camera_net.camera_position))
         step_loss /= NSteps
         print("Step loss:", step_loss)
         epoch_loss += step_loss
