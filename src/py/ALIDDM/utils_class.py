@@ -143,7 +143,7 @@ class FlyByDataset(Dataset):
         # surf, _a, _v = fbf.RandomRotation(surf)
         surf = ComputeNormals(surf) 
 
-        ideal_landmark = ToTensor(dtype=torch.float32, device=self.device)(self.get_landmarks_position(idx))
+        ideal_landmark = self.get_landmarks_position(idx)
         ideal_position = ToTensor(np.array([ideal_landmark[0],ideal_landmark[1],2])) # to put ideal position just above the landmark
         # ideal_position = (landmarks_position/np.linalg.norm(landmarks_position))*self.radius
         ideal_position = ToTensor(dtype=torch.float32, device=self.device)(ideal_position)
@@ -153,9 +153,9 @@ class FlyByDataset(Dataset):
         region_id = ToTensor(dtype=torch.int64, device=self.device)(vtk_to_numpy(surf.GetPointData().GetScalars("UniversalID")))
         region_id = torch.clamp(region_id, min=0)
         faces_pid0 = faces[:,0:1]
-        
+        landmark_pos = ToTensor(dtype=torch.float32, device=self.device)(ideal_landmark)
   
-        return verts, faces, region_id, faces_pid0, color_normals, ideal_position, ideal_landmark
+        return verts, faces, region_id, faces_pid0, color_normals, ideal_position, landmark_pos
     
     def get_landmarks_position(self,idx):
        
