@@ -80,7 +80,7 @@ def main(args):
             validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,args.out,device)
     
     print('-------- ACCURACY --------')
-    Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function)
+    Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function,writer,device)
 
 
 
@@ -93,11 +93,11 @@ if __name__ == '__main__':
     input_param.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.5)
-    input_param.add_argument('--batch_size',type=int, help='batch size', default=2)
-    input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
+    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.1)
+    input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
+    input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
-    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.5)
+    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
 
     parser.add_argument('--num_epoch',type=int,help="numero epoch",required=True)
 

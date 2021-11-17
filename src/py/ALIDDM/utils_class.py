@@ -28,7 +28,7 @@ class MoveNet(nn.Module):
         resnet.fc = Identity()
         # resnet.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.resnet = resnet
-        self.MovePrediction = nn.Linear(512, 3)
+        self.MovePrediction = nn.Linear(512, 6)
         # self.activation = nn.Tanh()
 
 
@@ -49,16 +49,24 @@ class CameraNet:
         # print(len(meshes))
         self.set_random_position()
         self.max_que = lenque
-        self.position_memory = deque(maxlen=self.max_que)
+        self.position_cam_memory = deque(maxlen=self.max_que)
+        self.position_land_memory = deque(maxlen=self.max_que)
+        self.set_landmark_position()
 
     def move(self,x):
-        self.camera_position = x
-
+        self.camera_position = x[:,:3]
+        # print(x)
+        # print(self.camera_position)
+    
+    def move_focal(self,x):
+        self.focal_pos = x[:,3:]
         # Render the image using the updated camera position. Based on the new position of the 
         # camera we calculate the rotation and translation matrices
     
     def shot(self):
-        R = look_at_rotation(self.camera_position, device=self.device)  # (1, 3, 3)
+        # print(self.camera_position.shape)
+        # print(self.focal_pos.shape)
+        R = look_at_rotation(self.camera_position, at=self.focal_pos, device=self.device)  # (1, 3, 3)
         T = -torch.bmm(R.transpose(1, 2), self.camera_position[:, :, None])[:, :, 0]   # (1, 3)
 
         images = self.renderer(meshes_world=self.meshes.clone(), R=R, T=T)
@@ -74,30 +82,47 @@ class CameraNet:
             rand_coord = np.random.rand(3)
             rand_coord = (rand_coord/np.linalg.norm(rand_coord))*self.radius
             list_random_pos_cam.append(rand_coord)
+            # print(list_random_pos_cam)
 
         self.camera_position = torch.from_numpy(np.array(list_random_pos_cam,dtype=np.float32)).to(self.device)
         # print(self.camera_position.size())
 
+    def set_landmark_position(self):
+        list_set_land_pos = [] # list of random coord for each meshes 
+        for i in range(len(self.meshes)):
+            focal_pos= np.array([0,0,0])
+            list_set_land_pos.append(focal_pos)
+            # print(list_set_land_pos)
+
+        self.focal_pos = torch.from_numpy(np.array(list_set_land_pos,dtype=np.float32)).to(self.device)
+
     def found(self,min_variance):
         found = False
         # print(len(self.position_memory))
-        if len(self.position_memory) == self.max_que:
-            variance = np.mean(np.var(np.array(list(self.position_memory)),axis=0),axis=1) #list variance
-            print('variance :', variance)
-            if np.max(variance)<min_variance:
+        if len(self.position_cam_memory) == self.max_que:
+            variance_cam = np.mean(np.var(np.array(list(self.position_cam_memory)),axis=0),axis=1) #list variance
+            variance_land = np.mean(np.var(np.array(list(self.position_land_memory)),axis=0),axis=1) #list variance
+            global_variance = (variance_cam+variance_land)/2
+            print('variance :', global_variance)
+            if np.max(global_variance)<min_variance:
                 found = True     
         return found   
 
-    def search(self,move_net,min_variance):
+    def search(self,move_net,min_variance,writer,device):
         self.set_random_position()
+        img_batch = torch.empty((0)).to(device)
         while not self.found(min_variance):
             images = self.shot().to(self.device)  #[batchsize,3,224,224]
+            img_batch = torch.cat((img_batch,images),dim=0)
             # print(images.shape)
-            x = move_net(images)  # [batchsize,3]  return the deplacment 
-            x += self.camera_position
+            x = move_net(images)  # [batchsize,6]  return the deplacment 
+            x += torch.cat((self.camera_position,self.focal_pos),dim=1)
             self.move(x.detach().clone())
-            self.position_memory.append(self.camera_position.cpu().numpy())
+            self.move_focal(x.detach().clone())
+            self.position_cam_memory.append(self.camera_position.cpu().numpy())
+            self.position_land_memory.append(self.focal_pos.cpu().numpy())
         
+        writer.add_images('image',img_batch)
         
 
 class FlyByDataset(Dataset):
@@ -118,8 +143,8 @@ class FlyByDataset(Dataset):
         # surf, _a, _v = fbf.RandomRotation(surf)
         surf = ComputeNormals(surf) 
 
-        landmarks_position = self.get_landmarks_position(idx)
-        ideal_position = np.array([landmarks_position[0],landmarks_position[1],2]) # to put ideal position just above the landmark
+        ideal_landmark = ToTensor(dtype=torch.float32, device=self.device)(self.get_landmarks_position(idx))
+        ideal_position = np.array([ideal_landmark[0],ideal_landmark[1],2]) # to put ideal position just above the landmark
         # ideal_position = (landmarks_position/np.linalg.norm(landmarks_position))*self.radius
         ideal_position = ToTensor(dtype=torch.float32, device=self.device)(ideal_position)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
@@ -130,7 +155,7 @@ class FlyByDataset(Dataset):
         faces_pid0 = faces[:,0:1]
         
   
-        return verts, faces, region_id, faces_pid0, color_normals,ideal_position
+        return verts, faces, region_id, faces_pid0, color_normals, ideal_position, ideal_landmark
     
     def get_landmarks_position(self,idx):
        

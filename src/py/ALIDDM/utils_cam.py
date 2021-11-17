@@ -12,7 +12,11 @@ import SimpleITK as sitk
 import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import sem
-
+from pytorch3d.renderer import (
+    FoVPerspectiveCameras, 
+    RasterizationSettings, MeshRenderer, MeshRasterizer,
+    HardPhongShader, PointLights,
+)
 def dataset(data):
     model_lst = []
     landmarks_lst = []
@@ -70,44 +74,48 @@ def generate_sphere_mesh(center,radius,device):
 
 def training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer,device):
     move_net.train()
-    for batch, (V, F, Y, F0, CN, IP) in enumerate(train_dataloader):
+    for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(train_dataloader):
             
-            textures = TexturesVertex(verts_features=CN)
-            meshes = Meshes(
-                verts=V,   
-                faces=F, 
-                textures=textures
-            )
+        textures = TexturesVertex(verts_features=CN)
+        meshes = Meshes(
+            verts=V,   
+            faces=F, 
+            textures=textures
+        )
 
-            camera_net = CameraNet(meshes, phong_renderer)
-            NSteps = 10
-            step_loss = 0
-            img_batch = torch.empty((0)).to(device)
+        camera_net = CameraNet(meshes, phong_renderer)
+        NSteps = 10
+        step_loss = 0
+        img_batch = torch.empty((0)).to(device)
 
-            for i in range(NSteps):
-                optimizer.zero_grad()   # prepare the gradients for this step's back propagation  
-                images = camera_net.shot().to(device)  #[batchsize,3,224,224]
-                x = move_net(images)  # [batchsize,3]  return the deplacment 
-                img_batch = torch.cat((img_batch,images),dim=0)
-                x += camera_net.camera_position
-                loss = loss_function(x, IP)
-   
-                loss.backward()   # backward propagation
-                optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
-                
-                step_loss += loss.item()
-                camera_net.move(x.detach().clone())
+        for i in range(NSteps):
+            optimizer.zero_grad()   # prepare the gradients for this step's back propagation  
+            images = camera_net.shot().to(device)  #[batchsize,3,224,224]
+            x = move_net(images)  # [batchsize,6]  return the deplacment 
+            img_batch = torch.cat((img_batch,images),dim=0)
+            x += torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1)
 
-            step_loss /= NSteps
-            print("Step loss:", step_loss)
-            epoch_loss += step_loss
-            writer.add_images('image',img_batch,epoch)
+            loss = loss_function(x, torch.cat((IP,IL),dim=1))
+
+            loss.backward()   # backward propagation
+            optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
+            
+            step_loss += loss.item()
+            camera_net.move(x.detach().clone())
+            camera_net.move_focal(x.detach().clone())
+
+        print("ideal focal :",IL,"current focal :",camera_net.focal_pos, "difference :",np.linalg.norm(IL-camera_net.focal_pos))
+        print("ideal cam pos :",IP," current cam pos",camera_net.camera_position, "difference :", np.linalg.norm(IP-camera_net.camera_position))
+        step_loss /= NSteps
+        print("Step loss:", step_loss)
+        epoch_loss += step_loss
+        writer.add_images('image',img_batch,epoch)
 
 
 def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,out,device):
     move_net.eval() 
     with torch.no_grad():
-        for batch, (V, F, Y, F0, CN, IP) in enumerate(test_dataloader):
+        for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(test_dataloader):
             
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
@@ -117,9 +125,9 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
             )
             
             camera_net = CameraNet(meshes, phong_renderer)
-            NSteps = 2
+            NSteps = 10
             NRandomPosition = 2
-            img_batch = torch.empty((0)).to(device)
+            # img_batch = torch.empty((0)).to(device)
             for r in range(NRandomPosition):
                 print(r)
                 camera_net.set_random_position()
@@ -127,11 +135,12 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
                     print("step :", i)
                     images = camera_net.shot().to(device) #[batchsize,3,224,224]
                     x = move_net(images)  # [batchsize,3]  return the deplacment 
-                    x += camera_net.camera_position
+                    x += torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1)
                     camera_net.move(x.detach().clone())
-                    img_batch = torch.cat((img_batch,images),dim=0)
+                    camera_net.move_focal(x.detach().clone())
+                    # img_batch = torch.cat((img_batch,images),dim=0)
                 
-                distance = loss_function(x, IP)
+                distance = loss_function(x, torch.cat((IP,IL),dim=1))
                 list_distance.append(distance)
             
             mean_distance = torch.sum(distance)/2
@@ -149,53 +158,62 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
 
 
 def pad_verts_faces(batch):
-    verts = [v for v, f, rid, fpid0, cn, ip in batch]
-    faces = [f for v, f, rid, fpid0, cn, ip in batch]
-    region_ids = [rid for v, f, rid, fpid0, cn, ip in batch]
-    faces_pid0s = [fpid0 for v, f, rid, fpid0, cn, ip in batch]
-    color_normals = [cn for v, f, rid, fpid0, cn, ip in batch]
-    ideal_position = [ip for v, f, rid, fpid0, cn, ip in batch]
+    verts = [v for v, f, rid, fpid0, cn, ip, il in batch]
+    faces = [f for v, f, rid, fpid0, cn, ip, il in batch]
+    region_ids = [rid for v, f, rid, fpid0, cn, ip, il in batch]
+    faces_pid0s = [fpid0 for v, f, rid, fpid0, cn, ip, il in batch]
+    color_normals = [cn for v, f, rid, fpid0, cn, ip, il in batch]
+    ideal_position = [ip for v, f, rid, fpid0, cn, ip, il in batch]
+    ideal_landmark = [il for v, f, rid, fpid0, cn, ip, il in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(region_ids, batch_first=True, padding_value=0), pad_sequence(faces_pid0s, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.),pad_sequence(ideal_position, batch_first=True, padding_value=0.0)
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(region_ids, batch_first=True, padding_value=0), pad_sequence(faces_pid0s, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.),pad_sequence(ideal_position, batch_first=True, padding_value=0.0), pad_sequence(ideal_landmark, batch_first=True, padding_value=0.0)
 
-def SavePrediction(data, outpath):
-    print("Saving prediction to : ", outpath)
-    img = data.numpy()
-    output = sitk.GetImageFromArray(img)
-    writer = sitk.ImageFileWriter()
-    writer.SetFileName(outpath)
-    writer.Execute(output)
+# def SavePrediction(data, outpath):
+#     print("Saving prediction to : ", outpath)
+#     img = data.numpy()
+#     output = sitk.GetImageFromArray(img)
+#     writer = sitk.ImageFileWriter()
+#     writer.SetFileName(outpath)
+#     writer.Execute(output)
 
 
-def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function):
-    list_distance = ({'landmark' : [], 'distance':[]})
+def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,device):
+    list_distance = ({'obj' : [], 'distance':[]})
     move_net.eval()
-    for batch, (V, F, Y, F0, CN, IP) in enumerate(df_val):
-        textures = TexturesVertex(verts_features=CN)
-        meshes = Meshes(
-            verts=V,   
-            faces=F, 
-            textures=textures
-        )
-        camera_net = CameraNet(meshes, phong_renderer)
-        camera_net.search(move_net,min_variance)
-        
-        distance = loss_function(camera_net.camera_position, IP)
-        # print(camera_net.camera_position)
-        # print(IP.shape)
-        print(distance)
-        cam_pos = camera_net.camera_position.cpu().numpy()
-        new_IP = IP.cpu().numpy()
-        for index,element in enumerate(cam_pos):
-            distance = np.linalg.norm(element-new_IP[index])
-            # print(distance)
-            list_distance['landmark'].append('Lower_O-1')
-            list_distance['distance'].append(distance)
-            print(list_distance)
+    with torch.no_grad():
+        for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(df_val):
+            textures = TexturesVertex(verts_features=CN)
+            meshes = Meshes(
+                verts=V,   
+                faces=F, 
+                textures=textures
+            )
+            camera_net = CameraNet(meshes, phong_renderer)
+            camera_net.search(move_net,min_variance,writer,device)
             
+            # distance = loss_function(torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1), torch.cat((IP,IL),dim=1))
+            # print(camera_net.camera_position)
+            # print(IP.shape)
+            # print(distance)
+            cam_pos = camera_net.camera_position.cpu().numpy()
+            new_IP = IP.cpu().numpy()
+            foc_pos = camera_net.focal_pos.cpu().numpy()
+            new_IL = IL.cpu().numpy()
+            for index,element in enumerate(cam_pos):
+                distance_cam = np.linalg.norm(element-new_IP[index])
+                distance_land = np.linalg.norm(foc_pos[index]-new_IL[index])
+                # print(distance)
+                list_distance['obj'].append('cam')
+                list_distance['distance'].append(distance_cam)
+                list_distance['obj'].append('land')
+                list_distance['distance'].append(distance_land)
 
-    violin_plot = sns.violinplot(x='landmark',y='distance',data=list_distance)
-    plt.show()
+                print(list_distance)
+                
+
+        violin_plot = sns.violinplot(x='obj',y='distance',data=list_distance)
+        plt.show()
+        
 
     # std_error = sem(list_distance)
     # print('std error :' , std_error )
