@@ -144,7 +144,7 @@ class FlyByDataset(Dataset):
         surf = ComputeNormals(surf) 
 
         ideal_landmark = ToTensor(dtype=torch.float32, device=self.device)(self.get_landmarks_position(idx))
-        ideal_position = np.array([ideal_landmark[0],ideal_landmark[1],2]) # to put ideal position just above the landmark
+        ideal_position = ToTensor(np.array([ideal_landmark[0],ideal_landmark[1],2])) # to put ideal position just above the landmark
         # ideal_position = (landmarks_position/np.linalg.norm(landmarks_position))*self.radius
         ideal_position = ToTensor(dtype=torch.float32, device=self.device)(ideal_position)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
