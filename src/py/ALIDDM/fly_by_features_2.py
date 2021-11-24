@@ -49,106 +49,106 @@ def main(args):
     df = dataset(args.dir)
     df = pd.read_csv(args.csv)
     print(df)
-    # df_train, df_val = train_test_split(df, test_size=args.test_size)
-    # # df_prediction = dataset(args.data_pred)
+    df_train, df_val = train_test_split(df, test_size=args.test_size)
+    # df_prediction = dataset(args.data_pred)
 
-    # train_data = FlyByDataset(df_train,device, dataset_dir=args.dir)
-    # val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir)
-    # # data_prediction = FlyByDataset(df_prediction,2,device)
+    train_data = FlyByDataset(df_train,device, dataset_dir=args.dir)
+    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir)
+    # data_prediction = FlyByDataset(df_prediction,2,device)
 
-    # train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    # test_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    # # pred_dataloader = DataLoader(data_prediction,batch_size=args.batch_size,shuffle=True, collate_fn=pad_verts_faces)
-    # # print(pred_dataloader)
+    train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
+    test_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
+    # pred_dataloader = DataLoader(data_prediction,batch_size=args.batch_size,shuffle=True, collate_fn=pad_verts_faces)
+    # print(pred_dataloader)
 
-    # learning_rate = 1e-5
-    # feat_net = FeaturesNet().to(device)
-    # # new_move_net = TimeDistributed(move_net).to(device)
-    # loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+    learning_rate = 1e-5
+    feat_net = FeaturesNet().to(device)
+    # new_move_net = TimeDistributed(move_net).to(device)
+    loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
     
-    # epoch_loss = 0
-    # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
+    epoch_loss = 0
+    writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
-    # best_deplacment = 99999
-    # best_deplacment_epoch = 0
-    # test_interval = args.test_interval
-    # list_distance = []
+    best_deplacment = 99999
+    best_deplacment_epoch = 0
+    test_interval = args.test_interval
+    list_distance = []
 
-    # agents = [Agent(phong_renderer, feat_net, device, batch_size = args.batch_size) for i in range(42)]
+    agents = [Agent(phong_renderer, feat_net, device, batch_size = args.batch_size) for i in range(42)]
 
-    # parameters = list(feat_net.parameters())
+    parameters = list(feat_net.parameters())
 
-    # for a in agents:
-    #     parameters += list(a.parameters())
+    for a in agents:
+        parameters += list(a.parameters())
 
-    # optimizer = torch.optim.Adam(parameters, learning_rate)
-    # # optimizer = torch.optim.Adam([list(agents[aid].attention.parameters()) + list(agents[aid].delta_move.parameters())], learning_rate)
+    optimizer = torch.optim.Adam(parameters, learning_rate)
+    # optimizer = torch.optim.Adam([list(agents[aid].attention.parameters()) + list(agents[aid].delta_move.parameters())], learning_rate)
 
     
-    # for epoch in range(args.num_epoch):
-    #     print('---------- epoch :', epoch,'----------')
-    #     agents_ids = np.arange(42)
-    #     np.random.shuffle(agents_ids)
+    for epoch in range(args.num_epoch):
+        print('---------- epoch :', epoch,'----------')
+        agents_ids = np.arange(42)
+        np.random.shuffle(agents_ids)
 
-    #     for batch, (V, F, CN, LP) in enumerate(train_dataloader):
-    #         textures = TexturesVertex(verts_features=CN)
-    #         meshes = Meshes(
-    #             verts=V,   
-    #             faces=F, 
-    #             textures=textures
-    #         )
+        for batch, (V, F, CN, LP) in enumerate(train_dataloader):
+            textures = TexturesVertex(verts_features=CN)
+            meshes = Meshes(
+                verts=V,   
+                faces=F, 
+                textures=textures
+            )
             
-    #         # list_pictures = agent.shot(meshes)
-    #         # agent.affichage(list_pictures)
-    #         img_batch = torch.empty((0)).to(device)
+            # list_pictures = agent.shot(meshes)
+            # agent.affichage(list_pictures)
+            img_batch = torch.empty((0)).to(device)
 
-    #         for aid in agents_ids: #aid == idlandmark_id
-    #             print('---------- agents id :', aid,'----------')
+            for aid in agents_ids: #aid == idlandmark_id
+                print('---------- agents id :', aid,'----------')
 
-    #             NSteps = 10
-    #             step_loss = 0
+                NSteps = 10
+                step_loss = 0
             
-    #             agents[aid].trainable(True)
+                agents[aid].trainable(True)
 
-    #             for i in range(NSteps):
-    #                 print('---------- step :', i,'----------')
+                for i in range(NSteps):
+                    print('---------- step :', i,'----------')
 
-    #                 optimizer.zero_grad()   # prepare the gradients for this step's back propagation
+                    optimizer.zero_grad()   # prepare the gradients for this step's back propagation
 
-    #                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+                    x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                     
-    #                 x += agents[aid].sphere_centers
-    #                 # print('coord sphere center :', agent.sphere_center)
-    #                 loss = loss_function(x, LP)
+                    x += agents[aid].sphere_centers
+                    # print('coord sphere center :', agent.sphere_center)
+                    loss = loss_function(x, LP)
 
-    #                 loss.backward()   # backward propagation
-    #                 optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
+                    loss.backward()   # backward propagation
+                    optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
                     
-    #                 step_loss += loss.item()
-    #                 agents[aid].sphere_centers = x.detach().clone()
+                    step_loss += loss.item()
+                    agents[aid].sphere_centers = x.detach().clone()
                 
-    #             step_loss /= NSteps
-    #             agents[aid].trainable(False)
+                step_loss /= NSteps
+                agents[aid].trainable(False)
 
-    #             print("Step loss:", step_loss)
-    #             epoch_loss += step_loss
-    #         # agent.affichage(list_pictures)
+                print("Step loss:", step_loss)
+                epoch_loss += step_loss
+            # agent.affichage(list_pictures)
     
 
-    # affichage(train_dataloader,phong_renderer)
+    affichage(train_dataloader,phong_renderer)
             
-    # for epoch in range(args.num_epoch):
-    #     print('-------- TRAINING --------')
+    for epoch in range(args.num_epoch):
+        print('-------- TRAINING --------')
 
-    #     training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer, device)
+        training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer, device)
 
-    #     if (epoch +1 ) % test_interval == 0:
-    #         print('-------- VALIDATION --------')
-    #         print(epoch +1)
-    #         validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,args.out,device)
+        if (epoch +1 ) % test_interval == 0:
+            print('-------- VALIDATION --------')
+            print(epoch +1)
+            validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,args.out,device)
     
-    # print('-------- ACCURACY --------')
-    # Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function,writer,device)
+    print('-------- ACCURACY --------')
+    Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function,writer,device)
 
 
 
