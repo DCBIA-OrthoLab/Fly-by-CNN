@@ -46,10 +46,9 @@ def main(args):
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
 
-    df = dataset(args.dir)
-    df = pd.read_csv(args.csv)
-    print(df)
+    df = pd.read_csv(dataset(args.dir))
     df_train, df_val = train_test_split(df, test_size=args.test_size)
+    print(df_train)
     # df_prediction = dataset(args.data_pred)
 
     train_data = FlyByDataset(df_train,device, dataset_dir=args.dir)
@@ -157,7 +156,7 @@ if __name__ == '__main__':
 
     input_param = parser.add_argument_group('input files')
     input_param.add_argument('--dir', type=str, help='dataset directory, if provided, it will be concatenated to the surf,landmarkrs file names', default='')
-    input_param.add_argument('--csv', type=str, help='csv with columns surf,landmarks,landmarks_number the landmarks column is a json filename with fiducials', required=True)
+    # input_param.add_argument('--csv', type=str, help='csv with columns surf,landmarks,landmarks_number the landmarks column is a json filename with fiducials', required=True)
     # input_param.add_argument('--data_pred', type=str, help='dataset prediction', required=True)
     input_param.add_argument('--image_size',type=int, help='size of the picture', default=24)
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)

@@ -29,7 +29,7 @@ def dataset(data):
             model_lst.append(img_fn)
         if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".json"]]: 
             landmarks_lst.append(img_fn)
-           
+
     # for i in model_lst:
     #     print("model_lst :",i)
     # for i in landmarks_lst:
@@ -49,9 +49,7 @@ def dataset(data):
     # return datalist
     
     
-    outfile = os.path.join('/Users/luciacev-admin/Desktop/data_O','data_O.csv')
-
-
+    outfile = os.path.join(os.path.dirname(data),'data_O.csv')
     fieldnames = ['surf', 'landmarks', 'number_of_landmarks']
     data_list = []
     for idx,path in enumerate(landmarks_lst):
@@ -65,13 +63,12 @@ def dataset(data):
                 'number_of_landmarks':number_of_landmarks }
         data_list.append(rows)
     
-    
     with open(outfile, 'w', encoding='UTF8', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(data_list)
 
-    return f
+    return outfile
 
 def generate_sphere_mesh(center,radius,device):
     sphereSource = vtk.vtkSphereSource()
