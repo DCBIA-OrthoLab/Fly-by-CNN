@@ -118,6 +118,8 @@ def main(args):
                     
                     x += agents[aid].sphere_centers
                     # print('coord sphere center :', agent.sphere_center)
+                    LP = torch.Tensor(list(LP[:][aid]))
+                    print(LP)
                     loss = loss_function(x, LP)
 
                     loss.backward()   # backward propagation
@@ -164,13 +166,13 @@ if __name__ == '__main__':
     input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.5)
     input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
-    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
+    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
 
     parser.add_argument('--num_epoch',type=int,help="numero epoch",required=True)
 
     output_param = parser.add_argument_group('output files')
-    output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
+    output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
 
     args = parser.parse_args()
     main(args)

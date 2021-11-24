@@ -20,9 +20,11 @@ import os
 class Agent(nn.Module):
     def __init__(self, renderer, features_net, device, batch_size = 1, radius=2,sl=2):
         super(Agent, self).__init__()
-        self.sphere_centers= torch.zeros([batch_size, 3]).type(torch.float32)
+        self.batch_size = batch_size
         self.renderer = renderer
         self.device = device
+
+        self.sphere_centers= torch.zeros([batch_size, 3]).type(torch.float32).to(self.device)
         # self.list_cam_pos = LIST_POINT
         # self.max_que = lenque
         # self.position_center_memory = deque(maxlen=self.max_que)
@@ -35,44 +37,80 @@ class Agent(nn.Module):
 
         sphere_points = np.array(sphere_points)
 
-        self.sphere_points = torch.tensor(sphere_points).type(torch.float32)
+        self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
         self.attention = SelfAttention(512, 128)
         self.delta_move = nn.Linear(512, 3)
 
         self.trainable(False)
-    
-    def forward(self, x):
-        batch_images = []
-        list_images = []
 
-        for spc in self.sphere_centers:
-            spc = spc.unsqueeze(0)
-            current_sphere_points = self.sphere_points + spc
-            for sp in current_sphere_points:
-                sp = sp.unsqueeze(0)
-                print('sphere_points :',sp)
-                print('sphere center :',spc)
-                R = look_at_rotation(sp, at=spc, device=self.device)  # (1, 3, 3)
-                print( 'R shape :',R.shape)
-                T = -torch.bmm(R.transpose(1, 2), sp[:, :, None])[:, :, 0]   # (1, 3)
 
-                images = self.renderer(meshes_world= x.clone(), R=R, T=T)
-                images = images.permute(0,3,1,2)
-                images = images[:,:-1,:,:]
-                
-                list_images.append(images)
-            images = torch.cat(list_images,dim=0) # [timesteps, channels, H, W]
-            batch_images.append(images) 
+    def forward(self,x):
 
-        x = torch.Tensor(x).to(self.device)
+        spc = self.sphere_centers
+        img_lst = torch.empty((0)).to(self.device)
+
+        for sp in self.sphere_points:
+            sp = sp.unsqueeze(0).repeat(self.batch_size)
+            current_cam_pos = spc + sp
+            R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
+            #print( 'R shape :',R.shape)
+            T = -torch.bmm(R.transpose(1, 2), current_cam_pos[:, :, None])[:, :, 0]  # (1, 3)
+
+            images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
+            images = images.permute(0,3,1,2)
+            images = images[:,:-1,:,:]
+            
+            img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
+        img_batch =  img_lst.permute(1,0,2,3,4)
+        print(img_batch.shape)
+
+        x = img_batch
         x = self.features_net(x)
         x, s = self.attention(x)
         x = self.delta_move(x)
 
         return x
     
+    # def forward(self, x):
+    # # print(x.size)
+    # # print(self.sphere_centers.size)
+
+    #     img_batch = torch.empty((0)).to(self.device)
+    #     for b,spc in enumerate(self.sphere_centers):
+    #         current_sphere_points = self.sphere_points + spc
+    #         spc = spc.unsqueeze(0)
+    #         spc = spc.to(self.device)
+    #         img_lst = torch.empty((0)).to(self.device)
+
+    #         for sp in current_sphere_points:
+    #             sp = sp.unsqueeze(0).to(self.device)
+    #             #print('sphere_points :',sp)
+    #             #print('sphere center :',spc)
+    #             R = look_at_rotation(sp, at=spc, device=self.device)  # (1, 3, 3)
+    #             #print( 'R shape :',R.shape)
+    #             T = -torch.bmm(R.transpose(1, 2), sp[:, :, None])[:, :, 0]  # (1, 3)
+
+    #             images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
+    #             images = images.permute(0,3,1,2)
+    #             images = images[b,:-1,:,:]
+                
+    #             img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
+                
+    #             # img_batch = torch.cat((img_batch,images.unsqueeze(0)),dim=0)
+    #         img_batch = torch.cat((img_batch,img_lst.unsqueeze(0)),dim=0)
+
+
+    #     print(img_batch.shape)
+
+    #     x = img_batch
+    #     x = self.features_net(x)
+    #     x, s = self.attention(x)
+    #     x = self.delta_move(x)
+
+    #     return x
+        
     def trainable(self, train = False):
         for param in self.attention.parameters():
             param.requires_grad = train
