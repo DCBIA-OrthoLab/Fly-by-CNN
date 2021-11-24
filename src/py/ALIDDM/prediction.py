@@ -53,7 +53,7 @@ def main(args):
     )
     
     writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
-
+    
     with torch.no_grad():
 
         for batch, (V, F, Y, F0, CN, IP) in enumerate(data):
@@ -64,12 +64,14 @@ def main(args):
                 textures=textures
             )
             camera_net = CameraNet(meshes, phong_renderer)
-            camera_net.search(move_net,args.min_variance) 
+            landmark_coord = camera_net.search(move_net,args.min_variance) 
             images = camera_net.shot().to(device) 
             # distance = loss_function(camera_net.camera_position, IP)
 
             writer.add_images('image',images)
-                
+            
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Predict Landmarks', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     

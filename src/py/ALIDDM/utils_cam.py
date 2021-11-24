@@ -17,6 +17,8 @@ from pytorch3d.renderer import (
     RasterizationSettings, MeshRenderer, MeshRasterizer,
     HardPhongShader, PointLights,
 )
+
+
 def dataset(data):
     model_lst = []
     landmarks_lst = []
@@ -43,8 +45,9 @@ def dataset(data):
     
     # for i in datalist:
     #     print("datalist :",i)
-    
+    # print(datalist)
     return datalist
+
 
 def generate_sphere_mesh(center,radius,device):
     sphereSource = vtk.vtkSphereSource()
@@ -111,8 +114,8 @@ def training( epoch, move_net, train_dataloader, phong_renderer, loss_function, 
         epoch_loss += step_loss
         writer.add_images('image',img_batch,epoch)
 
-
 def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,out,device):
+    list_distance = []
     move_net.eval() 
     with torch.no_grad():
         for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(test_dataloader):
@@ -124,49 +127,102 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
                 textures=textures
             )
             
-            camera_net = CameraNet(meshes, phong_renderer)
+            agent = Agent(phong_renderer,device)
             NSteps = 10
-            NRandomPosition = 2
             # img_batch = torch.empty((0)).to(device)
-            for r in range(NRandomPosition):
-                print(r)
-                camera_net.set_random_position()
-                for i in range(NSteps):
-                    print("step :", i)
-                    images = camera_net.shot().to(device) #[batchsize,3,224,224]
-                    x = move_net(images)  # [batchsize,3]  return the deplacment 
-                    x += torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1)
-                    camera_net.move(x.detach().clone())
-                    camera_net.move_focal(x.detach().clone())
-                    # img_batch = torch.cat((img_batch,images),dim=0)
-                
-                distance = loss_function(x, torch.cat((IP,IL),dim=1))
-                list_distance.append(distance)
+ 
+            for i in range(NSteps):
+                print("step :", i)
+                list_pictures = agent.shot().to(device) #[batchsize,3,224,224]
+                x = move_net(list_pictures)  # [batchsize,3]  return the deplacment 
+                print('x shape :',x)
+                x += agent.sphere_center
+                print('coord sphere center :', agent.sphere_center)
+                # img_batch = torch.cat((img_batch,images),dim=0)
+                agent.move(x.detach().clone())
+
+            distance = loss_function(x, IL)
+            list_distance.append(distance)
+        
+        mean_distance = torch.sum(distance)/2
+
+        if mean_distance<best_deplacment:
+            best_deplacment=mean_distance
+            best_deplacment_epoch = epoch + 1
+            output_dir = os.path.join(out, "best_move_net")
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            torch.save(move_net, os.path.join(output_dir, "best_move_net.pth"))
+            print("saved new best metric network")
+            print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
+
+# def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,out,device):
+#     move_net.eval() 
+#     with torch.no_grad():
+#         for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(test_dataloader):
             
-            mean_distance = torch.sum(distance)/2
+#             textures = TexturesVertex(verts_features=CN)
+#             meshes = Meshes(
+#                 verts=V,   
+#                 faces=F, 
+#                 textures=textures
+#             )
+            
+#             camera_net = CameraNet(meshes, phong_renderer)
+#             NSteps = 10
+#             NRandomPosition = 2
+#             # img_batch = torch.empty((0)).to(device)
+#             for r in range(NRandomPosition):
+#                 print(r)
+#                 camera_net.set_random_position()
+#                 for i in range(NSteps):
+#                     print("step :", i)
+#                     images = camera_net.shot().to(device) #[batchsize,3,224,224]
+#                     x = move_net(images)  # [batchsize,3]  return the deplacment 
+#                     x += torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1)
+#                     camera_net.move(x.detach().clone())
+#                     camera_net.move_focal(x.detach().clone())
+#                     # img_batch = torch.cat((img_batch,images),dim=0)
+                
+#                 distance = loss_function(x, torch.cat((IP,IL),dim=1))
+#                 list_distance.append(distance)
+            
+#             mean_distance = torch.sum(distance)/2
 
-            if mean_distance<best_deplacment:
-                best_deplacment=mean_distance
-                best_deplacment_epoch = epoch + 1
-                output_dir = os.path.join(out, "best_move_net")
-                if not os.path.exists(output_dir):
-                    os.makedirs(output_dir)
-                torch.save(move_net, os.path.join(output_dir, "best_move_net.pth"))
-                print("saved new best metric network")
-                print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
+#             if mean_distance<best_deplacment:
+#                 best_deplacment=mean_distance
+#                 best_deplacment_epoch = epoch + 1
+#                 output_dir = os.path.join(out, "best_move_net")
+#                 if not os.path.exists(output_dir):
+#                     os.makedirs(output_dir)
+#                 torch.save(move_net, os.path.join(output_dir, "best_move_net.pth"))
+#                 print("saved new best metric network")
+#                 print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
 
-
+# def affichage(data_loader,phong_renderer):
+#     for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
+#         textures = TexturesVertex(verts_features=CN)
+#         meshes = Meshes(
+#             verts=V,   
+#             faces=F, 
+#             textures=textures
+#         )
+        
+#         agent = Agent(meshes,phong_renderer)
+#         list_pictures = agent.shot().to(device)
+#         for pictures in list_pictures:
+#             plt.imshow(pictures)
+#             plt.show()
 
 def pad_verts_faces(batch):
-    verts = [v for v, f, rid, fpid0, cn, ip, il in batch]
-    faces = [f for v, f, rid, fpid0, cn, ip, il in batch]
-    region_ids = [rid for v, f, rid, fpid0, cn, ip, il in batch]
-    faces_pid0s = [fpid0 for v, f, rid, fpid0, cn, ip, il in batch]
-    color_normals = [cn for v, f, rid, fpid0, cn, ip, il in batch]
-    ideal_position = [ip for v, f, rid, fpid0, cn, ip, il in batch]
-    ideal_landmark = [il for v, f, rid, fpid0, cn, ip, il in batch]
-
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(region_ids, batch_first=True, padding_value=0), pad_sequence(faces_pid0s, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.),pad_sequence(ideal_position, batch_first=True, padding_value=0.0), pad_sequence(ideal_landmark, batch_first=True, padding_value=0.0)
+    verts = [v for v, f, cn, lp in batch]
+    faces = [f for v, f, cn, lp in batch]
+    # region_ids = [rid for v, f, rid, fpid0, cn, ip, lp in batch]
+    # faces_pid0s = [fpid0 for v, f, fpid0, cn, ip, lp in batch]
+    color_normals = [cn for v, f, cn, lp in batch]
+    # ideal_position = [ip for v, f, fpid0, cn, ip, lp in batch]
+    landmark_position = [lp for v, f, cn, lp in batch]
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position
 
 # def SavePrediction(data, outpath):
 #     print("Saving prediction to : ", outpath)
@@ -175,7 +231,6 @@ def pad_verts_faces(batch):
 #     writer = sitk.ImageFileWriter()
 #     writer.SetFileName(outpath)
 #     writer.Execute(output)
-
 
 def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,device):
     list_distance = ({'obj' : [], 'distance':[]})
@@ -188,31 +243,59 @@ def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,de
                 faces=F, 
                 textures=textures
             )
-            camera_net = CameraNet(meshes, phong_renderer)
-            camera_net.search(move_net,min_variance,writer,device)
+            agent = Agent(phong_renderer,device)
+            center_pos = agent.search(move_net,min_variance,writer,device)
             
             # distance = loss_function(torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1), torch.cat((IP,IL),dim=1))
             # print(camera_net.camera_position)
             # print(IP.shape)
             # print(distance)
-            cam_pos = camera_net.camera_position.cpu().numpy()
-            new_IP = IP.cpu().numpy()
-            foc_pos = camera_net.focal_pos.cpu().numpy()
             new_IL = IL.cpu().numpy()
-            for index,element in enumerate(cam_pos):
-                distance_cam = np.linalg.norm(element-new_IP[index])
-                distance_land = np.linalg.norm(foc_pos[index]-new_IL[index])
-                # print(distance)
-                list_distance['obj'].append('cam')
-                list_distance['distance'].append(distance_cam)
-                list_distance['obj'].append('land')
-                list_distance['distance'].append(distance_land)
+            distance_land = np.linalg.norm(center_pos-new_IL)
+            list_distance['obj'].append('agent')
+            list_distance['distance'].append(distance_land)
 
-                print(list_distance)
+            print(list_distance)
+                
+        sns.violinplot(x='obj',y='distance',data=list_distance)
+        plt.show()
+
+# def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,device):
+#     list_distance = ({'obj' : [], 'distance':[]})
+#     move_net.eval()
+#     with torch.no_grad():
+#         for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(df_val):
+#             textures = TexturesVertex(verts_features=CN)
+#             meshes = Meshes(
+#                 verts=V,   
+#                 faces=F, 
+#                 textures=textures
+#             )
+#             camera_net = CameraNet(meshes, phong_renderer)
+#             camera_net.search(move_net,min_variance,writer,device)
+            
+#             # distance = loss_function(torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1), torch.cat((IP,IL),dim=1))
+#             # print(camera_net.camera_position)
+#             # print(IP.shape)
+#             # print(distance)
+#             cam_pos = camera_net.camera_position.cpu().numpy()
+#             new_IP = IP.cpu().numpy()
+#             foc_pos = camera_net.focal_pos.cpu().numpy()
+#             new_IL = IL.cpu().numpy()
+#             for index,element in enumerate(cam_pos):
+#                 distance_cam = np.linalg.norm(element-new_IP[index])
+#                 distance_land = np.linalg.norm(foc_pos[index]-new_IL[index])
+#                 # print(distance)
+#                 list_distance['obj'].append('cam')
+#                 list_distance['distance'].append(distance_cam)
+#                 list_distance['obj'].append('land')
+#                 list_distance['distance'].append(distance_land)
+
+#                 print(list_distance)
                 
 
-        violin_plot = sns.violinplot(x='obj',y='distance',data=list_distance)
-        plt.show()
+#         violin_plot = sns.violinplot(x='obj',y='distance',data=list_distance)
+#         plt.show()
         
 
     # std_error = sem(list_distance)
@@ -239,3 +322,74 @@ def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,de
 #         list_distance.append(distance)
         
     # SavePrediction(output, output_path)
+
+
+def GenControlePoint(groupe_data):
+    lm_lst = []
+    false = False
+    true = True
+    id = 0
+    for landmark,data in groupe_data.items():
+        id+=1
+        controle_point = {
+            "id": str(id),
+            "label": landmark,
+            "description": "",
+            "associatedNodeID": "",
+            "position": [data["x"], data["y"], data["z"]],
+            "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            "selected": true,
+            "locked": true,
+            "visibility": true,
+            "positionStatus": "preview"
+        }
+        lm_lst.append(controle_point)
+
+    return lm_lst
+
+def WriteJson(lm_lst,out_path):
+    false = False
+    true = True
+    file = {
+    "@schema": "https://raw.githubusercontent.com/slicer/slicer/master/Modules/Loadable/Markups/Resources/Schema/markups-schema-v1.0.0.json#",
+    "markups": [
+        {
+            "type": "Fiducial",
+            "coordinateSystem": "LPS",
+            "locked": false,
+            "labelFormat": "%N-%d",
+            "controlPoints": lm_lst,
+            "measurements": [],
+            "display": {
+                "visibility": false,
+                "opacity": 1.0,
+                "color": [0.4, 1.0, 0.0],
+                "selectedColor": [1.0, 0.5000076295109484, 0.5000076295109484],
+                "activeColor": [0.4, 1.0, 0.0],
+                "propertiesLabelVisibility": false,
+                "pointLabelsVisibility": true,
+                "textScale": 3.0,
+                "glyphType": "Sphere3D",
+                "glyphScale": 1.0,
+                "glyphSize": 5.0,
+                "useGlyphScale": true,
+                "sliceProjection": false,
+                "sliceProjectionUseFiducialColor": true,
+                "sliceProjectionOutlinedBehindSlicePlane": false,
+                "sliceProjectionColor": [1.0, 1.0, 1.0],
+                "sliceProjectionOpacity": 0.6,
+                "lineThickness": 0.2,
+                "lineColorFadingStart": 1.0,
+                "lineColorFadingEnd": 10.0,
+                "lineColorFadingSaturation": 1.0,
+                "lineColorFadingHueOffset": 0.0,
+                "handlesInteractive": false,
+                "snapMode": "toVisibleSurface"
+            }
+        }
+    ]
+    }
+    with open(out_path, 'w', encoding='utf-8') as f:
+        json.dump(file, f, ensure_ascii=False, indent=4)
+
+    f.close
