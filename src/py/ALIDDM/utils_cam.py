@@ -17,7 +17,7 @@ from pytorch3d.renderer import (
     RasterizationSettings, MeshRenderer, MeshRasterizer,
     HardPhongShader, PointLights,
 )
-
+import csv
 
 def dataset(data):
     model_lst = []
@@ -35,19 +35,43 @@ def dataset(data):
     # for i in landmarks_lst:
     #     print("landmarks_lst :",i)
     
-    if len(model_lst) != len(landmarks_lst):
-        print("ERROR : Not the same number of models and landmarks file")
-        return
+    # if len(model_lst) != len(landmarks_lst):
+    #     print("ERROR : Not the same number of models and landmarks file")
+    #     return
     
-    for file_id in range(0,len(model_lst)):
-        data = {"model" : model_lst[file_id], "landmarks" : landmarks_lst[file_id]}
-        datalist.append(data)
+    # for file_id in range(0,len(model_lst)):
+    #     data = {"model" : model_lst[file_id], "landmarks" : landmarks_lst[file_id]}
+    #     datalist.append(data)
     
-    # for i in datalist:
-    #     print("datalist :",i)
-    # print(datalist)
-    return datalist
+    # # for i in datalist:
+    # #     print("datalist :",i)
+    # # print(datalist)
+    # return datalist
+    
+    
+    outfile = os.path.join('/Users/luciacev-admin/Desktop/data_O','data_O.csv')
 
+
+    fieldnames = ['surf', 'landmarks', 'number_of_landmarks']
+    data_list = []
+    for idx,path in enumerate(landmarks_lst):
+        data = json.load(open(path))
+        markups = data['markups']
+        landmarks_dict = markups[0]['controlPoints']
+        number_of_landmarks = len(landmarks_dict)
+
+        rows = {'surf':model_lst[idx],
+                'landmarks':path,
+                'number_of_landmarks':number_of_landmarks }
+        data_list.append(rows)
+    
+    
+    with open(outfile, 'w', encoding='UTF8', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(data_list)
+
+    return f
 
 def generate_sphere_mesh(center,radius,device):
     sphereSource = vtk.vtkSphereSource()
