@@ -95,52 +95,64 @@ def generate_sphere_mesh(center,radius,device):
     
     return mesh
 
-
-def training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer,device):
-    move_net.train()
-    for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(train_dataloader):
-            
+def training(agents, agents_ids, train_dataloader, loss_function, optimizer, epoch_loss, device):
+    for batch, (V, F, CN, LP) in enumerate(train_dataloader):
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(
             verts=V,   
             faces=F, 
             textures=textures
         )
-
-        camera_net = CameraNet(meshes, phong_renderer)
-        NSteps = 10
-        step_loss = 0
+        
+        # list_pictures = agent.shot(meshes)
+        # agent.affichage(list_pictures)
         img_batch = torch.empty((0)).to(device)
 
-        for i in range(NSteps):
-            optimizer.zero_grad()   # prepare the gradients for this step's back propagation  
-            images = camera_net.shot().to(device)  #[batchsize,3,224,224]
-            x = move_net(images)  # [batchsize,6]  return the deplacment 
-            img_batch = torch.cat((img_batch,images),dim=0)
-            x += torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1)
+        for aid in agents_ids: #aid == idlandmark_id
+            print('---------- agents id :', aid,'----------')
 
-            loss = loss_function(x, torch.cat((IP,IL),dim=1))
+            NSteps = 10
+            step_loss = 0
+        
+            agents[aid].trainable(True)
+            agents[aid].train()
 
-            loss.backward()   # backward propagation
-            optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
+            for i in range(NSteps):
+                print('---------- step :', i,'----------')
+
+                optimizer.zero_grad()   # prepare the gradients for this step's back propagation
+
+                x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+                
+                x += agents[aid].sphere_centers
+                # print('coord sphere center :', agent.sphere_center)
+                
+                lm_pos = torch.empty((0)).to(device)
+                for lst in LP:
+                    lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
+                # print(lm_pos)
+                
+                loss = loss_function(x, lm_pos)
+
+                loss.backward()   # backward propagation
+                optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
+                
+                l = loss.item()
+                step_loss += l
+                print("Step loss:",l)
+                agents[aid].sphere_centers = x.detach().clone()
             
-            step_loss += loss.item()
-            camera_net.move(x.detach().clone())
-            camera_net.move_focal(x.detach().clone())
+            step_loss /= NSteps
+            agents[aid].trainable(False)
 
-        # print("ideal focal :",IL,"current focal :",camera_net.focal_pos.cpu(), "difference :",np.linalg.norm(IL-camera_net.focal_pos))
-        # print("ideal cam pos :",IP," current cam pos",camera_net.camera_position.cpu(), "difference :", np.linalg.norm(IP-camera_net.camera_position))
-        step_loss /= NSteps
-        print("Step loss:", step_loss)
-        epoch_loss += step_loss
-        writer.add_images('image',img_batch,epoch)
+            print("Step loss:", step_loss)
+            epoch_loss += step_loss
 
-def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,out,device):
+def validation(epoch,agents,agents_ids,test_dataloader,num_step,num_agents,loss_function,best_deplacment,best_deplacment_epoch,out,device):
     list_distance = []
-    move_net.eval() 
     with torch.no_grad():
-        for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(test_dataloader):
-            
+        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
+
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
@@ -148,24 +160,37 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
                 textures=textures
             )
             
-            agent = Agent(phong_renderer,device)
-            NSteps = 10
-            # img_batch = torch.empty((0)).to(device)
- 
-            for i in range(NSteps):
-                print("step :", i)
-                list_pictures = agent.shot().to(device) #[batchsize,3,224,224]
-                x = move_net(list_pictures)  # [batchsize,3]  return the deplacment 
-                print('x shape :',x)
-                x += agent.sphere_center
-                print('coord sphere center :', agent.sphere_center)
-                # img_batch = torch.cat((img_batch,images),dim=0)
-                agent.move(x.detach().clone())
+            for aid in agents_ids: #aid == idlandmark_id
+                print('---------- agents id :', aid,'----------')
 
-            distance = loss_function(x, IL)
-            list_distance.append(distance)
+                NSteps =  num_step
+                aid_loss = 0
+                agents[aid].eval() 
+
+                for i in range(NSteps):
+                    print('---------- step :', i,'----------')
+
+                    x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+
+                    x += agents[aid].sphere_centers
+                    # print('coord sphere center :', agent.sphere_center)
+                    
+                    lm_pos = torch.empty((0)).to(device)
+                    for lst in LP:
+                        lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
+                    
+                    loss = loss_function(x, lm_pos)
+
+                    l = loss.item()
+                    aid_loss += l
+                    print("Step loss:",l)
+                    agents[aid].sphere_centers = x.detach().clone()
+                
+                aid_loss /= NSteps
+                print("Step loss:", aid_loss)
+                list_distance.append(aid_loss)
         
-        mean_distance = torch.sum(distance)/2
+        mean_distance = torch.sum(list_distance)/num_agents
 
         if mean_distance<best_deplacment:
             best_deplacment=mean_distance
@@ -173,7 +198,7 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
             output_dir = os.path.join(out, "best_move_net")
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
-            torch.save(move_net, os.path.join(output_dir, "best_move_net.pth"))
+            torch.save(agents, os.path.join(output_dir, "best_move_net.pth"))
             print("saved new best metric network")
             print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
 
@@ -220,20 +245,20 @@ def validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_
 #                 print("saved new best metric network")
 #                 print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
 
-# def affichage(data_loader,phong_renderer):
-#     for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
-#         textures = TexturesVertex(verts_features=CN)
-#         meshes = Meshes(
-#             verts=V,   
-#             faces=F, 
-#             textures=textures
-#         )
+def affichage(data_loader,phong_renderer):
+    for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
+        textures = TexturesVertex(verts_features=CN)
+        meshes = Meshes(
+            verts=V,   
+            faces=F, 
+            textures=textures
+        )
         
-#         agent = Agent(meshes,phong_renderer)
-#         list_pictures = agent.shot().to(device)
-#         for pictures in list_pictures:
-#             plt.imshow(pictures)
-#             plt.show()
+        agent = Agent(meshes,phong_renderer)
+        list_pictures = agent.shot().to(device)
+        for pictures in list_pictures:
+            plt.imshow(pictures)
+            plt.show()
 
 def pad_verts_faces(batch):
     verts = [v for v, f, cn, lp in batch]
@@ -253,33 +278,34 @@ def pad_verts_faces(batch):
 #     writer.SetFileName(outpath)
 #     writer.Execute(output)
 
-def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,device):
-    list_distance = ({'obj' : [], 'distance':[]})
-    move_net.eval()
-    with torch.no_grad():
-        for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(df_val):
-            textures = TexturesVertex(verts_features=CN)
-            meshes = Meshes(
-                verts=V,   
-                faces=F, 
-                textures=textures
-            )
-            agent = Agent(phong_renderer,device)
-            center_pos = agent.search(move_net,min_variance,writer,device)
-            
-            # distance = loss_function(torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1), torch.cat((IP,IL),dim=1))
-            # print(camera_net.camera_position)
-            # print(IP.shape)
-            # print(distance)
-            new_IL = IL.cpu().numpy()
-            distance_land = np.linalg.norm(center_pos-new_IL)
-            list_distance['obj'].append('agent')
-            list_distance['distance'].append(distance_land)
+# def Accuracy(agents,df_val,phong_renderer,min_variance,loss_function,writer,device):
+#     list_distance = ({'obj' : [], 'distance':[]})
+#     agents.eval()
+#     with torch.no_grad():
+#         for batch, (V,F,CN,LP) in enumerate(df_val):
+#             textures = TexturesVertex(verts_features=CN)
+#             meshes = Meshes(
+#                 verts=V,   
+#                 faces=F, 
+#                 textures=textures
+#             )
+#             agent = Agent(phong_renderer,device)
 
-            print(list_distance)
+#             center_pos = agent.search(move_net,min_variance,writer,device)
+            
+#             # distance = loss_function(torch.cat((camera_net.camera_position,camera_net.focal_pos),dim=1), torch.cat((IP,IL),dim=1))
+#             # print(camera_net.camera_position)
+#             # print(IP.shape)
+#             # print(distance)
+#             landmarks_position = LP.cpu().numpy()
+#             distance_land = np.linalg.norm(center_pos-landmarks_position)
+#             list_distance['obj'].append('agent')
+#             list_distance['distance'].append(distance_land)
+
+#             print(list_distance)
                 
-        sns.violinplot(x='obj',y='distance',data=list_distance)
-        plt.show()
+#         sns.violinplot(x='obj',y='distance',data=list_distance)
+#         plt.show()
 
 # def Accuracy(move_net,df_val,phong_renderer,min_variance,loss_function,writer,device):
 #     list_distance = ({'obj' : [], 'distance':[]})

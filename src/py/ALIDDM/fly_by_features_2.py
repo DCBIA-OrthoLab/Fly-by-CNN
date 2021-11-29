@@ -66,14 +66,14 @@ def main(args):
     loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
     
     epoch_loss = 0
-    writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
+    # print(args.run_folder)
+    # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
     best_deplacment = 99999
     best_deplacment_epoch = 0
     test_interval = args.test_interval
-    list_distance = []
 
-    agents = [Agent(phong_renderer, feat_net, device, batch_size = args.batch_size) for i in range(42)]
+    agents = [Agent(phong_renderer, feat_net, device, batch_size = args.batch_size) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())
 
@@ -85,77 +85,22 @@ def main(args):
 
     
     for epoch in range(args.num_epoch):
-        print('---------- epoch :', epoch,'----------')
-        agents_ids = np.arange(42)
+        agents_ids = np.arange(args.num_agents)
         np.random.shuffle(agents_ids)
-
-        for batch, (V, F, CN, LP) in enumerate(train_dataloader):
-            textures = TexturesVertex(verts_features=CN)
-            meshes = Meshes(
-                verts=V,   
-                faces=F, 
-                textures=textures
-            )
-            
-            # list_pictures = agent.shot(meshes)
-            # agent.affichage(list_pictures)
-            img_batch = torch.empty((0)).to(device)
-
-            for aid in agents_ids: #aid == idlandmark_id
-                print('---------- agents id :', aid,'----------')
-
-                NSteps = 10
-                step_loss = 0
-            
-                agents[aid].trainable(True)
-
-                for i in range(NSteps):
-                    print('---------- step :', i,'----------')
-
-                    optimizer.zero_grad()   # prepare the gradients for this step's back propagation
-
-                    x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+        # agents.train()
                     
-                    x += agents[aid].sphere_centers
-                    # print('coord sphere center :', agent.sphere_center)
-                    
-                    lm_pos = torch.empty((0)).to(device)
-                    for lst in LP:
-                        lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
-                    # print(lm_pos)
-                    
-                    loss = loss_function(x, lm_pos)
+        for epoch in range(args.num_epoch):
+            print('---------- epoch :', epoch,'----------')
+            print('-------- TRAINING --------')
+            training(agents, agents_ids, train_dataloader, loss_function, optimizer, epoch_loss, device)
 
-                    loss.backward()   # backward propagation
-                    optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
-                    
-                    l = loss.item()
-                    step_loss += l
-                    print("Step loss:",l)
-                    agents[aid].sphere_centers = x.detach().clone()
-                
-                step_loss /= NSteps
-                agents[aid].trainable(False)
-
-                print("Step loss:", step_loss)
-                epoch_loss += step_loss
-            # agent.affichage(list_pictures)
-    
-
-    affichage(train_dataloader,phong_renderer)
-            
-    for epoch in range(args.num_epoch):
-        print('-------- TRAINING --------')
-
-        training( epoch, move_net, train_dataloader, phong_renderer, loss_function, optimizer, epoch_loss, writer, device)
-
-        if (epoch +1 ) % test_interval == 0:
+        if (epoch) % test_interval == 0:
             print('-------- VALIDATION --------')
-            print(epoch +1)
-            validation(epoch,move_net,test_dataloader,phong_renderer,loss_function,list_distance,best_deplacment,best_deplacment_epoch,args.out,device)
+            print('---------- epoch :', epoch,'----------')
+            validation(epoch,agents,agents_ids,test_dataloader,loss_function,best_deplacment,best_deplacment_epoch,args.out,device)
     
-    print('-------- ACCURACY --------')
-    Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function,writer,device)
+    # print('-------- ACCURACY --------')
+    # Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function,writer,device)
 
 
 
@@ -166,21 +111,22 @@ if __name__ == '__main__':
     input_param.add_argument('--dir', type=str, help='dataset directory, if provided, it will be concatenated to the surf,landmarkrs file names', default='')
     # input_param.add_argument('--csv', type=str, help='csv with columns surf,landmarks,landmarks_number the landmarks column is a json filename with fiducials', required=True)
     # input_param.add_argument('--data_pred', type=str, help='dataset prediction', required=True)
-    input_param.add_argument('--image_size',type=int, help='size of the picture', default=24)
+    input_param.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.5)
+    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.1)
     input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
-    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
-    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
+    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
-
-    parser.add_argument('--num_epoch',type=int,help="numero epoch",required=True)
+    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=42)
+    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=10)
+    input_param.add_argument('--num_epoch',type=int,help="numero epoch", default=50, required=True)
 
     output_param = parser.add_argument_group('output files')
-    # output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
-    output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
+    output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    # output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
 
     args = parser.parse_args()
     main(args)

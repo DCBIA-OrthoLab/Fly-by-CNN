@@ -49,7 +49,7 @@ class Agent(nn.Module):
     def get_parameters(self):
         att_param = self.attention.parameters()
         move_param = self.delta_move.parameters()
-        return list(att_param)+ list(move_param)
+        return list(att_param) + list(move_param)
 
     def forward(self,x):
 
@@ -73,8 +73,8 @@ class Agent(nn.Module):
 
         x = img_batch
         x = self.features_net(x)
-        x, s = self.attention(x).to(self.device)
-        x = self.delta_move(x).to(self.device)
+        x, s = self.attention(x.to(self.device))
+        x = self.delta_move(x.to(self.device))
 
         return x
     
@@ -123,10 +123,7 @@ class Agent(nn.Module):
         for param in self.delta_move.parameters():
             param.requires_grad = train
 
-    # def shot(self, mesh):
-        # print('All cameras take meshes pictures')
-        # center = self.sphere_center.unsqueeze(0)
-
+    
     # def move(self,x):
     #     self.sphere_center = x
     #     # new_list = []
@@ -232,7 +229,6 @@ class TimeDistributed(nn.Module):
 
         return y # (batch, timesteps, features)
 
-
 class Identity(nn.Module):
     def __init__(self):
         super(Identity, self).__init__()
@@ -256,7 +252,6 @@ class FeaturesNet(nn.Module):
         x = self.timedist(x)
         
         return x #Output is [batch, timesteps, 512]
-
 
 class CameraNet:
     def __init__(self, meshes, renderer, radius=2.0, lenque=5):
@@ -344,9 +339,6 @@ class CameraNet:
         
         return self.focal_pos.cpu().numpy()
 
-
-
-
 class FlyByDataset(Dataset):
     def __init__(self, df, device, dataset_dir=''):
         self.df = df
@@ -403,7 +395,6 @@ class FlyByDataset(Dataset):
         # landmark_position_t = vtk_to_numpy(landmark_position_t)
 
         return landmark_position_t
-
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
