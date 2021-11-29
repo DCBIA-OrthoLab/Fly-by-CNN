@@ -1,3 +1,4 @@
+from torch._C import device
 from torch.utils.data import Dataset
 import torch.nn as nn
 import numpy as np 
@@ -40,11 +41,15 @@ class Agent(nn.Module):
         self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
-        self.attention = SelfAttention(512, 128)
-        self.delta_move = nn.Linear(512, 3)
+        self.attention = SelfAttention(512, 128).to(self.device)
+        self.delta_move = nn.Linear(512, 3).to(self.device)
 
         self.trainable(False)
 
+    def get_parameters(self):
+        att_param = self.attention.parameters()
+        move_param = self.delta_move.parameters()
+        return list(att_param)+ list(move_param)
 
     def forward(self,x):
 
@@ -52,7 +57,7 @@ class Agent(nn.Module):
         img_lst = torch.empty((0)).to(self.device)
 
         for sp in self.sphere_points:
-            sp = sp.unsqueeze(0).repeat(self.batch_size)
+            sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
             #print( 'R shape :',R.shape)
@@ -68,8 +73,8 @@ class Agent(nn.Module):
 
         x = img_batch
         x = self.features_net(x)
-        x, s = self.attention(x)
-        x = self.delta_move(x)
+        x, s = self.attention(x).to(self.device)
+        x = self.delta_move(x).to(self.device)
 
         return x
     
@@ -374,7 +379,7 @@ class FlyByDataset(Dataset):
     
     def get_landmarks_position(self,idx, mean_arr, scale_factor, angle, vector, number_of_landmarks):
        
-        # print(self.df[idx]["landmarks"])
+        print(self.df.iloc[idx]["landmarks"])
         data = json.load(open(os.path.join(self.dataset_dir,self.df.iloc[idx]["landmarks"])))
         markups = data['markups']
         landmarks_dict = markups[0]['controlPoints']
@@ -382,7 +387,7 @@ class FlyByDataset(Dataset):
         landmarks_position = np.zeros([number_of_landmarks, 3])
 
         for idx, landmark in enumerate(landmarks_dict):
-            lid = int(landmark["id"]) - 1
+            lid = int((landmark["label"]).split("-")[-1]) - 1
             landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
 
         transform = GetTransform(angle, vector)
