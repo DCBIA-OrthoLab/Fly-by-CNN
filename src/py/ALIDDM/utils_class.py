@@ -19,7 +19,7 @@ import os
 
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, device, batch_size = 1, radius=2,sl=2):
+    def __init__(self, renderer, features_net, device, batch_size = 1, radius=2,sl=2,lenque = 5):
         super(Agent, self).__init__()
         self.batch_size = batch_size
         self.renderer = renderer
@@ -27,8 +27,9 @@ class Agent(nn.Module):
 
         self.sphere_centers= torch.zeros([batch_size, 3]).type(torch.float32).to(self.device)
         # self.list_cam_pos = LIST_POINT
-        # self.max_que = lenque
-        # self.position_center_memory = deque(maxlen=self.max_que)
+        self.max_que = lenque
+        self.position_center_memory = deque(maxlen=self.max_que)
+        self.best_loss = 999
 
         icosahedron = CreateIcosahedron(radius, sl)
         sphere_points = []
@@ -60,7 +61,7 @@ class Agent(nn.Module):
             sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
-            #print( 'R shape :',R.shape)
+            # print( 'R shape :',R.shape)
             T = -torch.bmm(R.transpose(1, 2), current_cam_pos[:, :, None])[:, :, 0]  # (1, 3)
 
             images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
@@ -78,44 +79,6 @@ class Agent(nn.Module):
 
         return x
     
-    # def forward(self, x):
-    # # print(x.size)
-    # # print(self.sphere_centers.size)
-
-    #     img_batch = torch.empty((0)).to(self.device)
-    #     for b,spc in enumerate(self.sphere_centers):
-    #         current_sphere_points = self.sphere_points + spc
-    #         spc = spc.unsqueeze(0)
-    #         spc = spc.to(self.device)
-    #         img_lst = torch.empty((0)).to(self.device)
-
-    #         for sp in current_sphere_points:
-    #             sp = sp.unsqueeze(0).to(self.device)
-    #             #print('sphere_points :',sp)
-    #             #print('sphere center :',spc)
-    #             R = look_at_rotation(sp, at=spc, device=self.device)  # (1, 3, 3)
-    #             #print( 'R shape :',R.shape)
-    #             T = -torch.bmm(R.transpose(1, 2), sp[:, :, None])[:, :, 0]  # (1, 3)
-
-    #             images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
-    #             images = images.permute(0,3,1,2)
-    #             images = images[b,:-1,:,:]
-                
-    #             img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
-                
-    #             # img_batch = torch.cat((img_batch,images.unsqueeze(0)),dim=0)
-    #         img_batch = torch.cat((img_batch,img_lst.unsqueeze(0)),dim=0)
-
-
-    #     print(img_batch.shape)
-
-    #     x = img_batch
-    #     x = self.features_net(x)
-    #     x, s = self.attention(x)
-    #     x = self.delta_move(x)
-
-    #     return x
-        
     def trainable(self, train = False):
         for param in self.attention.parameters():
             param.requires_grad = train
@@ -124,14 +87,28 @@ class Agent(nn.Module):
             param.requires_grad = train
 
     
-    # def move(self,x):
-    #     self.sphere_center = x
-    #     # new_list = []
-    #     # for cam_pos in self.list_cam_pos:
-    #     #     cam_pos = cam_pos.unsqueeze(0)
-    #     #     cam_pos += x
-    #     #     self.list_cam_pos = new_list.append(cam_pos)
-            
+    def found(self,min_variance):
+        found = False
+        # print(len(self.position_memory))
+        if len(self.position_center_memory) == self.max_que:
+            print(self.position_center_memory)
+            print(np.var(np.array(list(self.position_center_memory)),axis=0))
+            variance_center_sphere = np.mean(np.var(np.array(list(self.position_center_memory)),axis=0),axis=1) #list variance
+            print('variance :', variance_center_sphere)
+            if np.max(variance_center_sphere)<min_variance:
+                found = True     
+        return found   
+
+    def search(self,meshes,min_variance):
+        while not self.found(min_variance):
+            x = self(meshes)  #[batchsize,time_steps,3,224,224]
+            x += self.sphere_centers
+            new_coord = x.detach().clone()
+            self.position_center_memory.append(new_coord.cpu().numpy())
+            self.sphere_centers = new_coord
+
+        
+        return self.sphere_centers
 
     # def affichage(self,list_images):
     #     print('affichage')
@@ -153,38 +130,6 @@ class Agent(nn.Module):
     #                 axes[r,c].imshow(new_list[k])
     #             k += 1
     #     plt.show()
-    
-    # def found(self,min_variance):
-    #     found = False
-    #     # print(len(self.position_memory))
-    #     if len(self.position_center_memory) == self.max_que:
-    #         variance_center_sphere = np.mean(np.var(np.array(list(self.position_center_memory)),axis=0),axis=1) #list variance
-    #         print('variance :', variance_center_sphere)
-    #         if np.max(variance_center_sphere)<min_variance:
-    #             found = True     
-    #     return found   
-
-    # def search(self,move_net,min_variance,writer,device):
-    #     img_batch = torch.empty((0)).to(device)
-    #     while not self.found(min_variance):
-    #         sample_images = self.shot().to(self.device)  #[batchsize,3,224,224]
-    #         img_batch = torch.cat((img_batch,sample_images),dim=0)
-    #         # print(images.shape)
-    #         x = move_net(sample_images)  # [batchsize,6]  return the deplacment 
-    #         x += self.sphere_center
-    #         self.move(x.detach().clone())
-    #         self.position_center_memory.append(self.sphere_center.cpu().numpy())
-        
-    #     writer.add_images('image',img_batch)
-        
-    #     return self.position_center_memory[-1].cpu().numpy()
-
-    # def forward(self, x):
-    #     x, s = self.attention(x)
-    #     x = self.delta_move(x)
-
-    #     return x
-
 class SelfAttention(nn.Module):
     def __init__(self, in_units, out_units):
         super(SelfAttention, self).__init__()

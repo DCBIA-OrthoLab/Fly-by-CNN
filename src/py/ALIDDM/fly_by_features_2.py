@@ -48,7 +48,7 @@ def main(args):
 
     df = pd.read_csv(dataset(args.dir))
     df_train, df_val = train_test_split(df, test_size=args.test_size)
-    print(df_train)
+    # print(df_train)
     # df_prediction = dataset(args.data_pred)
 
     train_data = FlyByDataset(df_train,device, dataset_dir=args.dir)
@@ -67,9 +67,9 @@ def main(args):
     
     epoch_loss = 0
     # print(args.run_folder)
-    # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
+    writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
-    best_deplacment = 99999
+    best_deplacment = 9999
     best_deplacment_epoch = 0
     test_interval = args.test_interval
 
@@ -89,18 +89,18 @@ def main(args):
         np.random.shuffle(agents_ids)
         # agents.train()
                     
-        for epoch in range(args.num_epoch):
-            print('---------- epoch :', epoch,'----------')
-            print('-------- TRAINING --------')
-            training(agents, agents_ids, train_dataloader, loss_function, optimizer, epoch_loss, device)
+        print('---------- epoch :', epoch,'----------')
+        print('-------- TRAINING --------')
+        Training(agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, epoch_loss, device)
 
         if (epoch) % test_interval == 0:
             print('-------- VALIDATION --------')
             print('---------- epoch :', epoch,'----------')
-            validation(epoch,agents,agents_ids,test_dataloader,loss_function,best_deplacment,best_deplacment_epoch,args.out,device)
+            Validation(epoch,agents,agents_ids,test_dataloader,args.num_step,loss_function,best_deplacment,best_deplacment_epoch,args.out,device)
     
-    # print('-------- ACCURACY --------')
-    # Accuracy(move_net,test_dataloader,phong_renderer,args.min_variance,loss_function,writer,device)
+        if (epoch + 1) % args.num_epoch == 0:
+            print('-------- ACCURACY --------')
+            Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
 
 
 
@@ -115,11 +115,11 @@ if __name__ == '__main__':
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
     input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.1)
-    input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
+    input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
     # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
-    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
+    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=999)
     input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=42)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=10)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", default=50, required=True)
