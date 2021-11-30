@@ -61,7 +61,7 @@ def main(args):
                     else:
                         dic_patient[str(int(num)-lenght+1)] = {'path_model_U' : model}
 
-    # print(dic_patient.items())
+    # print(dic_patient['path_model_L'])
     for obj in dic_patient.items():
         obj=obj[1]
         
@@ -75,8 +75,8 @@ def main(args):
         # # print(real_labels_u)
         # real_labels_np_u = vtk_to_numpy(real_labels_u)
         # real_labels_np_l = vtk_to_numpy(real_labels_l)
-        
-        outdir_patient_l = os.path.join(args.out,os.path.basename(obj["path_model_L"]).split(".")[0])
+        patient_id = os.path.basename(obj["path_model_L"]).split(".")[0]
+        outdir_patient_l = os.path.join(args.out,patient_id)
         outdir_u = os.path.join(outdir_patient_l,"Upper")
         outdir_l = os.path.join(outdir_patient_l,"Lower")
 
@@ -103,7 +103,7 @@ def main(args):
         
         data_u['markups'][0]['controlPoints'] = new_lst
         
-        with open(obj["path_landmarks_U"],'w') as json_file:
+        with open(os.path.join(outdir_u,f'Upper_{patient_id}.json'),'w') as json_file:
             json.dump(data_u,json_file,indent=4)  
 
         data_l = json.load(open(obj["path_landmarks_L"]))
@@ -122,14 +122,18 @@ def main(args):
 
         data_l['markups'][0]['controlPoints'] = new_lst
        
-        with open(obj["path_landmarks_L"],'w') as json_file:
+        with open(os.path.join(outdir_l,f'Lower_{patient_id}.json'),'w') as json_file:
             json.dump(data_l,json_file,indent=4)
         
-        shutil.copy(obj['path_landmarks_L'],outdir_l)
-        shutil.copy(obj['path_landmarks_U'],outdir_u)
-        shutil.copy(obj['path_model_L'],outdir_l)
-        shutil.copy(obj['path_model_U'],outdir_u)
 
+        shutil.copy(obj['path_model_L'],outdir_l)
+        dst_file_L = os.path.join(outdir_l,os.path.basename(obj['path_model_L']))
+        new_dst_file_name_L = os.path.join(outdir_l, f'Lower_{patient_id}.vtk')
+        os.rename(dst_file_L, new_dst_file_name_L)#rename
+        shutil.copy(obj['path_model_U'],outdir_u)
+        dst_file_U = os.path.join(outdir_u,os.path.basename(obj['path_model_U']))
+        new_dst_file_name_U = os.path.join(outdir_u, f'Upper_{patient_id}.vtk')
+        os.rename(dst_file_U, new_dst_file_name_U)#rename
 
 ###################################################################################################################################
 #                                                   FOR UPPER JAW                                                                 #

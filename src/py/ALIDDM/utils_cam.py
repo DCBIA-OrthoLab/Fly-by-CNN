@@ -26,9 +26,11 @@ def dataset(data):
     normpath = os.path.normpath("/".join([data, '**', '']))
     for img_fn in sorted(glob.iglob(normpath, recursive=True)):
         if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".vtk"]]:
-            model_lst.append(img_fn)
-        if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".json"]]: 
-            landmarks_lst.append(img_fn)
+            if True in ['Lower' in img_fn]:
+                model_lst.append(img_fn)
+        if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".json"]]:
+            if True in ['Lower' in img_fn]:
+                landmarks_lst.append(img_fn)
 
     # for i in model_lst:
     #     print("model_lst :",i)
@@ -47,7 +49,6 @@ def dataset(data):
     # #     print("datalist :",i)
     # # print(datalist)
     # return datalist
-    
     
     outfile = os.path.join(os.path.dirname(data),'data_O.csv')
     fieldnames = ['surf', 'landmarks', 'number_of_landmarks']
