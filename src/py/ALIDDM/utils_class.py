@@ -19,13 +19,11 @@ import os
 
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, device, batch_size = 1, radius=2,sl=2,lenque = 5):
+    def __init__(self, renderer, features_net, device, radius=2,sl=2,lenque = 5):
         super(Agent, self).__init__()
-        self.batch_size = batch_size
         self.renderer = renderer
         self.device = device
 
-        self.sphere_centers= torch.zeros([batch_size, 3]).type(torch.float32).to(self.device)
         # self.list_cam_pos = LIST_POINT
         self.max_que = lenque
         self.position_center_memory = deque(maxlen=self.max_que)
@@ -46,6 +44,10 @@ class Agent(nn.Module):
         self.delta_move = nn.Linear(512, 3).to(self.device)
 
         self.trainable(False)
+    
+    def reset_sphere_center(self,batch_size=1):
+        self.batch_size = batch_size
+        self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
 
     def get_parameters(self):
         att_param = self.attention.parameters()

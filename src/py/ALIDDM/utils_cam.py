@@ -108,6 +108,8 @@ def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optim
         # img_batch = torch.empty((0)).to(device)
 
         for aid in agents_ids: #aid == idlandmark_id
+            agents[aid].reset_sphere_center(V.shape[0])
+
             print('---------- agents id :', aid,'----------')
 
             NSteps = num_step
