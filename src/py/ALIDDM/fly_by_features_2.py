@@ -45,6 +45,9 @@ def main(args):
         rasterizer=rasterizer,
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
+    output_dir = os.path.join(args.out, "best_nets")
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
     df = pd.read_csv(dataset(args.dir))
     df_train, df_val = train_test_split(df, test_size=args.test_size)
@@ -70,7 +73,6 @@ def main(args):
     writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
     best_deplacment = 9999
-    best_deplacment_epoch = 0
     test_interval = args.test_interval
 
     agents = [Agent(phong_renderer, feat_net, device) for i in range(args.num_agents)]
@@ -95,7 +97,7 @@ def main(args):
         if (epoch) % test_interval == 0:
             print('-------- VALIDATION --------')
             print('---------- epoch :', epoch,'----------')
-            Validation(epoch,agents,agents_ids,test_dataloader,args.num_step,loss_function,best_deplacment,best_deplacment_epoch,args.out,device)
+            Validation(epoch,agents,agents_ids,test_dataloader,args.num_step,loss_function,best_deplacment,output_dir,device)
     
         if (epoch + 1) % args.num_epoch == 0:
             print('-------- ACCURACY --------')
@@ -114,14 +116,14 @@ if __name__ == '__main__':
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
     input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.1)
-    input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
+    input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
     # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
     input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
-    input_param.add_argument('--num_epoch',type=int,help="numero epoch", default=50, required=True)
+    input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')
     output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')

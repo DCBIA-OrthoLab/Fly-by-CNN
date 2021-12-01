@@ -149,7 +149,7 @@ def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optim
             print("agent loss:", aid_loss)
             # epoch_loss += step_loss
 
-def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,best_deplacment,best_deplacment_epoch,out,device):
+def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,best_deplacment,output_dir,device):
     with torch.no_grad():
         for batch, (V, F, CN, LP) in enumerate(test_dataloader):
 
@@ -170,7 +170,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
 
                 for i in range(NSteps):
                     print('---------- step :', i,'----------')
-                
+
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
 
                     x += agents[aid].sphere_centers
@@ -195,13 +195,11 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                 if aid_loss<agents[aid].best_loss:
                     agents[aid].best_loss=aid_loss
                     best_loss_epoch = epoch + 1
-                    output_dir = os.path.join(out, "best_nets")
-                    if not os.path.exists(output_dir):
-                        os.makedirs(output_dir)
+                    
                     torch.save(agents[aid].attention , os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
                     torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
                     print("saved new best metric network")
-                    print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
+                    print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_loss_epoch}")
             
             epoch_loss /= len(agents_ids)
             if epoch_loss<agents[aid].best_epoch_loss:
