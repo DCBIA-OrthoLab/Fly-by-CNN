@@ -27,8 +27,8 @@ class Agent(nn.Module):
         # self.list_cam_pos = LIST_POINT
         self.max_que = lenque
         self.position_center_memory = deque(maxlen=self.max_que)
-        self.best_loss = 999
-
+        self.best_loss = 9999
+        self.best_epoch_loss = 9999
         icosahedron = CreateIcosahedron(radius, sl)
         sphere_points = []
         for pid in range(icosahedron.GetNumberOfPoints()):
@@ -132,6 +132,7 @@ class Agent(nn.Module):
     #                 axes[r,c].imshow(new_list[k])
     #             k += 1
     #     plt.show()
+
 class SelfAttention(nn.Module):
     def __init__(self, in_units, out_units):
         super(SelfAttention, self).__init__()

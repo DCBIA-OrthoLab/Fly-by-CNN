@@ -165,11 +165,12 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
 
                 NSteps =  num_step
                 aid_loss = 0
+                epoch_loss = 0
                 agents[aid].eval() 
 
                 for i in range(NSteps):
                     print('---------- step :', i,'----------')
-
+                
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
 
                     x += agents[aid].sphere_centers
@@ -189,18 +190,23 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                     
                 aid_loss /= NSteps
                 print("Step loss:", aid_loss)
+                epoch_loss += aid_loss
 
                 if aid_loss<agents[aid].best_loss:
                     agents[aid].best_loss=aid_loss
                     best_loss_epoch = epoch + 1
-                    output_dir = os.path.join(out, "best_move_net")
+                    output_dir = os.path.join(out, "best_nets")
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    torch.save(agents[aid], os.path.join(output_dir, f"best_move_net{aid}.pth"))
+                    torch.save(agents[aid].attention , os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
+                    torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
                     print("saved new best metric network")
                     print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_deplacment_epoch}")
+            
+            epoch_loss /= len(agents_ids)
+            if epoch_loss<agents[aid].best_epoch_loss:
+                torch.save(agents[0].features_net, os.path.join(output_dir, "best_feature_net.pth"))
 
-                    
 def affichage(data_loader,phong_renderer):
     for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
         textures = TexturesVertex(verts_features=CN)
@@ -248,6 +254,7 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
             
             for aid in agents_ids: #aid == idlandmark_id
                 print('---------- agents id :', aid,'----------')
+                agents[aid].reset_sphere_center(V.shape[0])
 
                 agents[aid].eval() 
                 
@@ -259,8 +266,8 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
                 
                 loss = loss_function(pos_center, lm_pos)
                 
-                list_distance['obj'].append(aid)
-                list_distance['distance'].append(loss)
+                list_distance['obj'].append(str(aid))
+                list_distance['distance'].append(float(loss.item()))
                 
                 writer.add_scalar('distance',loss)
 
@@ -268,25 +275,6 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
         
         sns.violinplot(x='obj',y='distance',data=list_distance)
         plt.show()
-
-
-
-# def Prediction(agents,load_model):
-#     agents.load_state_dict(torch.load(load_model,map_location=device))
-#     with torch.no_grad():
-#         print("Loading data from :", args.dir)
-#                 for image in img_model:
-#                     new_image = torch.from_numpy(image).permute(2,0,1) # convertion in tensor (7,258,258)
-#                     img_output = net(new_image)
-#                     # print(torch.from_numpy(img_output).size())
-#                     output = torch.cat(img_output,0)
-#             output = torch.cat(img_output,0)
-#             distance = loss_function(img_output, IP)
-#             print('difference between exact and predict position :', distance)
-#             list_distance.append(distance)
-        
-#     SavePrediction(output, output_path)
-
 
 def GenControlePoint(groupe_data):
     lm_lst = []
@@ -357,3 +345,19 @@ def WriteJson(lm_lst,out_path):
         json.dump(file, f, ensure_ascii=False, indent=4)
 
     f.close
+
+# def Prediction(agents,load_model,datas):
+#     agents.load_state_dict(torch.load(load_model,map_location=device))
+#     with torch.no_grad():
+#         print("Loading data from :", args.dir)
+#                 for image in img_model:
+#                     new_image = torch.from_numpy(image).permute(2,0,1) # convertion in tensor (7,258,258)
+#                     img_output = net(new_image)
+#                     # print(torch.from_numpy(img_output).size())
+#                     output = torch.cat(img_output,0)
+#             output = torch.cat(img_output,0)
+#             distance = loss_function(img_output, IP)
+#             print('difference between exact and predict position :', distance)
+#             list_distance.append(distance)
+        
+#     SavePrediction(output, output_path)

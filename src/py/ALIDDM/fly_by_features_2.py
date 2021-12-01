@@ -87,7 +87,6 @@ def main(args):
     for epoch in range(args.num_epoch):
         agents_ids = np.arange(args.num_agents)
         np.random.shuffle(agents_ids)
-        # agents.train()
                     
         print('---------- epoch :', epoch,'----------')
         print('-------- TRAINING --------')
@@ -119,9 +118,9 @@ if __name__ == '__main__':
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
     # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
-    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=999)
-    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=42)
-    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=10)
+    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
+    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
+    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", default=50, required=True)
 
     output_param = parser.add_argument_group('output files')
