@@ -393,6 +393,30 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.path)
         self.val_loss_min = val_loss
 
+class FlyByDatasetPrediction(Dataset):
+    def __init__(self, df, device, dataset_dir=''):
+        self.df = df
+        self.device = device
+        self.dataset_dir = dataset_dir
+    
+    def set_env_params(self, params):
+        self.params = params
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, idx):
+        
+        surf = ReadSurf(os.path.join(self.dataset_dir, self.df.iloc[idx]["surf"])) # list of dico like [{"model":... ,"landmarks":...},...]
+        surf, mean_arr, scale_factor= ScaleSurf(surf) # resize my surface to center it to [0,0,0], return the distance between the [0,0,0] and the camera center and the rescale_factor
+        surf = ComputeNormals(surf) 
+
+        color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
+        verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
+        faces = ToTensor(dtype=torch.int32, device=self.device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
+
+        return verts, faces, color_normals,mean_arr,scale_factor
+
 def arrayFromVTKMatrix(vmatrix):
   """Return vtkMatrix4x4 or vtkMatrix3x3 elements as numpy array.
   The returned array is just a copy and so any modification in the array will not affect the input matrix.

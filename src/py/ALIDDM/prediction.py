@@ -41,75 +41,52 @@ def main(args):
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
     
-    net_lst = []
+    attention_lst = []
+    move_net_lst = []
     normpath = os.path.normpath("/".join([args.load_models, '**', '']))
     for model in sorted(glob.iglob(normpath, recursive=True)):
-        if True in ['.pth' in model]:
-            net_lst.append(model)
-    print(net_lst)
-
+        if True in ['_feature_' in model]:
+            feature_net_path = model
+        if True in ['_attention_' in model]:
+            attention_lst.append(model)
+        if True in ['_delta_move_' in model]:
+            move_net_lst.append(model)
+    
+    # print(feature_net_path)
+    # print(attention_lst)
+    # print(move_net_lst)
+    
+    print("Loading data from :", args.dir)
     df = pd.read_csv(dataset(args.dir))
-    df_train, df_val = train_test_split(df, test_size=args.test_size)
-    train_data = FlyByDataset(df_train,device, dataset_dir=args.dir)
-    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir)
-    train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    test_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
+    data = FlyByDatasetPrediction(df,device, dataset_dir=args.dir)
+    dataloader = DataLoader(data, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
    
-    # df = pd.read_csv(dataset(args.dir))
-    # data = FlyByDataset(df,device, dataset_dir=args.dir)
-    loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
     feat_net = FeaturesNet().to(device)
     agents = [Agent(phong_renderer, feat_net, device) for i in range(args.num_agents)]
     agents_ids = np.arange(args.num_agents)
     print(agents_ids)
-    writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
-    agents_lst = []
-   
-    for idx_agent,model in enumerate(net_lst):
-        print("loading model :", model)
-        agents[idx_agent].load_state_dict(torch.load(model,map_location=device))
-        agents_lst.append(agents[idx_agent])
+    # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
+    
+    print("loading feature net ... :", feature_net_path )
+    feat_net = torch.load(feature_net_path,map_location=device)
+    out_path = os.path.join(args.jsonfolder,'Lower_.json')
+
+    for idx_agent,model in enumerate(attention_lst):
+        print("loading attention net ... :", model)
+        agents[idx_agent].attention = torch.load(model,map_location=device)
+
+    for idx_agent,model in enumerate(move_net_lst):
+        print("loading move net ... :", model)
+        agents[idx_agent].delta_move = torch.load(model,map_location=device)
         
-    print("Loading data from :", args.dir)
+        
 
     print('-------- ACCURACY --------')
-    Accuracy(agents_lst,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
-
-        
-        # list_distance = ({ 'obj' : [], 'distance' : [] })
-        
-   
-
-        # with torch.no_grad():
-        #     for batch, (V, F, CN, LP) in enumerate(data):
-
-        #         textures = TexturesVertex(verts_features=CN)
-        #         meshes = Meshes(
-        #             verts=V,   
-        #             faces=F, 
-        #             textures=textures
-        #         )
-        #         for aid in agents_ids: #aid == idlandmark_id
-        #             print('---------- agents id :', aid,'----------')
-
-        #             agents[aid].eval() 
-                    
-        #             pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
-                    
-        #             lm_pos = torch.empty((0)).to(device)
-        #             for lst in LP:
-        #                 lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
-                    
-        #             loss = loss_function(pos_center, lm_pos)
-                    
-        #             list_distance['obj'].append(aid)
-        #             list_distance['distance'].append(loss)
-                    
-        #             writer.add_scalar('distance',loss)
+    groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance)
+    lm_lst = GenControlePoint(groupe_data)
+    WriteJson(lm_lst,out_path)
             
             
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Predict Landmarks', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     
@@ -122,8 +99,9 @@ if __name__ == "__main__":
     input_group.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_group.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_group.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_group.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.1)
-    input_group.add_argument('--batch_size',type=int, help='batch size', default=10)
+    input_group.add_argument('--batch_size',type=int, help='batch size', default=1)
+    input_group.add_argument('--jsonfolder',type=str, help='path where you save your jsonfile after prediction', required=True)
+
     
     args = parser.parse_args()
     

@@ -181,6 +181,8 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                         lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
                     
                     loss = loss_function(x, lm_pos)
+                    print('agent position : ', x)
+                    print('landmark position :', lm_pos)
 
                     l = loss.item()
                     aid_loss += l
@@ -196,7 +198,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                     agents[aid].best_loss=aid_loss
                     best_loss_epoch = epoch + 1
                     
-                    torch.save(agents[aid].attention , os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
+                    torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
                     torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
                     print("saved new best metric network")
                     print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_loss_epoch}")
@@ -238,6 +240,15 @@ def SavePrediction(data, outpath):
     writer.SetFileName(outpath)
     writer.Execute(output)
 
+def pad_verts_faces_prediction(batch):
+    verts = [v for v, f, cn, ma , sc in batch]
+    faces = [f for v, f, cn, ma , sc in batch]
+    color_normals = [cn for v, f, cn, ma , sc in batch]
+    mean_arr = [ma for v, f, cn, ma , sc  in batch]
+    scale_factor = [sc for v, f, cn, ma , sc in batch]
+
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor
+
 def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
     with torch.no_grad():
@@ -273,6 +284,52 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
         
         sns.violinplot(x='obj',y='distance',data=list_distance)
         plt.show()
+
+def Prediction(agents,dataloader,agents_ids,min_variance):
+    list_distance = ({ 'obj' : [], 'distance' : [] })
+    groupe_data = {}
+
+    with torch.no_grad():
+        for batch, (V, F, CN, MR, SF) in enumerate(dataloader):
+
+            textures = TexturesVertex(verts_features=CN)
+            meshes = Meshes(
+                verts=V,   
+                faces=F, 
+                textures=textures
+            )
+            
+            for aid in agents_ids: #aid == idlandmark_id
+                coord_dic = {}
+                print('---------- agents id :', aid,'----------')
+                agents[aid].reset_sphere_center(V.shape[0])
+
+                agents[aid].eval() 
+                
+                pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
+                
+                # lm_pos = torch.empty((0)).to(device)
+                # for lst in LP:
+                #     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
+                
+                # loss = loss_function(pos_center, lm_pos)
+
+                # list_distance['obj'].append(str(aid))
+                # list_distance['distance'].append(float(loss.item()))
+                
+                pos_center = (pos_center + MR) * (1/SF)
+                print(pos_center)
+                coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
+                groupe_data = {f'Lower_O-{aid}':coord_dic}
+
+                # writer.add_scalar('distance',loss)
+
+            print(list_distance)
+        
+        sns.violinplot(x='obj',y='distance',data=list_distance)
+        plt.show()
+        print("all the landmarks :" , groupe_data)
+    return groupe_data
 
 def GenControlePoint(groupe_data):
     lm_lst = []
