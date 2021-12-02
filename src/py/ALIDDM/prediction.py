@@ -55,7 +55,6 @@ def main(args):
     # print(feature_net_path)
     # print(attention_lst)
     # print(move_net_lst)
-    
     print("Loading data from :", args.dir)
     df = pd.read_csv(dataset(args.dir))
     data = FlyByDatasetPrediction(df,device, dataset_dir=args.dir)
