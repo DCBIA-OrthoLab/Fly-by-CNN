@@ -133,7 +133,6 @@ class environment:
         self.elevation=3*m.pi/4
         return(angle_elevation,angle_azimuth)
 
-
     def mov_azimuth(self,delta_azimuth):
         self.azimuth = self.azimuth + delta_azimuth
         return self.azimuth
