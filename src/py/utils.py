@@ -16,6 +16,7 @@ from monai.transforms import (
     ToTensor
 )
 
+
 def normalize_points(poly, radius):
     polypoints = poly.GetPoints()
     for pid in range(polypoints.GetNumberOfPoints()):

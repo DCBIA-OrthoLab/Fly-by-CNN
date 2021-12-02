@@ -6,6 +6,7 @@ try:
     import pytorch3d
 except ModuleNotFoundError:
     need_pytorch3d=True
+    
 if need_pytorch3d:
     if torch.__version__.startswith("1.9") and sys.platform.startswith("linux"):
         # We try to install PyTorch3D via a released wheel.

@@ -393,6 +393,7 @@ class EarlyStopping:
         torch.save(model.state_dict(), self.path)
         self.val_loss_min = val_loss
 
+
 class FlyByDatasetPrediction(Dataset):
     def __init__(self, df, device, dataset_dir=''):
         self.df = df

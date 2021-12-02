@@ -7,6 +7,7 @@ class LinearSubdivisionFilter:
 	Output = None
 	NumberOfSubdivisions = 1
 
+
 	def SetInputData(self, polydata):
 		self.InputData = polydata
 

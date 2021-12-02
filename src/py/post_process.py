@@ -11,6 +11,7 @@ from utils import *
 # parser.add_argument('--out', help='Insert output path+name')
 # arg = parser.parse_args()
 
+
 def ChangeLabel(vtkdata, label_array, label2change, change):
 	# Set all the label 'label2change' in 'change'
 	for pid in range (vtkdata.GetNumberOfPoints()):
