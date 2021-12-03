@@ -97,7 +97,7 @@ def generate_sphere_mesh(center,radius,device):
     
     return mesh
 
-def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, epoch_loss, device):
+def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, writer, device):
     for batch, (V, F, CN, LP) in enumerate(train_dataloader):
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(
@@ -105,7 +105,7 @@ def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optim
             faces=F, 
             textures=textures
         )
- 
+        batch_loss = 0
         # img_batch = torch.empty((0)).to(device)
 
         for aid in agents_ids: #aid == idlandmark_id
@@ -134,7 +134,7 @@ def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optim
                     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
                 # print(lm_pos)
                 
-                loss = loss_function(x, lm_pos)
+                loss = torch.sqrt(loss_function(x, lm_pos))
 
                 loss.backward()   # backward propagation
                 optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
@@ -147,10 +147,14 @@ def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optim
             aid_loss /= NSteps
             agents[aid].trainable(False)
 
-            print("agent loss:", aid_loss)
-            # epoch_loss += step_loss
-
-def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,best_deplacment,output_dir,device):
+            print(f"agent {aid} loss:", aid_loss)
+            
+            batch_loss += aid_loss
+        
+        batch_loss /= len(agents_ids)
+        writer.add_scalar('distance',batch_loss)
+        
+def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,best_deplacment,output_dir,early_stopping,device):
     with torch.no_grad():
         for batch, (V, F, CN, LP) in enumerate(test_dataloader):
 
@@ -181,7 +185,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                     for lst in LP:
                         lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
                     
-                    loss = loss_function(x, lm_pos)
+                    loss = torch.sqrt(loss_function(x, lm_pos))
                     print('agent position : ', x)
                     print('landmark position :', lm_pos)
 
@@ -194,20 +198,28 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                 aid_loss /= NSteps
                 print("Step loss:", aid_loss)
                 epoch_loss += aid_loss
+                best_loss_epoch = epoch + 1
 
-                if aid_loss<agents[aid].best_loss:
-                    agents[aid].best_loss=aid_loss
-                    best_loss_epoch = epoch + 1
-                    
-                    torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
-                    torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
-                    print("saved new best metric network")
-                    print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_loss_epoch}")
-            
+                early_stopping(aid_loss, 
+                            agents[aid].attention, 
+                            agents[aid].delta_move, 
+                            aid, 
+                            os.path.join(output_dir, f"best_attention_net_{aid}.pth"),
+                            os.path.join(output_dir, f"best_delta_move_net_{aid}.pth")
+                            )
+                
+                # torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
+                # torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
+                # print("saved new best metric network")
+                # print(f"Model Was Saved ! Current Best Avg. Dice: {best_deplacment} at epoch: {best_loss_epoch}")
+                # return
+
             epoch_loss /= len(agents_ids)
             if epoch_loss<agents[aid].best_epoch_loss:
                 torch.save(agents[0].features_net, os.path.join(output_dir, "best_feature_net.pth"))
 
+            return early_stopping.early_stop
+            
 def affichage(data_loader,phong_renderer):
     for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
         textures = TexturesVertex(verts_features=CN)
@@ -274,7 +286,7 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
                 for lst in LP:
                     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
                 
-                loss = loss_function(pos_center, lm_pos)
+                loss = torch.sqrt(loss_function(pos_center, lm_pos))
                 
                 list_distance['obj'].append(str(aid))
                 list_distance['distance'].append(float(loss.item()))

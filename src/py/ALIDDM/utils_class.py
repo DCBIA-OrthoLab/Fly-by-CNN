@@ -19,7 +19,7 @@ import os
 
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, device, radius=2,sl=2,lenque = 5):
+    def __init__(self, renderer, features_net, device, radius=2,sl=1,lenque = 5):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
@@ -346,7 +346,7 @@ class FlyByDataset(Dataset):
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, patience=7, verbose=False, delta=0, path='checkpoint.pt', trace_func=print):
+    def __init__(self, patience=7, verbose=False, delta=0, trace_func=print):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -367,15 +367,15 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
-        self.path = path
         self.trace_func = trace_func
-    def __call__(self, val_loss, model):
+
+    def __call__(self, val_loss, attention_model , move_net_model, aid, attention_path, move_path):
 
         score = -val_loss
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            self.save_checkpoint( val_loss, attention_model,move_net_model,aid,attention_path,move_path)
         elif score < self.best_score + self.delta:
             self.counter += 1
             self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -383,14 +383,15 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(val_loss, model)
+            self.save_checkpoint( val_loss, attention_model, move_net_model, aid, attention_path,move_path)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
+    def save_checkpoint(self, val_loss, attention_model,move_net_model,aid,attention_path,move_path):
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-        torch.save(model.state_dict(), self.path)
+        torch.save(attention_model, os.path.join(attention_path, f"best_attention_net_{aid}.pth"))
+        torch.save(move_net_model, os.path.join(move_path, f"best_delta_move_net_{aid}.pth"))               
         self.val_loss_min = val_loss
 
 
