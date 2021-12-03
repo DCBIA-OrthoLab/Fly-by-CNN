@@ -317,12 +317,18 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
 
                 # list_distance['obj'].append(str(aid))
                 # list_distance['distance'].append(float(loss.item()))
-                print(pos_center,MR,SF)
+                for i in range(V.shape[0]):
+                    # print(pos_center[i],SF[i],MR[i])
+                    scale_surf = SF[i]
+                    mean_arr = MR[i]
+                    landmark_pos = pos_center[i]
+                    # print(landmark_pos,MR,scale_surf)
 
-                pos_center = (torch.div(pos_center,i for i in SF)) - torch.tensor(MR)
-                print(pos_center)
-                coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
-                groupe_data = {f'Lower_O-{aid}':coord_dic}
+                    pos_center = (landmark_pos/scale_surf)- mean_arr
+                    pos_center = pos_center.cpu().numpy()
+                    # print(pos_center)
+                    coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
+                    groupe_data.append({f'Lower_O-{aid+1}':coord_dic})
 
                 # writer.add_scalar('distance',loss)
 
