@@ -167,6 +167,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
             
             for aid in agents_ids: #aid == idlandmark_id
                 print('---------- agents id :', aid,'----------')
+                agents[aid].reset_sphere_center(V.shape[0])
 
                 NSteps =  num_step
                 aid_loss = 0
@@ -204,8 +205,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                             agents[aid].attention, 
                             agents[aid].delta_move, 
                             aid, 
-                            os.path.join(output_dir, f"best_attention_net_{aid}.pth"),
-                            os.path.join(output_dir, f"best_delta_move_net_{aid}.pth")
+                            output_dir
                             )
                 
                 # torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
@@ -219,7 +219,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                 torch.save(agents[0].features_net, os.path.join(output_dir, "best_feature_net.pth"))
 
             return early_stopping.early_stop
-            
+
 def affichage(data_loader,phong_renderer):
     for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
         textures = TexturesVertex(verts_features=CN)
