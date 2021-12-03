@@ -81,7 +81,7 @@ def main(args):
         
         
 
-    print('-------- ACCURACY --------')
+    print('-------- PREDICTION --------')
     groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance)
     lm_lst = GenControlePoint(groupe_data)
     WriteJson(lm_lst,out_path)

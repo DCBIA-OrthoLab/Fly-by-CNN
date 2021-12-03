@@ -415,6 +415,8 @@ class FlyByDatasetPrediction(Dataset):
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
         verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
         faces = ToTensor(dtype=torch.int32, device=self.device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
+        mean_arr = ToTensor(dtype=torch.float32, device=self.device)(mean_arr)
+        scale_factor = ToTensor(dtype=torch.float32, device=self.device)(scale_factor)
 
         return verts, faces, color_normals,mean_arr,scale_factor
 

@@ -66,7 +66,7 @@ def main(args):
     learning_rate = 1e-5
     feat_net = FeaturesNet().to(device)
     # new_move_net = TimeDistributed(move_net).to(device)
-    loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+    loss_function = torch.sqrt(torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean'))
     
     epoch_loss = 0
     # print(args.run_folder)
@@ -116,19 +116,19 @@ if __name__ == '__main__':
     input_param.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.1)
+    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.2)
     input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
-    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
-    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
+    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
-    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
+    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=42)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')
-    # output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
-    output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
+    output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    # output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
 
     args = parser.parse_args()
     main(args)

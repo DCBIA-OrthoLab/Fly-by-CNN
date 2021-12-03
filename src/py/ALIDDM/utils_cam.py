@@ -317,8 +317,9 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
 
                 # list_distance['obj'].append(str(aid))
                 # list_distance['distance'].append(float(loss.item()))
-                
-                pos_center = (pos_center + MR) * (1/SF)
+                print(pos_center,MR,SF)
+
+                pos_center = (torch.div(pos_center,i for i in SF)) - torch.tensor(MR)
                 print(pos_center)
                 coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
                 groupe_data = {f'Lower_O-{aid}':coord_dic}
