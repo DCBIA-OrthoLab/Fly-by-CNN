@@ -97,7 +97,7 @@ def generate_sphere_mesh(center,radius,device):
     
     return mesh
 
-def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, writer, device):
+def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device):
     for batch, (V, F, CN, LP) in enumerate(train_dataloader):
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(
@@ -149,12 +149,14 @@ def Training(agents, agents_ids,num_step, train_dataloader, loss_function, optim
 
             print(f"agent {aid} loss:", aid_loss)
             
-            batch_loss += aid_loss
+            agents.writer.add_scalar('distance',aid_loss)
+
+        #     batch_loss += aid_loss
         
-        batch_loss /= len(agents_ids)
-        writer.add_scalar('distance',batch_loss)
+        # batch_loss /= len(agents_ids)
+        # writer.add_scalar('distance',batch_loss)
         
-def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,best_deplacment,output_dir,early_stopping,device):
+def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,output_dir,early_stopping,device):
     with torch.no_grad():
         for batch, (V, F, CN, LP) in enumerate(test_dataloader):
 
@@ -199,7 +201,6 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,be
                 aid_loss /= NSteps
                 print("Step loss:", aid_loss)
                 epoch_loss += aid_loss
-                best_loss_epoch = epoch + 1
 
                 early_stopping(aid_loss, 
                             agents[aid].attention, 
@@ -342,13 +343,11 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
                     coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
                     groupe_data.append({f'Lower_O-{aid+1}':coord_dic})
 
-                # writer.add_scalar('distance',loss)
 
             print(list_distance)
         
-        sns.violinplot(x='obj',y='distance',data=list_distance)
-        plt.show()
         print("all the landmarks :" , groupe_data)
+    
     return groupe_data
 
 def GenControlePoint(groupe_data):

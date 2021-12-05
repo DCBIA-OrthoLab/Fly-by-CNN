@@ -16,7 +16,6 @@ from pytorch3d.renderer import (
 import sys
 sys.path.insert(0,'..')
 from sklearn.model_selection import train_test_split
-from fast_ml.model_development import train_valid_test_split
 from utils_cam import *
 from utils_class import *
 import argparse
@@ -81,9 +80,7 @@ def main(args):
     # print(args.run_folder)
     writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
-    best_deplacment = 9999
-
-    agents = [Agent(phong_renderer, feat_net, device) for i in range(args.num_agents)]
+    agents = [Agent(phong_renderer, feat_net,args.run_folder, i, device) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())
 
@@ -100,12 +97,12 @@ def main(args):
 
         print('-------- TRAINING --------')          
         print('---------- epoch :', epoch,'----------')
-        Training(agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, writer, device)
+        Training(agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device)
 
         if (epoch) % args.test_interval == 0:
             print('-------- VALIDATION --------')
             print('---------- epoch :', epoch,'----------')
-            Validation(epoch,agents,agents_ids,validation_dataloader,args.num_step,loss_function,best_deplacment,output_dir,early_stopping,device)
+            Validation(epoch,agents,agents_ids,validation_dataloader,args.num_step,loss_function,output_dir,early_stopping,device)
             if early_stopping.early_stop == True :
                 print('-------- ACCURACY --------')
                 Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
@@ -130,18 +127,18 @@ if __name__ == '__main__':
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
     input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
     input_param.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
-    input_param.add_argument('--batch_size',type=int, help='batch size', default=5)
+    input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
-    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
-    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
+    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
     input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=42)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')
-    # output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
-    output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
+    output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    # output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
 
     args = parser.parse_args()
     main(args)

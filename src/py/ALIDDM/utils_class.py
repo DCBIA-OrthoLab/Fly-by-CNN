@@ -16,13 +16,15 @@ import statistics
 import matplotlib.pyplot as plt
 import math
 import os
+from torch.utils.tensorboard import SummaryWriter
 
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, device, radius=2,sl=1,lenque = 5):
+    def __init__(self, renderer, features_net, run_folder, aid, device, radius=2,sl=1,lenque = 5):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
+        self.writer = SummaryWriter(os.path.join(run_folder,f"runs_{aid}"))
 
         # self.list_cam_pos = LIST_POINT
         self.max_que = lenque
@@ -375,7 +377,8 @@ class EarlyStopping:
 
         if self.best_score is None:
             self.best_score = score
-            self.save_checkpoint( val_loss, attention_model,move_net_model,aid, path)
+            self.save_checkpoint( val_loss, attention_model, move_net_model, aid, path)
+
         elif score < self.best_score + self.delta:
             self.counter += 1
             self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')

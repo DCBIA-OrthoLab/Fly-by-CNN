@@ -58,6 +58,9 @@ def main(args):
     # print(move_net_lst)
     print("Loading data from :", args.dir)
     df = pd.read_csv(dataset(args.dir))
+    df_train, df_rem = train_test_split(df, train_size=args.train_size)
+    df_val, data = train_test_split(df_rem, test_size=args.test_size )
+    
     data = FlyByDatasetPrediction(df,device, dataset_dir=args.dir)
     dataloader = DataLoader(data, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
    
