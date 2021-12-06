@@ -304,7 +304,6 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
 
 def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
     list_distance = ({ 'obj' : [], 'distance' : [] })
-    groupe_data = {}
 
     with torch.no_grad():
         for batch, (V, F, CN, MR, SF,PS) in enumerate(dataloader):
@@ -334,6 +333,8 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
                 # list_distance['obj'].append(str(aid))
                 # list_distance['distance'].append(float(loss.item()))
                 for i in range(V.shape[0]):
+                    groupe_data = {}
+
                     # print(pos_center[i],SF[i],MR[i])
                     scale_surf = SF[i]
                     mean_arr = MR[i]
