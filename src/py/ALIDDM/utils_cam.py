@@ -317,6 +317,8 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
             
             for aid in agents_ids: #aid == idlandmark_id
                 coord_dic = {}
+                groupe_data = {}
+
                 print('---------- agents id :', aid,'----------')
                 agents[aid].reset_sphere_center(V.shape[0])
 
@@ -333,7 +335,6 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
                 # list_distance['obj'].append(str(aid))
                 # list_distance['distance'].append(float(loss.item()))
                 for i in range(V.shape[0]):
-                    groupe_data = {}
 
                     # print(pos_center[i],SF[i],MR[i])
                     scale_surf = SF[i]
