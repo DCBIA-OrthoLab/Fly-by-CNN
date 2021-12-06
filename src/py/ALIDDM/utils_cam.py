@@ -307,6 +307,7 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
 
     with torch.no_grad():
         for batch, (V, F, CN, MR, SF,PS) in enumerate(dataloader):
+            groupe_data = {}
 
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
@@ -317,7 +318,6 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
             
             for aid in agents_ids: #aid == idlandmark_id
                 coord_dic = {}
-                groupe_data = {}
 
                 print('---------- agents id :', aid,'----------')
                 agents[aid].reset_sphere_center(V.shape[0])
