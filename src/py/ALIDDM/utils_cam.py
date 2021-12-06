@@ -256,13 +256,14 @@ def SavePrediction(data, outpath):
     writer.Execute(output)
 
 def pad_verts_faces_prediction(batch):
-    verts = [v for v, f, cn, ma , sc in batch]
-    faces = [f for v, f, cn, ma , sc in batch]
-    color_normals = [cn for v, f, cn, ma , sc in batch]
-    mean_arr = [ma for v, f, cn, ma , sc  in batch]
-    scale_factor = [sc for v, f, cn, ma , sc in batch]
+    verts = [v for v, f, cn, ma , sc, ps in batch]
+    faces = [f for v, f, cn, ma , sc, ps in batch]
+    color_normals = [cn for v, f, cn, ma , sc, ps in batch]
+    mean_arr = [ma for v, f, cn, ma , sc, ps  in batch]
+    scale_factor = [sc for v, f, cn, ma , sc, ps in batch]
+    path_surf = [ps for v, f, cn, ma , sc,ps in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor, path_surf
 
 def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
@@ -301,12 +302,12 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
         sns.violinplot(x='obj',y='distance',data=list_distance)
         plt.show()
 
-def Prediction(agents,dataloader,agents_ids,min_variance):
+def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
     list_distance = ({ 'obj' : [], 'distance' : [] })
     groupe_data = {}
 
     with torch.no_grad():
-        for batch, (V, F, CN, MR, SF) in enumerate(dataloader):
+        for batch, (V, F, CN, MR, SF,PS) in enumerate(dataloader):
 
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
@@ -339,14 +340,14 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
                     landmark_pos = pos_center[i]
                     # print(landmark_pos,MR,scale_surf)
 
-                    pos_center = (landmark_pos/scale_surf)- mean_arr
+                    pos_center = (landmark_pos/scale_surf) + mean_arr
                     pos_center = pos_center.cpu().numpy()
                     # print(pos_center)
                     coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
                     groupe_data[f'Lower_O-{aid+1}']=coord_dic
+                    dic_patients[PS]=groupe_data
 
-
-            print(list_distance)
+            # print(list_distance)
         
         print("all the landmarks :" , groupe_data)
     

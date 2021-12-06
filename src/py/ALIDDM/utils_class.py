@@ -422,7 +422,7 @@ class FlyByDatasetPrediction(Dataset):
         mean_arr = ToTensor(dtype=torch.float32, device=self.device)(mean_arr)
         scale_factor = ToTensor(dtype=torch.float32, device=self.device)(scale_factor)
 
-        return verts, faces, color_normals,mean_arr,scale_factor
+        return verts, faces, color_normals,mean_arr,scale_factor,self.df.iloc[idx]["surf"]
 
 def arrayFromVTKMatrix(vmatrix):
   """Return vtkMatrix4x4 or vtkMatrix3x3 elements as numpy array.

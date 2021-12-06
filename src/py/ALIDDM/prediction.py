@@ -60,9 +60,9 @@ def main(args):
     df = pd.read_csv(dataset(args.dir))
     df_train, df_rem = train_test_split(df, train_size=args.train_size)
     df_val, data = train_test_split(df_rem, test_size=args.test_size )
-    
-    data = FlyByDatasetPrediction(df,device, dataset_dir=args.dir)
-    dataloader = DataLoader(data, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
+
+    data_pred = FlyByDatasetPrediction(data,device, dataset_dir=args.dir)
+    dataloader = DataLoader(data_pred, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
    
     feat_net = FeaturesNet().to(device)
     agents = [Agent(renderer=phong_renderer, features_net=feat_net, aid=i, device=device) for i in range(args.num_agents)]
@@ -81,11 +81,13 @@ def main(args):
     for idx_agent,model in enumerate(move_net_lst):
         print("loading move net ... :", model)
         agents[idx_agent].delta_move = torch.load(model,map_location=device)
-        
-        
-
+    
+    dic_patients = {}
+    for i in data['surf']:
+        dic_patients[i]={}
+    print(dic_patients)
     print('-------- PREDICTION --------')
-    groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance)
+    groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
     lm_lst = GenControlePoint(groupe_data)
     WriteJson(lm_lst,out_path)
             
@@ -100,8 +102,8 @@ if __name__ == "__main__":
     input_group.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
     input_group.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
 
-    # input_group.add_argument('--load_models', type=str, help='Path of the model', default='/Users/luciacev-admin/Desktop/data_O/best_move_net')
-    input_group.add_argument('--load_models', type=str, help='Path of the model', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/best_nets')
+    input_group.add_argument('--load_models', type=str, help='Path of the model', default='/Users/luciacev-admin/Desktop/data_O/best_move_net')
+    # input_group.add_argument('--load_models', type=str, help='Path of the model', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/best_nets')
     input_group.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
     input_group.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_group.add_argument('--blur_radius',type=int, help='blur raius', default=0)
