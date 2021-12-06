@@ -77,6 +77,7 @@ def main(args):
     early_stopping = EarlyStopping()
 
     epoch_loss = 0
+    best_score = 9999
     # print(args.run_folder)
     writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
@@ -97,7 +98,7 @@ def main(args):
 
         print('-------- TRAINING --------')          
         print('---------- epoch :', epoch,'----------')
-        Training(agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device)
+        Training(epoch, agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device)
 
         if (epoch) % args.test_interval == 0:
             print('-------- VALIDATION --------')

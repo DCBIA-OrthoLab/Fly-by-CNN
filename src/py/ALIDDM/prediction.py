@@ -65,14 +65,14 @@ def main(args):
     dataloader = DataLoader(data, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
    
     feat_net = FeaturesNet().to(device)
-    agents = [Agent(phong_renderer, feat_net, device) for i in range(args.num_agents)]
+    agents = [Agent(phong_renderer, feat_net,args.run_folder, i ,device) for i in range(args.num_agents)]
     agents_ids = np.arange(args.num_agents)
     print(agents_ids)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
     print("loading feature net ... :", feature_net_path )
     feat_net = torch.load(feature_net_path,map_location=device)
-    out_path = os.path.join(args.jsonfolder,'Lower_.json')
+    out_path = os.path.join(args.jsonfolder,'Lower_jaw.json')
 
     for idx_agent,model in enumerate(attention_lst):
         print("loading attention net ... :", model)
