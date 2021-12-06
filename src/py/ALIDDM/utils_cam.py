@@ -149,7 +149,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
             print(f"agent {aid} loss:", aid_loss)
             
-            agents.writer.add_scalar('distance',aid_loss,epoch)
+            agents[aid].writer.add_scalar('distance',aid_loss,epoch)
 
         #     batch_loss += aid_loss
         
