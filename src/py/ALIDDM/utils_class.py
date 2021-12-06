@@ -305,10 +305,10 @@ class FlyByDataset(Dataset):
         
         surf = ReadSurf(os.path.join(self.dataset_dir, self.df.iloc[idx]["surf"])) # list of dico like [{"model":... ,"landmarks":...},...]
         surf, mean_arr, scale_factor= ScaleSurf(surf) # resize my surface to center it to [0,0,0], return the distance between the [0,0,0] and the camera center and the rescale_factor
-        surf, angle, vector = RandomRotation(surf)
+        # surf, angle, vector = RandomRotation(surf)
         surf = ComputeNormals(surf) 
 
-        landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, angle, vector, self.max_landmarks)
+        landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks)# angle, vector,
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
         verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
         faces = ToTensor(dtype=torch.int32, device=self.device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
@@ -319,7 +319,7 @@ class FlyByDataset(Dataset):
         # print(landmark_pos)
         return verts, faces, color_normals,landmark_pos
     
-    def get_landmarks_position(self,idx, mean_arr, scale_factor, angle, vector, number_of_landmarks):
+    def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks): #angle, vector
        
         print(self.df.iloc[idx]["landmarks"])
         data = json.load(open(os.path.join(self.dataset_dir,self.df.iloc[idx]["landmarks"])))
@@ -332,19 +332,19 @@ class FlyByDataset(Dataset):
             lid = int((landmark["label"]).split("-")[-1]) - 1
             landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
 
-        transform = GetTransform(angle, vector)
+        # transform = GetTransform(angle, vector)
 
-        transform_matrix = arrayFromVTKMatrix(transform.GetMatrix())
-        landmarks_pos = [np.transpose(np.append(pos,1)) for pos in landmarks_position]
-        landmark_position_t = [pos * transform_matrix for pos in landmarks_pos]
-        landmark_position_t = [pos[:-1].tolist() for pos in landmarks_pos]
+        # transform_matrix = arrayFromVTKMatrix(transform.GetMatrix())
+        # landmarks_pos = [np.transpose(np.append(pos,1)) for pos in landmarks_position]
+        # landmark_position_t = [pos * transform_matrix for pos in landmarks_pos]
+        # landmark_position_t = [pos[:-1].tolist() for pos in landmarks_pos]
         # print(landmark_position_t)
 
         # landmark_position_t = numpy_to_vtk(np.zeros_like(landmarks_position))
         # transform.TransformPoints(numpy_to_vtk(landmarks_position), landmark_position_t)
         # landmark_position_t = vtk_to_numpy(landmark_position_t)
 
-        return landmark_position_t
+        return landmarks_position
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
