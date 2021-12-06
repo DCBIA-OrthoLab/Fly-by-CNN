@@ -133,7 +133,7 @@ if __name__ == '__main__':
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/runs')
     # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
-    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=42)
+    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
