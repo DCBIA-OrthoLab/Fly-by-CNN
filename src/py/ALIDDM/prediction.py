@@ -102,8 +102,8 @@ if __name__ == "__main__":
     input_group.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
     input_group.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
 
-    input_group.add_argument('--load_models', type=str, help='Path of the model', default='/Users/luciacev-admin/Desktop/data_O/best_move_net')
-    # input_group.add_argument('--load_models', type=str, help='Path of the model', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/best_nets')
+    # input_group.add_argument('--load_models', type=str, help='Path of the model', default='/Users/luciacev-admin/Desktop/data_O/best_move_net')
+    input_group.add_argument('--load_models', type=str, help='Path of the model', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/best_nets')
     input_group.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
     input_group.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_group.add_argument('--blur_radius',type=int, help='blur raius', default=0)
