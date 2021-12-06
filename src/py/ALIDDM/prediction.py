@@ -95,7 +95,7 @@ if __name__ == "__main__":
     
     input_group = parser.add_argument_group('directory')
     input_group.add_argument('--dir', type=str, help='Input directory with the scans',default=None, required=True)
-    input_group.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
+    input_group.add_argument('--min_variance',type=float, help='minimum of variance', default=0.3)
     # input_group.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_group.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
     input_group.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
