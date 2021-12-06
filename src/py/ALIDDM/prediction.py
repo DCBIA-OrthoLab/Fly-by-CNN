@@ -65,7 +65,7 @@ def main(args):
     dataloader = DataLoader(data, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
    
     feat_net = FeaturesNet().to(device)
-    agents = [Agent(phong_renderer, feat_net,args.run_folder, i ,device) for i in range(args.num_agents)]
+    agents = [Agent(renderer=phong_renderer, features_net=feat_net, aid=i, device=device) for i in range(args.num_agents)]
     agents_ids = np.arange(args.num_agents)
     print(agents_ids)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))

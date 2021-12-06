@@ -81,7 +81,7 @@ def main(args):
     # print(args.run_folder)
     writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
-    agents = [Agent(phong_renderer, feat_net,args.run_folder, i, device) for i in range(args.num_agents)]
+    agents = [Agent(renderer=phong_renderer, features_net=feat_net,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())
 
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/runs')
-    # input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
+    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
     input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)

@@ -20,7 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, run_folder, aid, device, radius=2,sl=1,lenque = 5):
+    def __init__(self, renderer, features_net, aid, device,run_folder = "", radius=2,sl=1,lenque = 5):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
