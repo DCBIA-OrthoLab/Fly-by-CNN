@@ -343,7 +343,7 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
                     pos_center = pos_center.cpu().numpy()
                     # print(pos_center)
                     coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
-                    groupe_data.append({f'Lower_O-{aid+1}':coord_dic})
+                    groupe_data[f'Lower_O-{aid+1}']=coord_dic
 
 
             print(list_distance)
