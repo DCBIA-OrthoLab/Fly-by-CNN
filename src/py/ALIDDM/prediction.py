@@ -88,8 +88,9 @@ def main(args):
     print(dic_patients)
     print('-------- PREDICTION --------')
     groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
-    lm_lst = GenControlePoint(groupe_data)
-    WriteJson(lm_lst,out_path)
+    for path,data in groupe_data.items():
+        lm_lst = GenControlePoint(data)
+        WriteJson(lm_lst,out_path)
             
             
 if __name__ == "__main__":

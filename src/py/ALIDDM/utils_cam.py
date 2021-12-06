@@ -360,21 +360,20 @@ def GenControlePoint(groupe_data):
     true = True
     id = 0
     for landmark,data in groupe_data.items():
-        for landmark_name,position in data.items():
-            id+=1
-            controle_point = {
-                "id": str(id),
-                "label": landmark_name,
-                "description": "",
-                "associatedNodeID": "",
-                "position": [position["x"], position["y"], position["z"]],
-                "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-                "selected": true,
-                "locked": true,
-                "visibility": true,
-                "positionStatus": "preview"
-            }
-            lm_lst.append(controle_point)
+        id+=1
+        controle_point = {
+            "id": str(id),
+            "label": landmark,
+            "description": "",
+            "associatedNodeID": "",
+            "position": [data["x"], data["y"], data["z"]],
+            "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+            "selected": true,
+            "locked": true,
+            "visibility": true,
+            "positionStatus": "preview"
+        }
+        lm_lst.append(controle_point)
 
     return lm_lst
 
