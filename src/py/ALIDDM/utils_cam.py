@@ -345,12 +345,12 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
                     # print(pos_center)
                     coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
                     groupe_data[f'Lower_O-{aid+1}']=coord_dic
-                    print(PS)
-                    dic_patients[PS]=groupe_data
+                    print(PS[i])
+                    dic_patients[PS[i]]=groupe_data
 
             # print(list_distance)
         
-        print("all the landmarks :" , groupe_data)
+        print("all the landmarks :" , dic_patients)
     
     return groupe_data
 
@@ -360,20 +360,21 @@ def GenControlePoint(groupe_data):
     true = True
     id = 0
     for landmark,data in groupe_data.items():
-        id+=1
-        controle_point = {
-            "id": str(id),
-            "label": landmark,
-            "description": "",
-            "associatedNodeID": "",
-            "position": [data["x"], data["y"], data["z"]],
-            "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
-            "selected": true,
-            "locked": true,
-            "visibility": true,
-            "positionStatus": "preview"
-        }
-        lm_lst.append(controle_point)
+        for landmark_name,position in data.items():
+            id+=1
+            controle_point = {
+                "id": str(id),
+                "label": landmark_name,
+                "description": "",
+                "associatedNodeID": "",
+                "position": [position["x"], position["y"], position["z"]],
+                "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
+                "selected": true,
+                "locked": true,
+                "visibility": true,
+                "positionStatus": "preview"
+            }
+            lm_lst.append(controle_point)
 
     return lm_lst
 
