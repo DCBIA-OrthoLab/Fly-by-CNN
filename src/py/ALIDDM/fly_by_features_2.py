@@ -58,23 +58,23 @@ def main(args):
     # print(df_train)
     # df_prediction = dataset(args.data_pred)
 
-    train_data = FlyByDataset(df_train,device, dataset_dir=args.dir)
-    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir)
-    test_data = FlyByDataset(df_test,device,  dataset_dir=args.dir)
+    train_data = FlyByDataset(df_train,device, dataset_dir=args.dir, rotate=True)
+    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir, rotate=False)
+    test_data = FlyByDataset(df_test,device,  dataset_dir=args.dir, rotate=False)
 
 
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    validation_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
+    validation_dataloader = DataLoader(val_data, batch_size=1, shuffle=False, collate_fn=pad_verts_faces)
     test_dataloader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
 
     # pred_dataloader = DataLoader(data_prediction,batch_size=args.batch_size,shuffle=True, collate_fn=pad_verts_faces)
     # print(pred_dataloader)
 
-    learning_rate = 1e-5
+    learning_rate = 1e-4
     feat_net = FeaturesNet().to(device)
     # new_move_net = TimeDistributed(move_net).to(device)
     loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-    early_stopping = EarlyStopping()
+    early_stopping = EarlyStopping(patience=20, verbose=True, path=args.out)
 
     epoch_loss = 0
     best_score = 9999
@@ -129,16 +129,15 @@ if __name__ == '__main__':
     input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
     input_param.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
     input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
-    input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=5)
-    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/home/jonas/Desktop/Baptiste_Baquero/data_O/runs')
-    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='/Users/luciacev-admin/Desktop/data_O')
+    input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
+    input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='./runs')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
     input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')
-    output_param.add_argument('--out', type=str, help='place where model is saved', default='/home/jonas/Desktop/Baptiste_Baquero/data_O')
+    output_param.add_argument('--out', type=str, help='place where model is saved', default='./training/')
     # output_param.add_argument('--out', type=str, help='place where model is saved', default='/Users/luciacev-admin/Desktop/data_O')
 
     args = parser.parse_args()

@@ -17,7 +17,7 @@ RUN pip install itk sklearn pandas matplotlib
 
 WORKDIR /app
 
-RUN git clone --branch 2.7 https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
+RUN git clone --branch 2.8 https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
 
 RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.4/u_seg_nn_3.2.zip
 RUN unzip u_seg_nn_3.2.zip

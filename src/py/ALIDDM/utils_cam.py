@@ -106,50 +106,49 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
             textures=textures
         )
         batch_loss = 0
-        # img_batch = torch.empty((0)).to(device)
+
+        optimizer.zero_grad()
 
         for aid in agents_ids: #aid == idlandmark_id
             agents[aid].reset_sphere_center(V.shape[0])
 
             print('---------- agents id :', aid,'----------')
 
+            lm_pos = torch.empty((0)).to(device)
+            for lst in LP:
+                lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
+
             NSteps = num_step
             aid_loss = 0
         
-            agents[aid].trainable(True)
-            agents[aid].train()
+            # agents[aid].trainable(True)
+            # agents[aid].train()
 
             for i in range(NSteps):
                 print('---------- step :', i,'----------')
 
-                optimizer.zero_grad()   # prepare the gradients for this step's back propagation
+                # optimizer.zero_grad()   # prepare the gradients for this step's back propagation
 
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 
                 x += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
-                
-                lm_pos = torch.empty((0)).to(device)
-                for lst in LP:
-                    lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
-                # print(lm_pos)
-                
-                loss = torch.sqrt(loss_function(x, lm_pos))
 
-                loss.backward()   # backward propagation
-                optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy
-                
-                l = loss.item()
-                aid_loss += l
-                print("Step loss:",l)
-                agents[aid].sphere_centers = x.detach().clone()
+                # aid_loss += l
+                # print("Step loss:",l)
+                agents[aid].sphere_centers = x.clone().detach()
+
+            aid_loss = loss_function(x, lm_pos)
             
-            aid_loss /= NSteps
-            agents[aid].trainable(False)
+            batch_loss += aid_loss
 
-            print(f"agent {aid} loss:", aid_loss)
+
+            print(f"agent {aid} loss:", aid_loss.item())
             
             agents[aid].writer.add_scalar('distance',aid_loss,epoch)
+
+        batch_loss.backward()   # backward propagation
+        optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy 
 
         #     batch_loss += aid_loss
         
@@ -158,69 +157,128 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
         
 def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,output_dir,early_stopping,device):
     with torch.no_grad():
-        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
 
+        running_loss = 0
+
+        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
                 faces=F, 
                 textures=textures
             )
-            
+            batch_loss = 0
+
             for aid in agents_ids: #aid == idlandmark_id
-                print('---------- agents id :', aid,'----------')
                 agents[aid].reset_sphere_center(V.shape[0])
 
-                NSteps =  num_step
+                print('---------- agents id :', aid,'----------')
+
+                lm_pos = torch.empty((0)).to(device)
+                for lst in LP:
+                    lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
+
+                NSteps = num_step
                 aid_loss = 0
-                epoch_loss = 0
-                agents[aid].eval() 
 
                 for i in range(NSteps):
                     print('---------- step :', i,'----------')
 
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
-
+                    
                     x += agents[aid].sphere_centers
-                    # print('coord sphere center :', agent.sphere_center)
-                    
-                    lm_pos = torch.empty((0)).to(device)
-                    for lst in LP:
-                        lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
-                    
-                    loss = torch.sqrt(loss_function(x, lm_pos))
-                    print('agent position : ', x)
-                    print('landmark position :', lm_pos)
-
-                    l = loss.item()
-                    aid_loss += l
-                    print("Step loss:",l)
                     agents[aid].sphere_centers = x.detach().clone()
-                    
-                    
-                aid_loss /= NSteps
-                print("Step loss:", aid_loss)
-                epoch_loss += aid_loss
 
-                if aid_loss<agents[aid].best_loss:
-                    agents[aid].best_loss = aid_loss
-                    agents[aid].best_epoch_loss = epoch
-                    torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
-                    torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
-                    print("saved new best metric network")
-                    print(f"Model Was Saved ! Current Best Avg. Dice: {agents[aid].best_loss} at epoch: {agents[aid].best_epoch_loss}")
+                aid_loss = loss_function(x, lm_pos)
+                
+                batch_loss += aid_loss
+
+
+                print(f"agent {aid} loss:", aid_loss.item())
+
+            running_loss += batch_loss
+
+            early_stopping(running_loss, agents)
+
+            return early_stopping.early_stop
+                
+            # if aid_loss<agents[aid].best_loss:
+            #     agents[aid].best_loss = aid_loss
+            #     agents[aid].best_epoch_loss = epoch
+            #     torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
+            #     torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
+            #     print("saved new best metric network")
+            #     print(f"Model Was Saved ! Current Best Avg. Dice: {agents[aid].best_loss} at epoch: {agents[aid].best_epoch_loss}")
+
+            #     batch_loss += aid_loss
+            
+            # batch_loss /= len(agents_ids)
+            # writer.add_scalar('distance',batch_loss)
+
+
+        # for batch, (V, F, CN, LP) in enumerate(test_dataloader):
+
+        #     textures = TexturesVertex(verts_features=CN)
+        #     meshes = Meshes(
+        #         verts=V,   
+        #         faces=F, 
+        #         textures=textures
+        #     )
+            
+        #     for aid in agents_ids: #aid == idlandmark_id
+        #         print('---------- agents id :', aid,'----------')
+        #         agents[aid].reset_sphere_center(V.shape[0])
+
+        #         NSteps =  num_step
+        #         aid_loss = 0
+        #         epoch_loss = 0
+        #         agents[aid].eval() 
+
+        #         for i in range(NSteps):
+        #             print('---------- step :', i,'----------')
+
+        #             x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+
+        #             x += agents[aid].sphere_centers
+        #             # print('coord sphere center :', agent.sphere_center)
+                    
+        #             lm_pos = torch.empty((0)).to(device)
+        #             for lst in LP:
+        #                 lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)
+                    
+        #             loss = torch.sqrt(loss_function(x, lm_pos))
+        #             print('agent position : ', x)
+        #             print('landmark position :', lm_pos)
+
+        #             l = loss.item()
+        #             aid_loss += l
+        #             print("Step loss:",l)
+        #             agents[aid].sphere_centers = x.detach().clone()
+                    
+                    
+        #         aid_loss /= NSteps
+        #         print("Step loss:", aid_loss)
+        #         epoch_loss += aid_loss
+
+        #         if aid_loss<agents[aid].best_loss:
+        #             agents[aid].best_loss = aid_loss
+        #             agents[aid].best_epoch_loss = epoch
+        #             torch.save(agents[aid].attention, os.path.join(output_dir, f"best_attention_net_{aid}.pth"))
+        #             torch.save(agents[aid].delta_move, os.path.join(output_dir, f"best_delta_move_net_{aid}.pth"))
+        #             print("saved new best metric network")
+        #             print(f"Model Was Saved ! Current Best Avg. Dice: {agents[aid].best_loss} at epoch: {agents[aid].best_epoch_loss}")
             
                 
               
 
-            epoch_loss /= len(agents_ids)
+        #     epoch_loss /= len(agents_ids)
             
-            early_stopping(epoch_loss)
+        #     early_stopping(epoch_loss)
 
-            if epoch_loss<agents[aid].best_epoch_loss:
-                torch.save(agents[0].features_net, os.path.join(output_dir, "best_feature_net.pth"))
+        #     if epoch_loss<agents[aid].best_epoch_loss:
+        #         torch.save(agents[0].features_net, os.path.join(output_dir, "best_feature_net.pth"))
 
-            return early_stopping.early_stop
+        #     return early_stopping.early_stop
 
 def affichage(data_loader,phong_renderer):
     for batch, (V, F, Y, F0, CN, IP,IL) in enumerate(data_loader):
