@@ -298,14 +298,15 @@ def affichage(data_loader,phong_renderer):
             plt.show()
 
 def pad_verts_faces(batch):
-    verts = [v for v, f, cn, lp in batch]
-    faces = [f for v, f, cn, lp in batch]
-    color_normals = [cn for v, f, cn, lp in batch]
-    landmark_position = [lp for v, f, cn, lp in batch]
-    scale_factor = [sc for v, f, cn, ma , sc, ps in batch]
-    path_surf = [ps for v, f, cn, ma , sc,ps in batch]
+    verts = [v for v, f, cn, lp, sc, ma in batch]
+    faces = [f for v, f, cn, lp, sc, ma in batch]
+    color_normals = [cn for v, f, cn, lp, sc, ma in batch]
+    landmark_position = [lp for v, f, cn, lp, sc, ma in batch]
+    scale_factor = [sc for v, f, cn, lp , sc, ma in batch]
+    mean_arr = [ma for v, f, cn, sc, ma  in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, scale_factor, path_surf
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, scale_factor, mean_arr 
+
 
 def SavePrediction(data, outpath):
     print("Saving prediction to : ", outpath)
@@ -328,7 +329,7 @@ def pad_verts_faces_prediction(batch):
 def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
     with torch.no_grad():
-        for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
+        for batch, (V, F, CN, LP, SF, MR) in enumerate(test_dataloader):
 
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
