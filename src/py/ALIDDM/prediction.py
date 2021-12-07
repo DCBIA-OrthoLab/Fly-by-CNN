@@ -1,3 +1,4 @@
+from posixpath import basename
 from monai.networks.nets import UNet
 import argparse
 import os
@@ -45,7 +46,9 @@ def main(args):
     agents_model = []
     normpath = os.path.normpath("/".join([args.load_models, '**', '']))
     for model in sorted(glob.iglob(normpath, recursive=True)):
-        agents_model.append(model)
+        if True in ['_aid_' in model]:
+            agents_model.append(model)        
+        
         # if True in ['_feature_' in model]:
         #     feature_net_path = model
         # if True in ['_attention_' in model]:
@@ -69,8 +72,12 @@ def main(args):
     agents_ids = np.arange(args.num_agents)
     print(agents_ids)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
-    
+    loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
+
     print("loading agent net ... :", agents_model)
+    for idx_agent,model in enumerate(agents_model):
+        print("loading attention net ... :", model)
+        agents[idx_agent].load_state_dict(torch.load(model,map_location=device))
 
     # feat_net = torch.load(feature_net_path,map_location=device)
     # out_path = os.path.join(args.jsonfolder,'Lower_jaw.json')
@@ -83,15 +90,22 @@ def main(args):
     #     print("loading move net ... :", model)
     #     agents[idx_agent].delta_move = torch.load(model,map_location=device)
     
-    dic_patients = {}
-    for i in data['surf']:
-        dic_patients[i]={}
-    # print(dic_patients)
-    print('-------- PREDICTION --------')
-    groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
-    for path,data in groupe_data.items():
-        lm_lst = GenControlePoint(data)
-        WriteJson(lm_lst,out_path)
+
+    print('-------- ACCURACY --------')
+    Accuracy(agents,dataloader,agents_ids,args.min_variance,loss_function,device)
+
+
+    # dic_patients = {}
+    # for i in data['surf']:
+    #     dic_patients[i]={}
+    # # print(dic_patients)
+    # print('-------- PREDICTION --------')
+    # groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
+    # for path,data in groupe_data.items():
+    #     # print('data',data)
+    #     lm_lst = GenControlePoint(data)
+    #     print(os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
+    #     WriteJson(lm_lst,os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
             
             
 if __name__ == "__main__":

@@ -343,7 +343,10 @@ class FlyByDataset(Dataset):
         # faces_pid0 = faces[:,0:1]
         landmark_pos = ToTensor(dtype=torch.float32, device=self.device)(landmark_pos)
         # print(landmark_pos)
-        return verts, faces, color_normals,landmark_pos
+        mean_arr = ToTensor(dtype=torch.float32, device=self.device)(mean_arr)
+        scale_factor = ToTensor(dtype=torch.float32, device=self.device)(scale_factor)
+
+        return verts, faces, color_normals,landmark_pos,mean_arr,scale_factor
     
     def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks, angle, vector):
        

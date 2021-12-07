@@ -300,12 +300,12 @@ def affichage(data_loader,phong_renderer):
 def pad_verts_faces(batch):
     verts = [v for v, f, cn, lp in batch]
     faces = [f for v, f, cn, lp in batch]
-    # region_ids = [rid for v, f, rid, fpid0, cn, ip, lp in batch]
-    # faces_pid0s = [fpid0 for v, f, fpid0, cn, ip, lp in batch]
     color_normals = [cn for v, f, cn, lp in batch]
-    # ideal_position = [ip for v, f, fpid0, cn, ip, lp in batch]
     landmark_position = [lp for v, f, cn, lp in batch]
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position
+    scale_factor = [sc for v, f, cn, ma , sc, ps in batch]
+    path_surf = [ps for v, f, cn, ma , sc,ps in batch]
+
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, scale_factor, path_surf
 
 def SavePrediction(data, outpath):
     print("Saving prediction to : ", outpath)
@@ -325,10 +325,10 @@ def pad_verts_faces_prediction(batch):
 
     return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor, path_surf
 
-def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer,device):
+def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
     with torch.no_grad():
-        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
+        for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
 
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
@@ -354,7 +354,16 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
                     loss = torch.sqrt(loss_function(pos_center[i], lm_pos[i]))
                     list_distance['obj'].append(str(aid))
                     list_distance['distance'].append(float(loss.item()))
-                
+                    scale_surf = SF[i]
+                    # print('scale_surf :', scale_surf)
+                    mean_arr = MR[i]
+                    # print('mean_arr :', mean_arr)
+                    landmark_pos = pos_center[i]
+                    print('landmark_pos before rescaling :', landmark_pos)
+                    new_pos_center = (landmark_pos/scale_surf) + mean_arr
+                    print('pos_center after rescaling :', new_pos_center)
+                    distance = np.linalg.norm(new_pos_center-lm_pos[i])
+                    print('distance between prediction and real landmark :',distance)
                 # writer.add_scalar('distance',loss)
 
             # print(list_distance)
@@ -402,11 +411,11 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
                     print('mean_arr :', mean_arr)
                     landmark_pos = pos_center[i]
                     print('landmark_pos :', landmark_pos)
-                    pos_center = (landmark_pos/scale_surf) + mean_arr
-                    print('pos_center :', pos_center)
-                    pos_center = pos_center.cpu().numpy()
+                    new_pos_center = (landmark_pos/scale_surf) + mean_arr
+                    print('pos_center :', new_pos_center)
+                    new_pos_center = new_pos_center.cpu().numpy()
                     # print(pos_center)
-                    coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
+                    coord_dic = {"x":new_pos_center[0],"y":new_pos_center[1],"z":new_pos_center[2]}
                     groupe_data[f'Lower_O-{aid+1}']=coord_dic
                     print(PS[i])
                     dic_patients[PS[i]]=groupe_data
@@ -415,7 +424,7 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
         
         print("all the landmarks :" , dic_patients)
     
-    return groupe_data
+    return dic_patients
 
 def GenControlePoint(groupe_data):
     lm_lst = []
@@ -429,7 +438,7 @@ def GenControlePoint(groupe_data):
             "label": landmark,
             "description": "",
             "associatedNodeID": "",
-            "position": [data["x"], data["y"], data["z"]],
+            "position": [float(data["x"]), float(data["y"]), float(data["z"])],
             "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
             "selected": true,
             "locked": true,
@@ -483,6 +492,7 @@ def WriteJson(lm_lst,out_path):
     ]
     }
     with open(out_path, 'w', encoding='utf-8') as f:
+        print(file)
         json.dump(file, f, ensure_ascii=False, indent=4)
 
     f.close
