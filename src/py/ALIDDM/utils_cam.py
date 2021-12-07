@@ -145,7 +145,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
             print(f"agent {aid} loss:", aid_loss.item())
             
-            agents[aid].writer.add_scalar('distance',aid_loss,epoch)
+            agents[aid].writer.add_scalar('training',aid_loss,epoch)
 
         batch_loss.backward()   # backward propagation
         optimizer.step()   # tell the optimizer to update the weights according to the gradients and its internal optimisation strategy 
@@ -199,6 +199,8 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
             running_loss += batch_loss
 
             early_stopping(running_loss, agents)
+            
+            agents[aid].writer.add_scalar('Validation',aid_loss,epoch)
 
             return early_stopping.early_stop
                 
