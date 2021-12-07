@@ -42,10 +42,11 @@ class Agent(nn.Module):
         self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
-        self.attention = SelfAttention(512, 128).to(self.device)
+        self.attention = TimeAttention(12, 128).to(self.device)
         self.delta_move = nn.Linear(512, 3).to(self.device)
+        self.agent_id = aid
 
-        self.trainable(False)
+        # self.trainable(False)
     
     def reset_sphere_center(self,batch_size=1):
         self.batch_size = batch_size
@@ -66,6 +67,7 @@ class Agent(nn.Module):
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
             # print( 'R shape :',R.shape)
+            # print(R)
             T = -torch.bmm(R.transpose(1, 2), current_cam_pos[:, :, None])[:, :, 0]  # (1, 3)
 
             images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
@@ -74,12 +76,11 @@ class Agent(nn.Module):
             
             img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
         img_batch =  img_lst.permute(1,0,2,3,4)
-        print(img_batch.shape)
 
         x = img_batch
         x = self.features_net(x)
-        x, s = self.attention(x.to(self.device))
-        x = self.delta_move(x.to(self.device))
+        x, s = self.attention(x)
+        x = self.delta_move(x)
 
         return x
     
@@ -150,6 +151,26 @@ class SelfAttention(nn.Module):
         attention_weights = nn.Softmax(dim=1)(score)
 
         context_vector = attention_weights * x
+        context_vector = torch.sum(context_vector, dim=1)
+
+        return context_vector, score
+
+class TimeAttention(nn.Module):
+    def __init__(self, in_units, out_units):
+        super(TimeAttention, self).__init__()
+        self.W1 = nn.Linear(in_units, out_units)
+        self.V = nn.Linear(out_units, 1)
+
+    def forward(self, x):        
+
+        x_t = x.transpose(dim0=1, dim1=2)
+        # score shape == (batch_size, max_length, 1)
+        # we get 1 at the last axis because we are applying score to self.V
+        # the shape of the tensor before applying self.V is (batch_size, max_length, units)
+        score = self.V(nn.Tanh()(self.W1(x_t)))
+        attention_weights = nn.Softmax(dim=1)(score)
+
+        context_vector = attention_weights.transpose(dim0=1, dim1=2) * x
         context_vector = torch.sum(context_vector, dim=1)
 
         return context_vector, score
@@ -290,11 +311,12 @@ class CameraNet:
         return self.focal_pos.cpu().numpy()
 
 class FlyByDataset(Dataset):
-    def __init__(self, df, device, dataset_dir=''):
+    def __init__(self, df, device, dataset_dir='', rotate=False):
         self.df = df
         self.device = device
         self.max_landmarks = np.max(self.df["number_of_landmarks"])
         self.dataset_dir = dataset_dir
+        self.rotate = rotate
     def set_env_params(self, params):
         self.params = params
 
@@ -305,10 +327,14 @@ class FlyByDataset(Dataset):
         
         surf = ReadSurf(os.path.join(self.dataset_dir, self.df.iloc[idx]["surf"])) # list of dico like [{"model":... ,"landmarks":...},...]
         surf, mean_arr, scale_factor= ScaleSurf(surf) # resize my surface to center it to [0,0,0], return the distance between the [0,0,0] and the camera center and the rescale_factor
-        # surf, angle, vector = RandomRotation(surf)
+        if self.rotate:
+            surf, angle, vector = RandomRotation(surf)
+        else:
+            angle = 0 
+            vector = np.array([0, 0, 1])
         surf = ComputeNormals(surf) 
 
-        landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks)# angle, vector,
+        landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks, angle, vector)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
         verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
         faces = ToTensor(dtype=torch.int32, device=self.device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
@@ -319,7 +345,7 @@ class FlyByDataset(Dataset):
         # print(landmark_pos)
         return verts, faces, color_normals,landmark_pos
     
-    def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks): #angle, vector
+    def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks, angle, vector):
        
         print(self.df.iloc[idx]["landmarks"])
         data = json.load(open(os.path.join(self.dataset_dir,self.df.iloc[idx]["landmarks"])))
@@ -332,23 +358,22 @@ class FlyByDataset(Dataset):
             lid = int((landmark["label"]).split("-")[-1]) - 1
             landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
 
-        # transform = GetTransform(angle, vector)
+        landmarks_pos = np.array([np.transpose(np.append(pos,1)) for pos in landmarks_position])
 
-        # transform_matrix = arrayFromVTKMatrix(transform.GetMatrix())
-        # landmarks_pos = [np.transpose(np.append(pos,1)) for pos in landmarks_position]
-        # landmark_position_t = [pos * transform_matrix for pos in landmarks_pos]
-        # landmark_position_t = [pos[:-1].tolist() for pos in landmarks_pos]
-        # print(landmark_position_t)
+        if angle:
+            transform = GetTransform(angle, vector)
 
-        # landmark_position_t = numpy_to_vtk(np.zeros_like(landmarks_position))
-        # transform.TransformPoints(numpy_to_vtk(landmarks_position), landmark_position_t)
-        # landmark_position_t = vtk_to_numpy(landmark_position_t)
+            transform_matrix = arrayFromVTKMatrix(transform.GetMatrix())
+            
+            landmarks_pos = np.matmul(landmarks_pos, transform_matrix)
 
-        return landmarks_position
+        return landmarks_pos[:, 0:3]
+
+
 
 class EarlyStopping:
     """Early stops the training if validation loss doesn't improve after a given patience."""
-    def __init__(self, patience=5, verbose=False, delta=0, trace_func=print):
+    def __init__(self, patience=10, verbose=False, delta=0, path='checkpoint.pt', trace_func=print):
         """
         Args:
             patience (int): How long to wait after last time validation loss improved.
@@ -369,16 +394,15 @@ class EarlyStopping:
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
+        self.path = path
         self.trace_func = trace_func
-
-    def __call__(self, val_loss):#, attention_model , move_net_model, aid, path):
+    def __call__(self, val_loss, agents):
 
         score = -val_loss
 
         if self.best_score is None:
             self.best_score = score
-            # self.save_checkpoint( val_loss, attention_model, move_net_model, aid, path)
-
+            self.save_checkpoint(val_loss, agents)
         elif score < self.best_score + self.delta:
             self.counter += 1
             self.trace_func(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -386,16 +410,17 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            # self.save_checkpoint( val_loss, attention_model, move_net_model, aid, path)
+            self.save_checkpoint(val_loss, agents)
             self.counter = 0
 
-    # def save_checkpoint(self, val_loss, attention_model,move_net_model,aid,path):
-    #     '''Saves model when validation loss decrease.'''
-    #     if self.verbose:
-    #         self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
-    #     torch.save(attention_model, os.path.join(path, f"best_attention_net_{aid}.pth"))
-    #     torch.save(move_net_model, os.path.join(path, f"best_delta_move_net_{aid}.pth"))               
-    #     self.val_loss_min = val_loss
+    def save_checkpoint(self, val_loss, agents):
+        '''Saves model when validation loss decrease.'''
+        if self.verbose:
+            self.trace_func(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+
+        for a in agents:
+            torch.save(a.state_dict(), os.path.join(self.path, "_aid_" + str(a.agent_id) + ".pt"))
+        self.val_loss_min = val_loss
 
 
 class FlyByDatasetPrediction(Dataset):
