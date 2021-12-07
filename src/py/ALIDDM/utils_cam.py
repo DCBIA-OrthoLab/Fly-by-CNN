@@ -195,13 +195,13 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
 
                 print(f"agent {aid} loss:", aid_loss.item())
+                
+                agents[aid].writer.add_scalar('Validation',aid_loss,epoch)
 
             running_loss += batch_loss
 
             early_stopping(running_loss, agents)
             
-            agents[aid].writer.add_scalar('Validation',aid_loss,epoch)
-
             return early_stopping.early_stop
                 
             # if aid_loss<agents[aid].best_loss:
