@@ -42,16 +42,16 @@ def main(args):
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
     
-    attention_lst = []
-    move_net_lst = []
+    agents_model = []
     normpath = os.path.normpath("/".join([args.load_models, '**', '']))
     for model in sorted(glob.iglob(normpath, recursive=True)):
-        if True in ['_feature_' in model]:
-            feature_net_path = model
-        if True in ['_attention_' in model]:
-            attention_lst.append(model)
-        if True in ['_delta_move_' in model]:
-            move_net_lst.append(model)
+        agents_model.append(model)
+        # if True in ['_feature_' in model]:
+        #     feature_net_path = model
+        # if True in ['_attention_' in model]:
+        #     attention_lst.append(model)
+        # if True in ['_delta_move_' in model]:
+        #     move_net_lst.append(model)
     
     # print(feature_net_path)
     # print(attention_lst)
@@ -70,17 +70,18 @@ def main(args):
     print(agents_ids)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
     
-    print("loading feature net ... :", feature_net_path )
-    feat_net = torch.load(feature_net_path,map_location=device)
-    out_path = os.path.join(args.jsonfolder,'Lower_jaw.json')
+    print("loading agent net ... :", agents_model)
 
-    for idx_agent,model in enumerate(attention_lst):
-        print("loading attention net ... :", model)
-        agents[idx_agent].attention = torch.load(model,map_location=device)
+    # feat_net = torch.load(feature_net_path,map_location=device)
+    # out_path = os.path.join(args.jsonfolder,'Lower_jaw.json')
 
-    for idx_agent,model in enumerate(move_net_lst):
-        print("loading move net ... :", model)
-        agents[idx_agent].delta_move = torch.load(model,map_location=device)
+    # for idx_agent,model in enumerate(attention_lst):
+    #     print("loading attention net ... :", model)
+    #     agents[idx_agent].attention = torch.load(model,map_location=device)
+
+    # for idx_agent,model in enumerate(move_net_lst):
+    #     print("loading move net ... :", model)
+    #     agents[idx_agent].delta_move = torch.load(model,map_location=device)
     
     dic_patients = {}
     for i in data['surf']:

@@ -368,7 +368,7 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
     with torch.no_grad():
         for batch, (V, F, CN, MR, SF,PS) in enumerate(dataloader):
             groupe_data = {}
-
+            print(PS)
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
@@ -385,7 +385,7 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
                 agents[aid].eval() 
                 
                 pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
-                
+                print('pos_center',pos_center)
                 # lm_pos = torch.empty((0)).to(device)
                 # for lst in LP:
                 #     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
@@ -395,7 +395,6 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
                 # list_distance['obj'].append(str(aid))
                 # list_distance['distance'].append(float(loss.item()))
                 for i in range(V.shape[0]):
-
                     # print(pos_center[i],SF[i],MR[i])
                     scale_surf = SF[i]
                     print('scale_surf :', scale_surf)

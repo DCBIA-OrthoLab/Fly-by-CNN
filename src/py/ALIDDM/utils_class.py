@@ -96,8 +96,8 @@ class Agent(nn.Module):
         found = False
         # print(len(self.position_memory))
         if len(self.position_center_memory) == self.max_que:
-            print(self.position_center_memory)
-            print(np.var(np.array(list(self.position_center_memory)),axis=0))
+            # print(self.position_center_memory)
+            # print(np.var(np.array(list(self.position_center_memory)),axis=0))
             variance_center_sphere = np.mean(np.var(np.array(list(self.position_center_memory)),axis=0),axis=1) #list variance
             print('variance :', variance_center_sphere)
             if np.max(variance_center_sphere)<min_variance:
