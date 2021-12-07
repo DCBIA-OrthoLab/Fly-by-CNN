@@ -85,11 +85,10 @@ def main(args):
     dic_patients = {}
     for i in data['surf']:
         dic_patients[i]={}
-    print(dic_patients)
+    # print(dic_patients)
     print('-------- PREDICTION --------')
     groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
     for path,data in groupe_data.items():
-        print(data)
         lm_lst = GenControlePoint(data)
         WriteJson(lm_lst,out_path)
             

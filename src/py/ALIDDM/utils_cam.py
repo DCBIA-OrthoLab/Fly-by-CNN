@@ -363,7 +363,7 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
         plt.show()
 
 def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
-    list_distance = ({ 'obj' : [], 'distance' : [] })
+    # list_distance = ({ 'obj' : [], 'distance' : [] })
 
     with torch.no_grad():
         for batch, (V, F, CN, MR, SF,PS) in enumerate(dataloader):
@@ -398,11 +398,13 @@ def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
 
                     # print(pos_center[i],SF[i],MR[i])
                     scale_surf = SF[i]
+                    print('scale_surf :', scale_surf)
                     mean_arr = MR[i]
+                    print('mean_arr :', mean_arr)
                     landmark_pos = pos_center[i]
-                    # print(landmark_pos,MR,scale_surf)
-
+                    print('landmark_pos :', landmark_pos)
                     pos_center = (landmark_pos/scale_surf) + mean_arr
+                    print('pos_center :', pos_center)
                     pos_center = pos_center.cpu().numpy()
                     # print(pos_center)
                     coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
