@@ -328,8 +328,10 @@ def pad_verts_faces_prediction(batch):
 
 def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
+
     with torch.no_grad():
         for batch, (V, F, CN, LP, SF, MR) in enumerate(test_dataloader):
+            groupe_data = {}
 
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
@@ -363,11 +365,18 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
                     print('landmark_pos before rescaling :', agent_pos)
                     new_pos_center = Upscale(agent_pos,scale_surf,mean_arr)#(landmark_pos/scale_surf) + mean_arr
                     print('pos_center after rescaling :', new_pos_center)
-                    new_landmark_pos = Upscale(lm_pos[i],scale_surf,mean_arr)
+                    # new_landmark_pos = Upscale(lm_pos[i],scale_surf,mean_arr)
+                    new_landmark_pos = Upscale(LP[i],scale_surf,mean_arr)
+                    new_pos_center=new_pos_center.cpu()
+                    new_landmark_pos=new_landmark_pos.cpu()
                     distance = np.linalg.norm(new_pos_center-new_landmark_pos)
                     print('distance between prediction and real landmark :',distance)
                     list_distance['distance'].append(distance)
-
+                    coord_dic = {"x":new_landmark_pos[0],"y":new_landmark_pos[1],"z":new_landmark_pos[2]}
+                    groupe_data[f'Lower_O-{aid+1}']=coord_dic
+                    print(groupe_data)
+                    # print(PS[i])
+                    # dic_patients[PS[i]]=groupe_data
                 # writer.add_scalar('distance',loss)
 
             # print(list_distance)

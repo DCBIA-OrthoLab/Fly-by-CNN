@@ -358,7 +358,7 @@ class FlyByDataset(Dataset):
         resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
         for idx, landmark in enumerate(landmarks_dict):
             lid = int((landmark["label"]).split("-")[-1]) - 1
-            print('position du landmark avant rescale :',landmark["position"])
+            # print('position du landmark avant rescale :',landmark["position"])
             # landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
             landmarks_position[lid] = Downscale(landmark["position"],mean_arr,scale_factor)
             # print('position apres dowacaling :', landmarks_position[lid])
