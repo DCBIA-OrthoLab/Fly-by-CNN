@@ -354,17 +354,20 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
                 for i in range(V.shape[0]):
                     loss = torch.sqrt(loss_function(pos_center[i], lm_pos[i]))
                     list_distance['obj'].append(str(aid))
-                    list_distance['distance'].append(float(loss.item()))
+                    # list_distance['distance'].append(float(loss.item()))
                     scale_surf = SF[i]
                     # print('scale_surf :', scale_surf)
                     mean_arr = MR[i]
                     # print('mean_arr :', mean_arr)
-                    landmark_pos = pos_center[i]
-                    print('landmark_pos before rescaling :', landmark_pos)
-                    new_pos_center = (landmark_pos/scale_surf) + mean_arr
+                    agent_pos = pos_center[i]
+                    print('landmark_pos before rescaling :', agent_pos)
+                    new_pos_center = Upscale(agent_pos,scale_surf,mean_arr)#(landmark_pos/scale_surf) + mean_arr
                     print('pos_center after rescaling :', new_pos_center)
-                    distance = np.linalg.norm(new_pos_center-lm_pos[i])
+                    new_landmark_pos = Upscale(lm_pos[i],scale_surf,mean_arr)
+                    distance = np.linalg.norm(new_pos_center-new_landmark_pos)
                     print('distance between prediction and real landmark :',distance)
+                    list_distance['distance'].append(distance)
+
                 # writer.add_scalar('distance',loss)
 
             # print(list_distance)
@@ -513,3 +516,8 @@ def WriteJson(lm_lst,out_path):
 #             list_distance.append(distance)
         
 #     SavePrediction(output, output_path)
+
+
+def Upscale(landmark_pos,scale_factor,mean_arr):
+    new_pos_center = (landmark_pos/scale_factor) + mean_arr
+    return new_pos_center

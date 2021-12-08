@@ -18,7 +18,6 @@ import math
 import os
 from torch.utils.tensorboard import SummaryWriter
 
-
 class Agent(nn.Module):
     def __init__(self, renderer, features_net, aid, device,run_folder = "", radius=2,sl=1,lenque = 5):
         super(Agent, self).__init__()
@@ -333,7 +332,7 @@ class FlyByDataset(Dataset):
             angle = 0 
             vector = np.array([0, 0, 1])
         surf = ComputeNormals(surf) 
-
+        print('bonjour')
         landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks, angle, vector)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
         verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
@@ -356,10 +355,15 @@ class FlyByDataset(Dataset):
         landmarks_dict = markups[0]['controlPoints']
 
         landmarks_position = np.zeros([number_of_landmarks, 3])
-
+        resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
         for idx, landmark in enumerate(landmarks_dict):
             lid = int((landmark["label"]).split("-")[-1]) - 1
-            landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
+            print('position du landmark avant rescale :',landmark["position"])
+            # landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
+            landmarks_position[lid] = Downscale(landmark["position"],mean_arr,scale_factor)
+            # print('position apres dowacaling :', landmarks_position[lid])
+            # resc_landmarks_position[lid] = Upscale(landmarks_position[lid],scale_factor,mean_arr)
+            # print('position apres upscaling', resc_landmarks_position[lid])
 
         landmarks_pos = np.array([np.transpose(np.append(pos,1)) for pos in landmarks_position])
 
@@ -470,3 +474,11 @@ def arrayFromVTKMatrix(vmatrix):
   narray = np.eye(matrixSize)
   vmatrix.DeepCopy(narray.ravel(), vmatrix)
   return narray
+
+def Upscale(landmark_pos,scale_factor,mean_arr):
+    new_pos_center = (landmark_pos/scale_factor) + mean_arr
+    return new_pos_center
+
+def Downscale(pos_center,mean_arr,scale_factor):
+    landmarks_position = (pos_center - mean_arr) * scale_factor
+    return landmarks_position
