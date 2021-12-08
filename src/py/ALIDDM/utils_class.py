@@ -19,7 +19,7 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, aid, device,run_folder = "", radius=2,sl=1,lenque = 5):
+    def __init__(self, renderer, features_net, aid, device,run_folder = "", radius=2,sl=1,lenque = 10):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
@@ -81,8 +81,9 @@ class Agent(nn.Module):
         x, s = self.attention(x)
         x = self.delta_move(x)
 
-        return x
-    
+        return x        
+
+
     def trainable(self, train = False):
         for param in self.attention.parameters():
             param.requires_grad = train
@@ -341,11 +342,18 @@ class FlyByDataset(Dataset):
         # faces_pid0 = faces[:,0:1]
         landmark_pos = ToTensor(dtype=torch.float32, device=self.device)(landmark_pos)
         # print(landmark_pos)
-        mean_arr = ToTensor(dtype=torch.float32, device=self.device)(mean_arr)
-        scale_factor = ToTensor(dtype=torch.float32, device=self.device)(scale_factor)
+        # print('m',mean_arr)
+        # print('s',scale_factor)
+        # mean_arr = ToTensor( dtype=torch.float64,device=self.device)(mean_arr)
+        # scale_factor = ToTensor(dtype=torch.float64, device=self.device)(scale_factor)
+        mean_arr = torch.tensor(mean_arr,dtype=torch.float64).to(self.device)
+        scale_factor = torch.tensor(scale_factor,dtype=torch.float64).to(self.device)
+        # print('m',mean_arr)
+        print('s',scale_factor)
+        
 
         return verts, faces, color_normals,landmark_pos,mean_arr,scale_factor
-    
+   
     def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks, angle, vector):
        
         print(self.df.iloc[idx]["landmarks"])
@@ -357,8 +365,10 @@ class FlyByDataset(Dataset):
         resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
         for idx, landmark in enumerate(landmarks_dict):
             lid = int((landmark["label"]).split("-")[-1]) - 1
-            # print('position du landmark avant rescale :',landmark["position"])
+            print('position du landmark avant rescale :',landmark["position"])
             # landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
+            # print('m',mean_arr)
+            # print('s',scale_factor)
             landmarks_position[lid] = Downscale(landmark["position"],mean_arr,scale_factor)
             # print('position apres dowacaling :', landmarks_position[lid])
             # resc_landmarks_position[lid] = Upscale(landmarks_position[lid],scale_factor,mean_arr)
@@ -474,7 +484,7 @@ def arrayFromVTKMatrix(vmatrix):
   vmatrix.DeepCopy(narray.ravel(), vmatrix)
   return narray
 
-def Upscale(landmark_pos,scale_factor,mean_arr):
+def Upscale(landmark_pos,mean_arr,scale_factor):
     new_pos_center = (landmark_pos/scale_factor) + mean_arr
     return new_pos_center
 

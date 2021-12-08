@@ -18,6 +18,7 @@ from pytorch3d.renderer import (
     HardPhongShader, PointLights,
 )
 import csv
+from pytorch3d.vis.plotly_vis import AxisArgs, plot_batch_individually, plot_scene
 
 
 def dataset(data):
@@ -141,7 +142,6 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
             aid_loss = loss_function(x, lm_pos)
             
             batch_loss += aid_loss
-
 
             print(f"agent {aid} loss:", aid_loss.item())
             
@@ -305,7 +305,7 @@ def pad_verts_faces(batch):
     scale_factor = [sc for v, f, cn, lp , sc, ma in batch]
     mean_arr = [ma for v, f, cn, sc, ma  in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, scale_factor, mean_arr 
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor 
 
 
 def SavePrediction(data, outpath):
@@ -326,28 +326,50 @@ def pad_verts_faces_prediction(batch):
 
     return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor, path_surf
 
+def plot_fig(teeth_mesh,center_mesh):
+        radius_sphere = 0.1
+        # R, T = look_at_view_transform(self.distance, self.elevation, self.azimuth, device=self.device,degrees=False)
+        # cam_pos=torch.matmul(T,R)
+        # print(cam_pos)
+        # cam_pos = cam_pos.numpy()[0][0]
+        # cam_mesh = generate_sphere_mesh(cam_pos,radius_sphere,self.device)
+        # center_mesh = generate_sphere_mesh([0,0,0],radius_sphere,self.device)
+
+        dic = {"teeth_mesh": teeth_mesh, 'center':center_mesh}
+        # for n,lm_mesh in enumerate(self.list_meshe_landmarks):
+        #     dic[str(n)] = lm_mesh
+        fig = plot_scene({"subplot1": dic},     
+            xaxis={"backgroundcolor":"rgb(200, 200, 230)"},
+            yaxis={"backgroundcolor":"rgb(230, 200, 200)"},
+            zaxis={"backgroundcolor":"rgb(200, 230, 200)"}, 
+            axis_args=AxisArgs(showgrid=True))
+            
+        fig.show()
+
 def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
 
     with torch.no_grad():
-        for batch, (V, F, CN, LP, SF, MR) in enumerate(test_dataloader):
+        for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
             groupe_data = {}
-
+            radius = 2
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
                 faces=F, 
                 textures=textures
             )
-            
+       
             for aid in agents_ids: #aid == idlandmark_id
                 print('---------- agents id :', aid,'----------')
                 agents[aid].reset_sphere_center(V.shape[0])
-
+                
                 agents[aid].eval() 
                 
                 pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
-                
+                center_mesh = generate_sphere_mesh(pos_center,radius,device)
+                plot_fig(meshes,center_mesh)
+
                 lm_pos = torch.empty((0)).to(device)
                 for lst in LP:
                     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
@@ -362,20 +384,24 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
                     mean_arr = MR[i]
                     # print('mean_arr :', mean_arr)
                     agent_pos = pos_center[i]
-                    print('landmark_pos before rescaling :', agent_pos)
-                    new_pos_center = Upscale(agent_pos,scale_surf,mean_arr)#(landmark_pos/scale_surf) + mean_arr
-                    print('pos_center after rescaling :', new_pos_center)
-                    # new_landmark_pos = Upscale(lm_pos[i],scale_surf,mean_arr)
-                    new_landmark_pos = Upscale(LP[i],scale_surf,mean_arr)
+                    # print('landmark_pos before rescaling :', agent_pos)
+                    new_pos_center = Upscale(agent_pos,mean_arr,scale_surf)#(landmark_pos/scale_surf) + mean_arr
+                    # print('pos_center after rescaling :', new_pos_center)
+                    landmark_pos = Upscale(lm_pos[i],scale_surf,mean_arr)
+                    # print('d',LP[i][aid])
+                    # new_landmark_pos = Upscale(LP[i][aid],mean_arr,scale_surf)
+                    # print('m',mean_arr)
+                    # print('s',scale_surf)
+                    # print('u',new_landmark_pos)
                     new_pos_center=new_pos_center.cpu()
                     new_landmark_pos=new_landmark_pos.cpu()
-                    distance = np.linalg.norm(new_pos_center-new_landmark_pos)
-                    print('distance between prediction and real landmark :',distance)
+                    distance = np.linalg.norm(new_pos_center-landmark_pos)
+                    # print('distance between prediction and real landmark :',distance)
                     list_distance['distance'].append(distance)
                     coord_dic = {"x":new_landmark_pos[0],"y":new_landmark_pos[1],"z":new_landmark_pos[2]}
-                    print(coord_dic)
+                    # print(coord_dic)
                     groupe_data[f'Lower_O-{aid+1}']=coord_dic
-                    print(groupe_data)
+                    # print(groupe_data)
                     # print(PS[i])
                     # dic_patients[PS[i]]=groupe_data
                 # writer.add_scalar('distance',loss)
@@ -511,23 +537,4 @@ def WriteJson(lm_lst,out_path):
 
     f.close
 
-# def Prediction(agents,load_model,datas):
-#     agents.load_state_dict(torch.load(load_model,map_location=device))
-#     with torch.no_grad():
-#         print("Loading data from :", args.dir)
-#                 for image in img_model:
-#                     new_image = torch.from_numpy(image).permute(2,0,1) # convertion in tensor (7,258,258)
-#                     img_output = net(new_image)
-#                     # print(torch.from_numpy(img_output).size())
-#                     output = torch.cat(img_output,0)
-#             output = torch.cat(img_output,0)
-#             distance = loss_function(img_output, IP)
-#             print('difference between exact and predict position :', distance)
-#             list_distance.append(distance)
-        
-#     SavePrediction(output, output_path)
 
-
-def Upscale(landmark_pos,scale_factor,mean_arr):
-    new_pos_center = (landmark_pos/scale_factor) + mean_arr
-    return new_pos_center

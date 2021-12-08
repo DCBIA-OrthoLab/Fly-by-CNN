@@ -124,7 +124,7 @@ if __name__ == "__main__":
     input_group.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_group.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_group.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_group.add_argument('--batch_size',type=int, help='batch size', default=2)
+    input_group.add_argument('--batch_size',type=int, help='batch size', default=1)
     input_group.add_argument('--jsonfolder',type=str, help='path where you save your jsonfile after prediction', required=True)
 
     
