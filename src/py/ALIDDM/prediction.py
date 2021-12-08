@@ -91,21 +91,21 @@ def main(args):
     #     agents[idx_agent].delta_move = torch.load(model,map_location=device)
     
 
-    print('-------- ACCURACY --------')
-    Accuracy(agents,dataloader,agents_ids,args.min_variance,loss_function,device)
+    # print('-------- ACCURACY --------')
+    # Accuracy(agents,dataloader,agents_ids,args.min_variance,loss_function,device)
 
 
-    # dic_patients = {}
-    # for i in data['surf']:
-    #     dic_patients[i]={}
-    # # print(dic_patients)
-    # print('-------- PREDICTION --------')
-    # groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
-    # for path,data in groupe_data.items():
-    #     # print('data',data)
-    #     lm_lst = GenControlePoint(data)
-    #     print(os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
-    #     WriteJson(lm_lst,os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
+    dic_patients = {}
+    for i in data['surf']:
+        dic_patients[i]={}
+    # print(dic_patients)
+    print('-------- PREDICTION --------')
+    groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
+    for path,data in groupe_data.items():
+        # print('data',data)
+        lm_lst = GenControlePoint(data)
+        print(os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
+        WriteJson(lm_lst,os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
             
             
 if __name__ == "__main__":
