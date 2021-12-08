@@ -373,6 +373,7 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
                     print('distance between prediction and real landmark :',distance)
                     list_distance['distance'].append(distance)
                     coord_dic = {"x":new_landmark_pos[0],"y":new_landmark_pos[1],"z":new_landmark_pos[2]}
+                    print(coord_dic)
                     groupe_data[f'Lower_O-{aid+1}']=coord_dic
                     print(groupe_data)
                     # print(PS[i])

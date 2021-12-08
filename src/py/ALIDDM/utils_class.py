@@ -332,7 +332,6 @@ class FlyByDataset(Dataset):
             angle = 0 
             vector = np.array([0, 0, 1])
         surf = ComputeNormals(surf) 
-        print('bonjour')
         landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks, angle, vector)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
         verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
