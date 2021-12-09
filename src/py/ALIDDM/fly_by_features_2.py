@@ -105,12 +105,12 @@ def main(args):
             Validation(epoch,agents,agents_ids,validation_dataloader,args.num_step,loss_function,output_dir,early_stopping,device)
             if early_stopping.early_stop == True :
                 print('-------- ACCURACY --------')
-                Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
+                Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
                 break
         
         if (epoch + 1) % args.num_epoch == 0:
             print('-------- ACCURACY --------')
-            Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
+            Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
 
 
 

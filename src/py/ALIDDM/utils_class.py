@@ -77,11 +77,12 @@ class Agent(nn.Module):
             
             # print(images.shape)
             pix_to_face, zbuf, bary_coords, dists = self.renderer.rasterizer(x)
-            print(dists.shape)
-            y = torch.cat([images[..., 0:3], dists], dim=-1).permute(0, 3, 1, 2)
-            print(y)
+            zbuf.permute(0, 3, 1, 2)
+            # print(dists.shape)
+            y = torch.cat([images, zbuf], dim=1)
+            # print(y)
 
-            img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
+            img_lst = torch.cat((img_lst,y.unsqueeze(0)),dim=0)
         img_batch =  img_lst.permute(1,0,2,3,4)
 
         x = img_batch
@@ -221,7 +222,7 @@ class FeaturesNet(nn.Module):
         
         resnet = models.resnet34(pretrained=True)
         resnet.fc = Identity()
-        # resnet.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        resnet.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.resnet = resnet
         # self.activation = nn.Tanh()
         self.timedist = TimeDistributed(self.resnet)

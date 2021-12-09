@@ -133,10 +133,10 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                 # optimizer.zero_grad()   # prepare the gradients for this step's back propagation
 
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
-                print('x', x)
+                # print('x', x)
                 x =  x[...,0:3]
                 # x= [x[batch][:-1] for batch in range(V.shape[0])]
-                print('x without last param',x)
+                # print('x without last param',x)
 
                 x += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
