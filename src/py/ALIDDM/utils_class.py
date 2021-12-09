@@ -42,14 +42,16 @@ class Agent(nn.Module):
 
         self.features_net = features_net
         self.attention = TimeAttention(12, 128).to(self.device)
-        self.delta_move = nn.Linear(512, 3).to(self.device)
+        self.delta_move = nn.Linear(512, 4).to(self.device)
         self.agent_id = aid
 
         # self.trainable(False)
     
     def reset_sphere_center(self,batch_size=1):
         self.batch_size = batch_size
-        self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+        # self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+        self.sphere_centers= (torch.rand([self.batch_size, 3])*2-1).type(torch.float32).to(self.device)
+        print(self.sphere_centers)
 
     def get_parameters(self):
         att_param = self.attention.parameters()
@@ -72,6 +74,7 @@ class Agent(nn.Module):
             images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
             images = images.permute(0,3,1,2)
             images = images[:,:-1,:,:]
+            
             
             img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
         img_batch =  img_lst.permute(1,0,2,3,4)
@@ -349,7 +352,7 @@ class FlyByDataset(Dataset):
         mean_arr = torch.tensor(mean_arr,dtype=torch.float64).to(self.device)
         scale_factor = torch.tensor(scale_factor,dtype=torch.float64).to(self.device)
         # print('m',mean_arr)
-        print('s',scale_factor)
+        # print('s',scale_factor)
         
 
         return verts, faces, color_normals,landmark_pos,mean_arr,scale_factor
@@ -365,7 +368,7 @@ class FlyByDataset(Dataset):
         resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
         for idx, landmark in enumerate(landmarks_dict):
             lid = int((landmark["label"]).split("-")[-1]) - 1
-            print('position du landmark avant rescale :',landmark["position"])
+            # print('position du landmark avant rescale :',landmark["position"])
             # landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
             # print('m',mean_arr)
             # print('s',scale_factor)

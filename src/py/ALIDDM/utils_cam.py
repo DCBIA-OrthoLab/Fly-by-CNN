@@ -73,8 +73,9 @@ def dataset(data):
 
     return outfile
 
-def generate_sphere_mesh(center,radius,device):
+def generate_sphere_mesh(center,radius,device,col):
     sphereSource = vtk.vtkSphereSource()
+    print(center)
     sphereSource.SetCenter(center[0],center[1],center[2])
     sphereSource.SetRadius(radius)
 
@@ -88,18 +89,18 @@ def generate_sphere_mesh(center,radius,device):
 
     verts_teeth,faces_teeth = PolyDataToTensors(vtk_landmarks.GetOutput())
 
-    verts_rgb = torch.ones_like(verts_teeth)[None]  # (1, V, 3)
+    verts_rgb = torch.ones_like(verts_teeth)[None]+col  # (1, V, 3)
     # color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
     textures = TexturesVertex(verts_features=verts_rgb.to(device))
     mesh = Meshes(
         verts=[verts_teeth], 
         faces=[faces_teeth],
-        textures=textures)
+        textures=textures).to(device)
     
     return mesh
 
 def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device):
-    for batch, (V, F, CN, LP) in enumerate(train_dataloader):
+    for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(
             verts=V,   
@@ -131,7 +132,9 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                 # optimizer.zero_grad()   # prepare the gradients for this step's back propagation
 
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
-                
+                print('x', x)
+                print('x without last param',x[:-1])
+
                 x += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
 
@@ -303,7 +306,7 @@ def pad_verts_faces(batch):
     color_normals = [cn for v, f, cn, lp, sc, ma in batch]
     landmark_position = [lp for v, f, cn, lp, sc, ma in batch]
     scale_factor = [sc for v, f, cn, lp , sc, ma in batch]
-    mean_arr = [ma for v, f, cn, sc, ma  in batch]
+    mean_arr = [ma for v, f, cn,lp, sc, ma  in batch]
 
     return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor 
 
@@ -326,7 +329,7 @@ def pad_verts_faces_prediction(batch):
 
     return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor, path_surf
 
-def plot_fig(teeth_mesh,center_mesh):
+def plot_fig(dic):
         radius_sphere = 0.1
         # R, T = look_at_view_transform(self.distance, self.elevation, self.azimuth, device=self.device,degrees=False)
         # cam_pos=torch.matmul(T,R)
@@ -335,7 +338,7 @@ def plot_fig(teeth_mesh,center_mesh):
         # cam_mesh = generate_sphere_mesh(cam_pos,radius_sphere,self.device)
         # center_mesh = generate_sphere_mesh([0,0,0],radius_sphere,self.device)
 
-        dic = {"teeth_mesh": teeth_mesh, 'center':center_mesh}
+        # dic = {"teeth_mesh": teeth_mesh, 'center':center_mesh}
         # for n,lm_mesh in enumerate(self.list_meshe_landmarks):
         #     dic[str(n)] = lm_mesh
         fig = plot_scene({"subplot1": dic},     
@@ -352,7 +355,7 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
     with torch.no_grad():
         for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
             groupe_data = {}
-            radius = 2
+            radius = 0.02
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
@@ -365,14 +368,21 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
                 agents[aid].reset_sphere_center(V.shape[0])
                 
                 agents[aid].eval() 
-                
                 pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
-                center_mesh = generate_sphere_mesh(pos_center,radius,device)
-                plot_fig(meshes,center_mesh)
+                # plot_fig(meshes,center_mesh)
 
                 lm_pos = torch.empty((0)).to(device)
                 for lst in LP:
                     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
+                                # center_mesh = generate_sphere_mesh(pos_center[0],radius,device,0.9)
+                
+                perfect_pos = generate_sphere_mesh(lm_pos[0],radius,device,0.0)
+                dic = {"teeth_mesh": meshes, 'landmark':perfect_pos}
+                for index,step in enumerate(agents[aid].position_center_memory):
+                    center_mesh = generate_sphere_mesh(step[0],radius,device,0.9)
+                    dic[str(index)]=center_mesh
+
+                plot_fig(dic)
                 
                 
                 for i in range(V.shape[0]):

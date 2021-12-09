@@ -33,6 +33,7 @@ def main(args):
         blur_radius=args.blur_radius, 
         faces_per_pixel=args.faces_per_pixel, 
     )
+    raster_settings.perspective_correct = True  
 
     lights = PointLights(device=device) # light in front of the object. 
 
@@ -40,11 +41,12 @@ def main(args):
             cameras=cameras, 
             raster_settings=raster_settings
         )
-
+    
     phong_renderer = MeshRenderer(
         rasterizer=rasterizer,
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
+    
     output_dir = os.path.join(args.out, "best_nets")
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -59,16 +61,13 @@ def main(args):
     # df_prediction = dataset(args.data_pred)
 
     train_data = FlyByDataset(df_train,device, dataset_dir=args.dir, rotate=True)
-    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir, rotate=False)
+    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir, rotate=True)
     test_data = FlyByDataset(df_test,device,  dataset_dir=args.dir, rotate=False)
 
 
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    validation_dataloader = DataLoader(val_data, batch_size=1, shuffle=False, collate_fn=pad_verts_faces)
-    test_dataloader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-
-    # pred_dataloader = DataLoader(data_prediction,batch_size=args.batch_size,shuffle=True, collate_fn=pad_verts_faces)
-    # print(pred_dataloader)
+    validation_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, collate_fn=pad_verts_faces)
+    test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True, collate_fn=pad_verts_faces)
 
     learning_rate = 1e-4
     feat_net = FeaturesNet().to(device)
