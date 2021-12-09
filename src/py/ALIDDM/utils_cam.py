@@ -133,7 +133,8 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 print('x', x)
-                print('x without last param',x[:-1])
+                x= [x[batch][:-1] for batch in range(V.shape[0])]
+                print('x without last param',x)
 
                 x += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
