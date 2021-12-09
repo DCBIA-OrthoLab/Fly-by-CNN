@@ -309,9 +309,9 @@ def pad_verts_faces(batch):
     landmark_position = [lp for v, f, cn, lp, sc, ma, d  in batch]
     scale_factor = [sc for v, f, cn, lp , sc, ma , d in batch]
     mean_arr = [ma for v, f, cn,lp, sc, ma , d  in batch]
-    dests = [d for v, f, cn,lp, sc, ma, d  in batch]
+    dists = [d for v, f, cn,lp, sc, ma, d  in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor, pad_sequence(dests, batch_first=True, padding_value=0.0) 
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor, pad_sequence(dists, batch_first=True, padding_value=0.0) 
 
 
 def SavePrediction(data, outpath):
