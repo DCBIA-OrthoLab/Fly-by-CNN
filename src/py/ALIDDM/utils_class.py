@@ -75,7 +75,11 @@ class Agent(nn.Module):
             images = images.permute(0,3,1,2)
             images = images[:,:-1,:,:]
             
-            
+            # print(images.shape)
+            # pix_to_face, zbuf, bary_coords, dists = self.renderer.rasterizer(x)
+            # y = torch.cat([images[..., 0:3], dists], dim=-1).permute(0, 3, 1, 2)
+            # print(y)
+
             img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
         img_batch =  img_lst.permute(1,0,2,3,4)
 
@@ -335,6 +339,10 @@ class FlyByDataset(Dataset):
         else:
             angle = 0 
             vector = np.array([0, 0, 1])
+        
+        pix_to_face, zbuf, bary_coords, dists = self.renderer.rasterizer(surf)
+        dists = dists.permute(0, 3, 1, 2)
+        print(dists.shape)
         surf = ComputeNormals(surf) 
         landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks, angle, vector)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
@@ -353,9 +361,8 @@ class FlyByDataset(Dataset):
         scale_factor = torch.tensor(scale_factor,dtype=torch.float64).to(self.device)
         # print('m',mean_arr)
         # print('s',scale_factor)
-        
 
-        return verts, faces, color_normals,landmark_pos,mean_arr,scale_factor
+        return verts, faces, color_normals,landmark_pos,mean_arr,scale_factor,dists
    
     def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks, angle, vector):
        

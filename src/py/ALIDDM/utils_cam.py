@@ -100,8 +100,8 @@ def generate_sphere_mesh(center,radius,device,col):
     return mesh
 
 def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device):
-    for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
-        textures = TexturesVertex(verts_features=CN)
+    for batch, (V, F, CN, LP, MR, SF, D) in enumerate(train_dataloader):
+        textures = TexturesVertex(verts_features=D)
         meshes = Meshes(
             verts=V,   
             faces=F, 
@@ -133,7 +133,8 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 print('x', x)
-                x= [x[batch][:-1] for batch in range(V.shape[0])]
+                x =  x[...,0:3]
+                # x= [x[batch][:-1] for batch in range(V.shape[0])]
                 print('x without last param',x)
 
                 x += agents[aid].sphere_centers
@@ -302,14 +303,15 @@ def affichage(data_loader,phong_renderer):
             plt.show()
 
 def pad_verts_faces(batch):
-    verts = [v for v, f, cn, lp, sc, ma in batch]
-    faces = [f for v, f, cn, lp, sc, ma in batch]
-    color_normals = [cn for v, f, cn, lp, sc, ma in batch]
-    landmark_position = [lp for v, f, cn, lp, sc, ma in batch]
-    scale_factor = [sc for v, f, cn, lp , sc, ma in batch]
-    mean_arr = [ma for v, f, cn,lp, sc, ma  in batch]
+    verts = [v for v, f, cn, lp, sc, ma, d  in batch]
+    faces = [f for v, f, cn, lp, sc, ma, d  in batch]
+    color_normals = [cn for v, f, cn, lp, sc, ma, d  in batch]
+    landmark_position = [lp for v, f, cn, lp, sc, ma, d  in batch]
+    scale_factor = [sc for v, f, cn, lp , sc, ma , d in batch]
+    mean_arr = [ma for v, f, cn,lp, sc, ma , d  in batch]
+    dests = [d for v, f, cn,lp, sc, ma, d  in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor 
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor, pad_sequence(dests, batch_first=True, padding_value=0.0) 
 
 
 def SavePrediction(data, outpath):

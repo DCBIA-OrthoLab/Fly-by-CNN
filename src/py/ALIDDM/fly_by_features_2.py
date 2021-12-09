@@ -33,7 +33,6 @@ def main(args):
         blur_radius=args.blur_radius, 
         faces_per_pixel=args.faces_per_pixel, 
     )
-    raster_settings.perspective_correct = True  
 
     lights = PointLights(device=device) # light in front of the object. 
 
@@ -127,7 +126,7 @@ if __name__ == '__main__':
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
     input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
     input_param.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
-    input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
+    input_param.add_argument('--batch_size',type=int, help='batch size', default=2)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='./runs')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
