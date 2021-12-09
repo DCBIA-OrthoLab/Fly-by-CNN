@@ -19,25 +19,25 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, aid, device,run_folder = "", radius=2,sl=1,lenque = 10):
+    def __init__(self, renderer, features_net, aid, device,run_folder = "",min_radius=0.5,max_radius=2.5,sl=1,lenque = 10):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
         self.writer = SummaryWriter(os.path.join(run_folder,f"runs_{aid}"))
-
+        self.min_radius=min_radius
+        self.max_radius=max_radius
         # self.list_cam_pos = LIST_POINT
         self.max_que = lenque
         self.position_center_memory = deque(maxlen=self.max_que)
         self.best_loss = 9999
         self.best_epoch_loss = 9999
-        icosahedron = CreateIcosahedron(radius, sl)
+        icosahedron = CreateIcosahedron(1, sl)
         sphere_points = []
         for pid in range(icosahedron.GetNumberOfPoints()):
             spoint = icosahedron.GetPoint(pid)
             sphere_points.append([point+0.00001 for point in spoint])
 
         sphere_points = np.array(sphere_points)
-
         self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
@@ -51,19 +51,24 @@ class Agent(nn.Module):
         self.batch_size = batch_size
         # self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
         self.sphere_centers= (torch.rand([self.batch_size, 3])*2-1).type(torch.float32).to(self.device)
-        print(self.sphere_centers)
+        # print(self.sphere_centers)
+        self.radius = (torch.rand([self.batch_size, 1])* self.max_radius + self.min_radius).type(torch.float32).to(self.device)
 
     def get_parameters(self):
         att_param = self.attention.parameters()
         move_param = self.delta_move.parameters()
         return list(att_param) + list(move_param)
-
+    
+    def set_radius(self,delta_rad):
+        self.radius = nn.Tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
+         
     def forward(self,x):
 
         spc = self.sphere_centers
         img_lst = torch.empty((0)).to(self.device)
 
         for sp in self.sphere_points:
+            sp = sp*self.radius
             sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
@@ -116,8 +121,10 @@ class Agent(nn.Module):
     def search(self,meshes,min_variance):
         while not self.found(min_variance):
             x = self(meshes)  #[batchsize,time_steps,3,224,224]
-            x += self.sphere_centers
-            new_coord = x.detach().clone()
+            delta_pos =  x[...,0:3]
+            delta_pos += self.sphere_centers
+            self.set_radius(x[...,3:4],1) 
+            new_coord = delta_pos.detach().clone()
             self.position_center_memory.append(new_coord.cpu().numpy())
             self.sphere_centers = new_coord
 

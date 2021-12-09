@@ -134,18 +134,19 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 # print('x', x)
-                x =  x[...,0:3]
+                delta_pos =  x[...,0:3]
                 # x= [x[batch][:-1] for batch in range(V.shape[0])]
                 # print('x without last param',x)
 
-                x += agents[aid].sphere_centers
+                delta_pos += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
+                agents[aid].set_radius(x[...,3:4],1) 
 
                 # aid_loss += l
                 # print("Step loss:",l)
-                agents[aid].sphere_centers = x.clone().detach()
+                agents[aid].sphere_centers = delta_pos.clone().detach()
 
-            aid_loss = loss_function(x, lm_pos)
+            aid_loss = loss_function(delta_pos, lm_pos)
             
             batch_loss += aid_loss
 
@@ -192,10 +193,15 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                     
-                    x += agents[aid].sphere_centers
-                    agents[aid].sphere_centers = x.detach().clone()
+                    delta_pos =  x[...,0:3]
+                    
+                    delta_pos += agents[aid].sphere_centers
+                    
+                    agents[aid].set_radius(x[...,3:4],1) 
 
-                aid_loss = loss_function(x, lm_pos)
+                    agents[aid].sphere_centers = delta_pos.detach().clone()
+
+                aid_loss = loss_function(delta_pos, lm_pos)
                 
                 batch_loss += aid_loss
 
@@ -389,7 +395,7 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device
                 
                 
                 for i in range(V.shape[0]):
-                    loss = torch.sqrt(loss_function(pos_center[i], lm_pos[i]))
+                    # loss = torch.sqrt(loss_function(pos_center[i], lm_pos[i]))
                     list_distance['obj'].append(str(aid))
                     # list_distance['distance'].append(float(loss.item()))
                     scale_surf = SF[i]
