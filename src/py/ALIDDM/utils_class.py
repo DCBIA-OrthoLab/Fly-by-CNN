@@ -318,12 +318,13 @@ class CameraNet:
         return self.focal_pos.cpu().numpy()
 
 class FlyByDataset(Dataset):
-    def __init__(self, df, device, dataset_dir='', rotate=False):
+    def __init__(self, df, renderer, device, dataset_dir='', rotate=False):
         self.df = df
         self.device = device
         self.max_landmarks = np.max(self.df["number_of_landmarks"])
         self.dataset_dir = dataset_dir
         self.rotate = rotate
+        self.renderer = renderer
     def set_env_params(self, params):
         self.params = params
 
