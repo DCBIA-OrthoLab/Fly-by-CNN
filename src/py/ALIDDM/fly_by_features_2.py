@@ -60,9 +60,9 @@ def main(args):
     # print(df_train)
     # df_prediction = dataset(args.data_pred)
 
-    train_data = FlyByDataset(df_train,device,renderer=phong_renderer, dataset_dir=args.dir, rotate=True)
-    val_data = FlyByDataset(df_val,device,renderer=phong_renderer , dataset_dir=args.dir, rotate=True)
-    test_data = FlyByDataset(df_test,device,renderer=phong_renderer, dataset_dir=args.dir, rotate=False)
+    train_data = FlyByDataset(df_train,device,phong_renderer, dataset_dir=args.dir, rotate=True)
+    val_data = FlyByDataset(df_val,device,phong_renderer , dataset_dir=args.dir, rotate=True)
+    test_data = FlyByDataset(df_test,device,phong_renderer, dataset_dir=args.dir, rotate=False)
 
 
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
