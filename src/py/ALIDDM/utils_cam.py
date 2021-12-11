@@ -107,7 +107,19 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
             verts=V,   
             faces=F, 
             textures=textures
-        )
+        ) # batchsize
+        
+        # center_mesh = generate_sphere_mesh(step[0],radius,device,0.9)
+        # agent_verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(center_mesh.GetPoints().GetData()))
+        # agent_faces = ToTensor(dtype=torch.int32, device=device)(vtk_to_numpy(center_mesh.GetPolys().GetData()).reshape(-1, 4)[:,1:])
+
+        # verts = torch.cat([verts, agent_verts], dim=0)
+        # faces = torch.cat([faces, agent_faces + verts.shape[0]], dim=0)
+        # init_meshes =  Meshes(
+        #     verts=verts,   
+        #     faces=faces, 
+        #     textures=textures
+        # )
         batch_loss = 0
 
         optimizer.zero_grad()
@@ -131,8 +143,10 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                 print('---------- step :', i,'----------')
 
                 # optimizer.zero_grad()   # prepare the gradients for this step's back propagation
-
+                
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+
+                # x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 # print('x', x)
                 delta_pos =  x[...,0:3]
                 # x= [x[batch][:-1] for batch in range(V.shape[0])]
@@ -140,12 +154,15 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
                 delta_pos += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
-                agents[aid].set_radius(x[...,3:4],1) 
+
+                # agents[aid].set_radius(x[...,3:4].clone().detach())
 
                 # aid_loss += l
                 # print("Step loss:",l)
                 agents[aid].sphere_centers = delta_pos.clone().detach()
-
+            
+            print('delta_pos',delta_pos)
+            print('lm_pos',lm_pos)
             aid_loss = loss_function(delta_pos, lm_pos)
             
             batch_loss += aid_loss
@@ -167,7 +184,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
         running_loss = 0
 
-        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
+        for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
@@ -197,7 +214,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
                     
                     delta_pos += agents[aid].sphere_centers
                     
-                    agents[aid].set_radius(x[...,3:4],1) 
+                    # agents[aid].set_radius(x[...,3:4].clone().detach())
 
                     agents[aid].sphere_centers = delta_pos.detach().clone()
 

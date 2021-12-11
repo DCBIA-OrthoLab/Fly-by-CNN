@@ -48,8 +48,8 @@ def main(args):
     )
     
     output_dir = os.path.join(args.out, "best_nets")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
 
     df = pd.read_csv(dataset(args.dir))
     df_train, df_rem = train_test_split(df, train_size=args.train_size)
@@ -73,13 +73,13 @@ def main(args):
     feat_net = FeaturesNet().to(device)
     # new_move_net = TimeDistributed(move_net).to(device)
     loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-    early_stopping = EarlyStopping(patience=20, verbose=True, path=args.out)
+    early_stopping = EarlyStopping(patience=10, verbose=True, path=args.out)
 
     epoch_loss = 0
     best_score = 9999
     # print(args.run_folder)
-    writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
-    
+    # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
+
     agents = [Agent(renderer=phong_renderer, features_net=feat_net,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())

@@ -36,21 +36,25 @@ class Agent(nn.Module):
         for pid in range(icosahedron.GetNumberOfPoints()):
             spoint = icosahedron.GetPoint(pid)
             sphere_points.append([point+0.00001 for point in spoint])
+            sphere_points.append([(point+0.00001)*0.5 for point in spoint])
+
 
         sphere_points = np.array(sphere_points)
         self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
         self.attention = TimeAttention(12, 128).to(self.device)
-        self.delta_move = nn.Linear(512, 4).to(self.device)
-        self.agent_id = aid
+        # self.delta_move = nn.Linear(512, 4).to(self.device)
+        self.delta_move = nn.Linear(512, 3).to(self.device)
 
+        self.agent_id = aid
+        self.tanh = nn.Tanh() 
         # self.trainable(False)
     
     def reset_sphere_center(self,batch_size=1):
         self.batch_size = batch_size
-        # self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
-        self.sphere_centers= (torch.rand([self.batch_size, 3])*2-1).type(torch.float32).to(self.device)
+        self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+        # self.sphere_centers= (torch.rand([self.batch_size, 3])*2-1).type(torch.float32).to(self.device)
         # print(self.sphere_centers)
         self.radius = (torch.rand([self.batch_size, 1])* self.max_radius + self.min_radius).type(torch.float32).to(self.device)
 
@@ -60,8 +64,9 @@ class Agent(nn.Module):
         return list(att_param) + list(move_param)
     
     def set_radius(self,delta_rad):
-        self.radius = nn.Tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
-         
+        self.radius = self.tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
+        # print(self.radius)
+
     def forward(self,x):
 
         spc = self.sphere_centers
@@ -69,7 +74,7 @@ class Agent(nn.Module):
 
         for sp in self.sphere_points:
             sp = sp*self.radius
-            sp = sp.unsqueeze(0).repeat(self.batch_size,1)
+            # sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
             # print( 'R shape :',R.shape)
@@ -82,7 +87,7 @@ class Agent(nn.Module):
             
             # print(images.shape)
             pix_to_face, zbuf, bary_coords, dists = self.renderer.rasterizer(x)
-            zbuf.permute(0, 3, 1, 2)
+            zbuf = zbuf.permute(0, 3, 1, 2)
             # print(dists.shape)
             y = torch.cat([images, zbuf], dim=1)
             # print(y)
@@ -123,7 +128,7 @@ class Agent(nn.Module):
             x = self(meshes)  #[batchsize,time_steps,3,224,224]
             delta_pos =  x[...,0:3]
             delta_pos += self.sphere_centers
-            self.set_radius(x[...,3:4],1) 
+            # self.set_radius(x[...,3:4].clone().detach()) 
             new_coord = delta_pos.detach().clone()
             self.position_center_memory.append(new_coord.cpu().numpy())
             self.sphere_centers = new_coord
@@ -378,7 +383,7 @@ class FlyByDataset(Dataset):
         landmarks_dict = markups[0]['controlPoints']
 
         landmarks_position = np.zeros([number_of_landmarks, 3])
-        resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
+        # resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
         for idx, landmark in enumerate(landmarks_dict):
             lid = int((landmark["label"]).split("-")[-1]) - 1
             # print('position du landmark avant rescale :',landmark["position"])
