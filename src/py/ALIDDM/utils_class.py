@@ -31,12 +31,12 @@ class Agent(nn.Module):
         self.position_center_memory = deque(maxlen=self.max_que)
         self.best_loss = 9999
         self.best_epoch_loss = 9999
-        self.radius = 2.0
+        self.radius = torch.tensor(2.0)
         icosahedron = CreateIcosahedron(1, sl)
         sphere_points = []
         for pid in range(icosahedron.GetNumberOfPoints()):
             spoint = icosahedron.GetPoint(pid)
-            sphere_points.append([point+0.00001 for point in spoint])
+            sphere_points.append([point for point in spoint])
             # sphere_points.append([(point+0.00001)*0.5 for point in spoint])
 
 
@@ -74,15 +74,15 @@ class Agent(nn.Module):
         img_lst = torch.empty((0)).to(self.device)
 
         for sp in self.sphere_points:
-            sp *= self.radius
+            sp_i = sp*self.radius
             # sp = sp.unsqueeze(0).repeat(self.batch_size,1)
-            current_cam_pos = spc + sp
+            current_cam_pos = spc + sp_i
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
             # print( 'R shape :',R.shape)
             # print(R)
             T = -torch.bmm(R.transpose(1, 2), current_cam_pos[:, :, None])[:, :, 0]  # (1, 3)
 
-            images = self.renderer(meshes_world= x.clone(), R=R, T=T.to(self.device))
+            images = self.renderer(meshes_world=x.clone(), R=R, T=T.to(self.device))
             images = images.permute(0,3,1,2)
             images = images[:,:-1,:,:]
             
@@ -100,6 +100,7 @@ class Agent(nn.Module):
         x = self.features_net(x)
         x, s = self.attention(x)
         x = self.delta_move(x)
+        x = self.tanh(x)
 
         return x        
 
