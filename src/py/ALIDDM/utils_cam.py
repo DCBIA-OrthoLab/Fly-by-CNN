@@ -137,7 +137,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
         optimizer.zero_grad()
 
         for aid in agents_ids: #aid == idlandmark_id
-            agents[aid].reset_sphere_center(V.shape[0])
+            agents[aid].reset_sphere_center(V.shape[0], random=True)
 
             print('---------- agents id :', aid,'----------')
 
