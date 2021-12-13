@@ -160,11 +160,11 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
 
                 # x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 # print('x', x)
-                delta_pos =  x[...,0:3]
+                # delta_pos =  x[...,0:3]
                 # x= [x[batch][:-1] for batch in range(V.shape[0])]
                 # print('x without last param',x)
 
-                delta_pos += agents[aid].sphere_centers
+                # delta_pos += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
 
             #     # agents[aid].set_radius(x[...,3:4].clone().detach())
@@ -183,6 +183,8 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
             
             # agents[aid].writer.add_scalar('training',aid_loss,epoch)
             #     # f_i = G*m_1*m_2/(loss_function(x, lm_pos) + epsilon) 
+
+                x += agents[aid].sphere_centers
                 f_i = 1.0/(loss_function(x, lm_pos) + epsilon) 
                 A_i_gforce += f_i* torch.pow(discount_factor, i)
 
