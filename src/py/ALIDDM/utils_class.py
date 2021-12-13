@@ -31,12 +31,13 @@ class Agent(nn.Module):
         self.position_center_memory = deque(maxlen=self.max_que)
         self.best_loss = 9999
         self.best_epoch_loss = 9999
+        self.radius = 2.0
         icosahedron = CreateIcosahedron(1, sl)
         sphere_points = []
         for pid in range(icosahedron.GetNumberOfPoints()):
             spoint = icosahedron.GetPoint(pid)
             sphere_points.append([point+0.00001 for point in spoint])
-            sphere_points.append([(point+0.00001)*0.5 for point in spoint])
+            # sphere_points.append([(point+0.00001)*0.5 for point in spoint])
 
 
         sphere_points = np.array(sphere_points)
@@ -51,12 +52,12 @@ class Agent(nn.Module):
         self.tanh = nn.Tanh() 
         # self.trainable(False)
     
-    def reset_sphere_center(self,batch_size=1):
+    def reset_sphere_center(self,batch_size=1, random=False):
         self.batch_size = batch_size
-        self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
-        # self.sphere_centers= (torch.rand([self.batch_size, 3])*2-1).type(torch.float32).to(self.device)
-        # print(self.sphere_centers)
-        self.radius = (torch.rand([self.batch_size, 1])* self.max_radius + self.min_radius).type(torch.float32).to(self.device)
+        if(random):
+            self.sphere_centers = (torch.rand(self.batch_size, 3) * 2.0 - 1.0).to(self.device)
+        else:
+            self.sphere_centers = torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
 
     def get_parameters(self):
         att_param = self.attention.parameters()
@@ -73,7 +74,7 @@ class Agent(nn.Module):
         img_lst = torch.empty((0)).to(self.device)
 
         for sp in self.sphere_points:
-            sp = sp*self.radius
+            sp *= self.radius
             # sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
