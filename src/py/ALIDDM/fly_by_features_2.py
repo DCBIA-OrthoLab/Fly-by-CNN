@@ -3,6 +3,7 @@
 
 from shutil import move
 from itk.support.extras import image
+from pytorch3d import renderer
 import torch
 from torch._C import default_generator
 import torch.optim as optim
@@ -40,14 +41,15 @@ def main(args):
             cameras=cameras, 
             raster_settings=raster_settings
         )
-
+    
     phong_renderer = MeshRenderer(
         rasterizer=rasterizer,
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
+    
     output_dir = os.path.join(args.out, "best_nets")
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+    # if not os.path.exists(output_dir):
+    #     os.makedirs(output_dir)
 
     df = pd.read_csv(dataset(args.dir))
     df_train, df_rem = train_test_split(df, train_size=args.train_size)
@@ -59,28 +61,25 @@ def main(args):
     # df_prediction = dataset(args.data_pred)
 
     train_data = FlyByDataset(df_train,device, dataset_dir=args.dir, rotate=True)
-    val_data = FlyByDataset(df_val,device,  dataset_dir=args.dir, rotate=False)
-    test_data = FlyByDataset(df_test,device,  dataset_dir=args.dir, rotate=False)
+    val_data = FlyByDataset(df_val,device , dataset_dir=args.dir, rotate=True)
+    test_data = FlyByDataset(df_test,device,dataset_dir=args.dir, rotate=False)
 
 
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    validation_dataloader = DataLoader(val_data, batch_size=1, shuffle=False, collate_fn=pad_verts_faces)
-    test_dataloader = DataLoader(test_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
-
-    # pred_dataloader = DataLoader(data_prediction,batch_size=args.batch_size,shuffle=True, collate_fn=pad_verts_faces)
-    # print(pred_dataloader)
+    validation_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, collate_fn=pad_verts_faces)
+    test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True, collate_fn=pad_verts_faces)
 
     learning_rate = 1e-4
     feat_net = FeaturesNet().to(device)
     # new_move_net = TimeDistributed(move_net).to(device)
     loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-    early_stopping = EarlyStopping(patience=20, verbose=True, path=args.out)
+    early_stopping = EarlyStopping(patience=10, verbose=True, path=args.out)
 
     epoch_loss = 0
     best_score = 9999
     # print(args.run_folder)
-    writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
-    
+    # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
+
     agents = [Agent(renderer=phong_renderer, features_net=feat_net,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())
@@ -106,12 +105,12 @@ def main(args):
             Validation(epoch,agents,agents_ids,validation_dataloader,args.num_step,loss_function,output_dir,early_stopping,device)
             if early_stopping.early_stop == True :
                 print('-------- ACCURACY --------')
-                Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
+                Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
                 break
         
         if (epoch + 1) % args.num_epoch == 0:
             print('-------- ACCURACY --------')
-            Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,writer,device)
+            Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
 
 
 
@@ -132,8 +131,8 @@ if __name__ == '__main__':
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='./runs')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
-    input_param.add_argument('--num_agents',type=int, help=' umber of agents = number of maximum of landmarks in dataset', default=2)
-    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=5)
+    input_param.add_argument('--num_agents',type=int, help=' number of agents = number of maximum of landmarks in dataset', default=2)
+    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=10)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')

@@ -18,6 +18,7 @@ from pytorch3d.renderer import (
     HardPhongShader, PointLights,
 )
 import csv
+from pytorch3d.vis.plotly_vis import AxisArgs, plot_batch_individually, plot_scene
 
 
 def dataset(data):
@@ -72,8 +73,9 @@ def dataset(data):
 
     return outfile
 
-def generate_sphere_mesh(center,radius,device):
+def generate_sphere_mesh(center,radius,device,col):
     sphereSource = vtk.vtkSphereSource()
+    print(center)
     sphereSource.SetCenter(center[0],center[1],center[2])
     sphereSource.SetRadius(radius)
 
@@ -87,17 +89,19 @@ def generate_sphere_mesh(center,radius,device):
 
     verts_teeth,faces_teeth = PolyDataToTensors(vtk_landmarks.GetOutput())
 
-    verts_rgb = torch.ones_like(verts_teeth)[None]  # (1, V, 3)
+    verts_rgb = torch.ones_like(verts_teeth)[None]+col  # (1, V, 3)
     # color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
     textures = TexturesVertex(verts_features=verts_rgb.to(device))
     mesh = Meshes(
         verts=[verts_teeth], 
         faces=[faces_teeth],
-        textures=textures)
+        textures=textures).to(device)
     
     return mesh
 
 def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device):
+    # for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
+        
 
     #Gravitational law F = G * (m_1*m_2/r^2)
 
@@ -107,13 +111,27 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
     epsilon = torch.tensor(1e-10)
     discount_factor = torch.tensor(0.8)
 
-    for batch, (V, F, CN, LP) in enumerate(train_dataloader):
+    for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(
             verts=V,   
             faces=F, 
             textures=textures
-        )
+        ) # batchsize
+        
+        # center_mesh = generate_sphere_mesh(step[0],radius,device,0.9)
+        # agent_verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(center_mesh.GetPoints().GetData()))
+        # agent_faces = ToTensor(dtype=torch.int32, device=device)(vtk_to_numpy(center_mesh.GetPolys().GetData()).reshape(-1, 4)[:,1:])
+
+        # verts = torch.cat([verts, agent_verts], dim=0)
+        # faces = torch.cat([faces, agent_faces + verts.shape[0]], dim=0)
+        # init_meshes =  Meshes(
+        #     verts=verts,   
+        #     faces=faces, 
+        #     textures=textures
+        # )
+        # batch_loss = 0
+        # )
         batch_g_force = 0
 
         optimizer.zero_grad()
@@ -137,13 +155,34 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                 print('---------- step :', i,'----------')
 
                 # optimizer.zero_grad()   # prepare the gradients for this step's back propagation
-
-                x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                 
-                x += agents[aid].sphere_centers
+                x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+
+                # x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
+                # print('x', x)
+                delta_pos =  x[...,0:3]
+                # x= [x[batch][:-1] for batch in range(V.shape[0])]
+                # print('x without last param',x)
+
+                delta_pos += agents[aid].sphere_centers
                 # print('coord sphere center :', agent.sphere_center)
 
-                # f_i = G*m_1*m_2/(loss_function(x, lm_pos) + epsilon) 
+            #     # agents[aid].set_radius(x[...,3:4].clone().detach())
+
+            #     # aid_loss += l
+            #     # print("Step loss:",l)
+            #     agents[aid].sphere_centers = delta_pos.clone().detach()
+            
+            # print('delta_pos',delta_pos)
+            # print('lm_pos',lm_pos)
+            # aid_loss = loss_function(delta_pos, lm_pos)
+            
+            # batch_loss += aid_loss
+
+            # print(f"agent {aid} loss:", aid_loss.item())
+            
+            # agents[aid].writer.add_scalar('training',aid_loss,epoch)
+            #     # f_i = G*m_1*m_2/(loss_function(x, lm_pos) + epsilon) 
                 f_i = 1.0/(loss_function(x, lm_pos) + epsilon) 
                 A_i_gforce += f_i* torch.pow(discount_factor, i)
 
@@ -170,7 +209,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
         running_loss = 0
 
-        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
+        for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
@@ -195,6 +234,13 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                     
+                    # delta_pos =  x[...,0:3]
+                    
+                    # delta_pos += agents[aid].sphere_centers
+                    
+                    # # agents[aid].set_radius(x[...,3:4].clone().detach())
+
+                    # agents[aid].sphere_centers = delta_pos.detach().clone()
                     x += agents[aid].sphere_centers
                     agents[aid].sphere_centers = x.clone().detach()
 
@@ -203,9 +249,14 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
                 batch_loss += aid_loss
 
                 print(f"agent {aid} loss:", aid_loss.item())
+                
+                agents[aid].writer.add_scalar('Validation',aid_loss,epoch)
 
             running_loss += batch_loss
 
+            # early_stopping(running_loss, agents)
+            
+            # return early_stopping.early_stop
         early_stopping(running_loss, agents)
 
         return early_stopping.early_stop
@@ -304,14 +355,15 @@ def affichage(data_loader,phong_renderer):
             plt.show()
 
 def pad_verts_faces(batch):
-    verts = [v for v, f, cn, lp in batch]
-    faces = [f for v, f, cn, lp in batch]
-    # region_ids = [rid for v, f, rid, fpid0, cn, ip, lp in batch]
-    # faces_pid0s = [fpid0 for v, f, fpid0, cn, ip, lp in batch]
-    color_normals = [cn for v, f, cn, lp in batch]
-    # ideal_position = [ip for v, f, fpid0, cn, ip, lp in batch]
-    landmark_position = [lp for v, f, cn, lp in batch]
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position
+    verts = [v for v, f, cn, lp, sc, ma  in batch]
+    faces = [f for v, f, cn, lp, sc, ma  in batch]
+    color_normals = [cn for v, f, cn, lp, sc, ma, in batch]
+    landmark_position = [lp for v, f, cn, lp, sc, ma in batch]
+    scale_factor = [sc for v, f, cn, lp , sc, ma  in batch]
+    mean_arr = [ma for v, f, cn,lp, sc, ma   in batch]
+
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), landmark_position, mean_arr, scale_factor
+
 
 def SavePrediction(data, outpath):
     print("Saving prediction to : ", outpath)
@@ -322,44 +374,100 @@ def SavePrediction(data, outpath):
     writer.Execute(output)
 
 def pad_verts_faces_prediction(batch):
-    verts = [v for v, f, cn, ma , sc in batch]
-    faces = [f for v, f, cn, ma , sc in batch]
-    color_normals = [cn for v, f, cn, ma , sc in batch]
-    mean_arr = [ma for v, f, cn, ma , sc  in batch]
-    scale_factor = [sc for v, f, cn, ma , sc in batch]
+    verts = [v for v, f, cn, ma , sc, ps in batch]
+    faces = [f for v, f, cn, ma , sc, ps in batch]
+    color_normals = [cn for v, f, cn, ma , sc, ps in batch]
+    mean_arr = [ma for v, f, cn, ma , sc, ps  in batch]
+    scale_factor = [sc for v, f, cn, ma , sc, ps in batch]
+    path_surf = [ps for v, f, cn, ma , sc,ps in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor
+    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), mean_arr, scale_factor, path_surf
 
-def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer,device):
+def plot_fig(dic):
+        radius_sphere = 0.1
+        # R, T = look_at_view_transform(self.distance, self.elevation, self.azimuth, device=self.device,degrees=False)
+        # cam_pos=torch.matmul(T,R)
+        # print(cam_pos)
+        # cam_pos = cam_pos.numpy()[0][0]
+        # cam_mesh = generate_sphere_mesh(cam_pos,radius_sphere,self.device)
+        # center_mesh = generate_sphere_mesh([0,0,0],radius_sphere,self.device)
+
+        # dic = {"teeth_mesh": teeth_mesh, 'center':center_mesh}
+        # for n,lm_mesh in enumerate(self.list_meshe_landmarks):
+        #     dic[str(n)] = lm_mesh
+        fig = plot_scene({"subplot1": dic},     
+            xaxis={"backgroundcolor":"rgb(200, 200, 230)"},
+            yaxis={"backgroundcolor":"rgb(230, 200, 200)"},
+            zaxis={"backgroundcolor":"rgb(200, 230, 200)"}, 
+            axis_args=AxisArgs(showgrid=True))
+            
+        fig.show()
+
+def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,device):
     list_distance = ({ 'obj' : [], 'distance' : [] })
-    with torch.no_grad():
-        for batch, (V, F, CN, LP) in enumerate(test_dataloader):
 
+    with torch.no_grad():
+        for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
+            groupe_data = {}
+            radius = 0.02
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
                 faces=F, 
                 textures=textures
             )
-            
+       
             for aid in agents_ids: #aid == idlandmark_id
                 print('---------- agents id :', aid,'----------')
                 agents[aid].reset_sphere_center(V.shape[0])
-
+                
                 agents[aid].eval() 
-                
                 pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
-                
+                # plot_fig(meshes,center_mesh)
+
                 lm_pos = torch.empty((0)).to(device)
                 for lst in LP:
                     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
+                                # center_mesh = generate_sphere_mesh(pos_center[0],radius,device,0.9)
+                
+                perfect_pos = generate_sphere_mesh(lm_pos[0],radius,device,0.0)
+                dic = {"teeth_mesh": meshes, 'landmark':perfect_pos}
+                for index,step in enumerate(agents[aid].position_center_memory):
+                    center_mesh = generate_sphere_mesh(step[0],radius,device,0.9)
+                    dic[str(index)]=center_mesh
+
+                plot_fig(dic)
                 
                 
                 for i in range(V.shape[0]):
-                    loss = torch.sqrt(loss_function(pos_center[i], lm_pos[i]))
+                    # loss = torch.sqrt(loss_function(pos_center[i], lm_pos[i]))
                     list_distance['obj'].append(str(aid))
-                    list_distance['distance'].append(float(loss.item()))
-                
+                    # list_distance['distance'].append(float(loss.item()))
+                    scale_surf = SF[i]
+                    # print('scale_surf :', scale_surf)
+                    mean_arr = MR[i]
+                    # print('mean_arr :', mean_arr)
+                    agent_pos = pos_center[i]
+                    # print('landmark_pos before rescaling :', agent_pos)
+                    new_pos_center = Upscale(agent_pos,mean_arr,scale_surf)#(landmark_pos/scale_surf) + mean_arr
+                    # print('pos_center after rescaling :', new_pos_center)
+                    landmark_pos = Upscale(lm_pos[i],scale_surf,mean_arr)
+                    # print('d',LP[i][aid])
+                    # new_landmark_pos = Upscale(LP[i][aid],mean_arr,scale_surf)
+                    # print('m',mean_arr)
+                    # print('s',scale_surf)
+                    # print('u',new_landmark_pos)
+                    new_pos_center=new_pos_center.cpu()
+                    new_landmark_pos=new_landmark_pos.cpu()
+                    distance = np.linalg.norm(new_pos_center-landmark_pos)
+                    # print('distance between prediction and real landmark :',distance)
+                    list_distance['distance'].append(distance)
+                    coord_dic = {"x":new_landmark_pos[0],"y":new_landmark_pos[1],"z":new_landmark_pos[2]}
+                    # print(coord_dic)
+                    groupe_data[f'Lower_O-{aid+1}']=coord_dic
+                    # print(groupe_data)
+                    # print(PS[i])
+                    # dic_patients[PS[i]]=groupe_data
                 # writer.add_scalar('distance',loss)
 
             # print(list_distance)
@@ -367,13 +475,13 @@ def Accuracy(agents,test_dataloader,agents_ids,min_variance,loss_function,writer
         sns.violinplot(x='obj',y='distance',data=list_distance)
         plt.show()
 
-def Prediction(agents,dataloader,agents_ids,min_variance):
-    list_distance = ({ 'obj' : [], 'distance' : [] })
-    groupe_data = {}
+def Prediction(agents,dataloader,agents_ids,min_variance,dic_patients):
+    # list_distance = ({ 'obj' : [], 'distance' : [] })
 
     with torch.no_grad():
-        for batch, (V, F, CN, MR, SF) in enumerate(dataloader):
-
+        for batch, (V, F, CN, MR, SF,PS) in enumerate(dataloader):
+            groupe_data = {}
+            print(PS)
             textures = TexturesVertex(verts_features=CN)
             meshes = Meshes(
                 verts=V,   
@@ -383,13 +491,14 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
             
             for aid in agents_ids: #aid == idlandmark_id
                 coord_dic = {}
+
                 print('---------- agents id :', aid,'----------')
                 agents[aid].reset_sphere_center(V.shape[0])
 
                 agents[aid].eval() 
                 
                 pos_center = agents[aid].search(meshes,min_variance) #[batchsize,3]
-                
+                print('pos_center',pos_center)
                 # lm_pos = torch.empty((0)).to(device)
                 # for lst in LP:
                 #     lm_pos = torch.cat((lm_pos,lst[aid].unsqueeze(0)),dim=0)  #[batchsize,3]
@@ -401,22 +510,25 @@ def Prediction(agents,dataloader,agents_ids,min_variance):
                 for i in range(V.shape[0]):
                     # print(pos_center[i],SF[i],MR[i])
                     scale_surf = SF[i]
+                    print('scale_surf :', scale_surf)
                     mean_arr = MR[i]
+                    print('mean_arr :', mean_arr)
                     landmark_pos = pos_center[i]
-                    # print(landmark_pos,MR,scale_surf)
-
-                    pos_center = (landmark_pos/scale_surf)- mean_arr
-                    pos_center = pos_center.cpu().numpy()
+                    print('landmark_pos :', landmark_pos)
+                    new_pos_center = (landmark_pos/scale_surf) + mean_arr
+                    print('pos_center :', new_pos_center)
+                    new_pos_center = new_pos_center.cpu().numpy()
                     # print(pos_center)
-                    coord_dic = {"x":pos_center[0],"y":pos_center[1],"z":pos_center[2]}
+                    coord_dic = {"x":new_pos_center[0],"y":new_pos_center[1],"z":new_pos_center[2]}
                     groupe_data[f'Lower_O-{aid+1}']=coord_dic
+                    print(PS[i])
+                    dic_patients[PS[i]]=groupe_data
 
-
-            print(list_distance)
+            # print(list_distance)
         
-        print("all the landmarks :" , groupe_data)
+        print("all the landmarks :" , dic_patients)
     
-    return groupe_data
+    return dic_patients
 
 def GenControlePoint(groupe_data):
     lm_lst = []
@@ -430,7 +542,7 @@ def GenControlePoint(groupe_data):
             "label": landmark,
             "description": "",
             "associatedNodeID": "",
-            "position": [data["x"], data["y"], data["z"]],
+            "position": [float(data["x"]), float(data["y"]), float(data["z"])],
             "orientation": [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0],
             "selected": true,
             "locked": true,
@@ -484,22 +596,9 @@ def WriteJson(lm_lst,out_path):
     ]
     }
     with open(out_path, 'w', encoding='utf-8') as f:
+        print(file)
         json.dump(file, f, ensure_ascii=False, indent=4)
 
     f.close
 
-# def Prediction(agents,load_model,datas):
-#     agents.load_state_dict(torch.load(load_model,map_location=device))
-#     with torch.no_grad():
-#         print("Loading data from :", args.dir)
-#                 for image in img_model:
-#                     new_image = torch.from_numpy(image).permute(2,0,1) # convertion in tensor (7,258,258)
-#                     img_output = net(new_image)
-#                     # print(torch.from_numpy(img_output).size())
-#                     output = torch.cat(img_output,0)
-#             output = torch.cat(img_output,0)
-#             distance = loss_function(img_output, IP)
-#             print('difference between exact and predict position :', distance)
-#             list_distance.append(distance)
-        
-#     SavePrediction(output, output_path)
+

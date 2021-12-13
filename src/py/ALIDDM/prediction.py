@@ -1,3 +1,4 @@
+from posixpath import basename
 from monai.networks.nets import UNet
 import argparse
 import os
@@ -42,16 +43,18 @@ def main(args):
         shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
     )
     
-    attention_lst = []
-    move_net_lst = []
+    agents_model = []
     normpath = os.path.normpath("/".join([args.load_models, '**', '']))
     for model in sorted(glob.iglob(normpath, recursive=True)):
-        if True in ['_feature_' in model]:
-            feature_net_path = model
-        if True in ['_attention_' in model]:
-            attention_lst.append(model)
-        if True in ['_delta_move_' in model]:
-            move_net_lst.append(model)
+        if True in ['_aid_' in model]:
+            agents_model.append(model)        
+        
+        # if True in ['_feature_' in model]:
+        #     feature_net_path = model
+        # if True in ['_attention_' in model]:
+        #     attention_lst.append(model)
+        # if True in ['_delta_move_' in model]:
+        #     move_net_lst.append(model)
     
     # print(feature_net_path)
     # print(attention_lst)
@@ -60,34 +63,49 @@ def main(args):
     df = pd.read_csv(dataset(args.dir))
     df_train, df_rem = train_test_split(df, train_size=args.train_size)
     df_val, data = train_test_split(df_rem, test_size=args.test_size )
-    
-    data = FlyByDatasetPrediction(df,device, dataset_dir=args.dir)
-    dataloader = DataLoader(data, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
+    print(data)
+    data_pred = FlyByDataset(data,device, dataset_dir=args.dir)
+    dataloader = DataLoader(data_pred, batch_size=args.batch_size, collate_fn=pad_verts_faces_prediction)
    
     feat_net = FeaturesNet().to(device)
     agents = [Agent(renderer=phong_renderer, features_net=feat_net, aid=i, device=device) for i in range(args.num_agents)]
     agents_ids = np.arange(args.num_agents)
     print(agents_ids)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
-    
-    print("loading feature net ... :", feature_net_path )
-    feat_net = torch.load(feature_net_path,map_location=device)
-    out_path = os.path.join(args.jsonfolder,'Lower_jaw.json')
+    loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
 
-    for idx_agent,model in enumerate(attention_lst):
+    print("loading agent net ... :", agents_model)
+    for idx_agent,model in enumerate(agents_model):
         print("loading attention net ... :", model)
-        agents[idx_agent].attention = torch.load(model,map_location=device)
+        agents[idx_agent].load_state_dict(torch.load(model,map_location=device))
 
-    for idx_agent,model in enumerate(move_net_lst):
-        print("loading move net ... :", model)
-        agents[idx_agent].delta_move = torch.load(model,map_location=device)
-        
-        
+    # feat_net = torch.load(feature_net_path,map_location=device)
+    # out_path = os.path.join(args.jsonfolder,'Lower_jaw.json')
 
-    print('-------- PREDICTION --------')
-    groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance)
-    lm_lst = GenControlePoint(groupe_data)
-    WriteJson(lm_lst,out_path)
+    # for idx_agent,model in enumerate(attention_lst):
+    #     print("loading attention net ... :", model)
+    #     agents[idx_agent].attention = torch.load(model,map_location=device)
+
+    # for idx_agent,model in enumerate(move_net_lst):
+    #     print("loading move net ... :", model)
+    #     agents[idx_agent].delta_move = torch.load(model,map_location=device)
+    
+           
+    print('-------- ACCURACY --------')
+    Accuracy(agents,dataloader,agents_ids,args.min_variance,loss_function,device)
+
+
+    # dic_patients = {}
+    # for i in data['surf']:
+    #     dic_patients[i]={}
+    # # print(dic_patients)
+    # print('-------- PREDICTION --------')
+    # groupe_data = Prediction(agents,dataloader,agents_ids,args.min_variance,dic_patients)
+    # for path,data in groupe_data.items():
+    #     # print('data',data)
+    #     lm_lst = GenControlePoint(data)
+    #     print(os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
+    #     WriteJson(lm_lst,os.path.join(args.jsonfolder,os.path.basename(path).split('.')[0]+'.json'))
             
             
 if __name__ == "__main__":
@@ -106,7 +124,7 @@ if __name__ == "__main__":
     input_group.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_group.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_group.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_group.add_argument('--batch_size',type=int, help='batch size', default=2)
+    input_group.add_argument('--batch_size',type=int, help='batch size', default=1)
     input_group.add_argument('--jsonfolder',type=str, help='path where you save your jsonfile after prediction', required=True)
 
     

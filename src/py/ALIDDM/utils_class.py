@@ -18,44 +18,54 @@ import math
 import os
 from torch.utils.tensorboard import SummaryWriter
 
-
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, aid, device,run_folder = "", radius=2,sl=1,lenque = 5):
+    def __init__(self, renderer, features_net, aid, device,run_folder = "",min_radius=0.5,max_radius=2.5,sl=1,lenque = 10):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
         self.writer = SummaryWriter(os.path.join(run_folder,f"runs_{aid}"))
-
+        self.min_radius=min_radius
+        self.max_radius=max_radius
         # self.list_cam_pos = LIST_POINT
         self.max_que = lenque
         self.position_center_memory = deque(maxlen=self.max_que)
         self.best_loss = 9999
         self.best_epoch_loss = 9999
-        icosahedron = CreateIcosahedron(radius, sl)
+        icosahedron = CreateIcosahedron(1, sl)
         sphere_points = []
         for pid in range(icosahedron.GetNumberOfPoints()):
             spoint = icosahedron.GetPoint(pid)
             sphere_points.append([point+0.00001 for point in spoint])
+            sphere_points.append([(point+0.00001)*0.5 for point in spoint])
+
 
         sphere_points = np.array(sphere_points)
-
         self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
         self.attention = TimeAttention(12, 128).to(self.device)
+        # self.delta_move = nn.Linear(512, 4).to(self.device)
         self.delta_move = nn.Linear(512, 3).to(self.device)
-        self.agent_id = aid
 
+        self.agent_id = aid
+        self.tanh = nn.Tanh() 
         # self.trainable(False)
     
     def reset_sphere_center(self,batch_size=1):
         self.batch_size = batch_size
         self.sphere_centers= torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+        # self.sphere_centers= (torch.rand([self.batch_size, 3])*2-1).type(torch.float32).to(self.device)
+        # print(self.sphere_centers)
+        self.radius = (torch.rand([self.batch_size, 1])* self.max_radius + self.min_radius).type(torch.float32).to(self.device)
 
     def get_parameters(self):
         att_param = self.attention.parameters()
         move_param = self.delta_move.parameters()
         return list(att_param) + list(move_param)
+    
+    def set_radius(self,delta_rad):
+        self.radius = self.tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
+        # print(self.radius)
 
     def forward(self,x):
 
@@ -63,7 +73,8 @@ class Agent(nn.Module):
         img_lst = torch.empty((0)).to(self.device)
 
         for sp in self.sphere_points:
-            sp = sp.unsqueeze(0).repeat(self.batch_size,1)
+            sp = sp*self.radius
+            # sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
             # print( 'R shape :',R.shape)
@@ -74,7 +85,14 @@ class Agent(nn.Module):
             images = images.permute(0,3,1,2)
             images = images[:,:-1,:,:]
             
-            img_lst = torch.cat((img_lst,images.unsqueeze(0)),dim=0)
+            # print(images.shape)
+            pix_to_face, zbuf, bary_coords, dists = self.renderer.rasterizer(x)
+            zbuf = zbuf.permute(0, 3, 1, 2)
+            # print(dists.shape)
+            y = torch.cat([images, zbuf], dim=1)
+            # print(y)
+
+            img_lst = torch.cat((img_lst,y.unsqueeze(0)),dim=0)
         img_batch =  img_lst.permute(1,0,2,3,4)
 
         x = img_batch
@@ -82,8 +100,9 @@ class Agent(nn.Module):
         x, s = self.attention(x)
         x = self.delta_move(x)
 
-        return x
-    
+        return x        
+
+
     def trainable(self, train = False):
         for param in self.attention.parameters():
             param.requires_grad = train
@@ -96,8 +115,8 @@ class Agent(nn.Module):
         found = False
         # print(len(self.position_memory))
         if len(self.position_center_memory) == self.max_que:
-            print(self.position_center_memory)
-            print(np.var(np.array(list(self.position_center_memory)),axis=0))
+            # print(self.position_center_memory)
+            # print(np.var(np.array(list(self.position_center_memory)),axis=0))
             variance_center_sphere = np.mean(np.var(np.array(list(self.position_center_memory)),axis=0),axis=1) #list variance
             print('variance :', variance_center_sphere)
             if np.max(variance_center_sphere)<min_variance:
@@ -107,8 +126,10 @@ class Agent(nn.Module):
     def search(self,meshes,min_variance):
         while not self.found(min_variance):
             x = self(meshes)  #[batchsize,time_steps,3,224,224]
-            x += self.sphere_centers
-            new_coord = x.detach().clone()
+            delta_pos =  x[...,0:3]
+            delta_pos += self.sphere_centers
+            # self.set_radius(x[...,3:4].clone().detach()) 
+            new_coord = delta_pos.detach().clone()
             self.position_center_memory.append(new_coord.cpu().numpy())
             self.sphere_centers = new_coord
 
@@ -213,7 +234,7 @@ class FeaturesNet(nn.Module):
         
         resnet = models.resnet34(pretrained=True)
         resnet.fc = Identity()
-        # resnet.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        resnet.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.resnet = resnet
         # self.activation = nn.Tanh()
         self.timedist = TimeDistributed(self.resnet)
@@ -332,8 +353,8 @@ class FlyByDataset(Dataset):
         else:
             angle = 0 
             vector = np.array([0, 0, 1])
+        
         surf = ComputeNormals(surf) 
-
         landmark_pos = self.get_landmarks_position(idx, mean_arr, scale_factor, self.max_landmarks, angle, vector)
         color_normals = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(GetColorArray(surf, "Normals"))/255.0)
         verts = ToTensor(dtype=torch.float32, device=self.device)(vtk_to_numpy(surf.GetPoints().GetData()))
@@ -343,8 +364,17 @@ class FlyByDataset(Dataset):
         # faces_pid0 = faces[:,0:1]
         landmark_pos = ToTensor(dtype=torch.float32, device=self.device)(landmark_pos)
         # print(landmark_pos)
-        return verts, faces, color_normals,landmark_pos
-    
+        # print('m',mean_arr)
+        # print('s',scale_factor)
+        # mean_arr = ToTensor( dtype=torch.float64,device=self.device)(mean_arr)
+        # scale_factor = ToTensor(dtype=torch.float64, device=self.device)(scale_factor)
+        mean_arr = torch.tensor(mean_arr,dtype=torch.float64).to(self.device)
+        scale_factor = torch.tensor(scale_factor,dtype=torch.float64).to(self.device)
+        # print('m',mean_arr)
+        # print('s',scale_factor)
+
+        return verts, faces, color_normals,landmark_pos,mean_arr,scale_factor
+   
     def get_landmarks_position(self,idx, mean_arr, scale_factor, number_of_landmarks, angle, vector):
        
         print(self.df.iloc[idx]["landmarks"])
@@ -353,10 +383,17 @@ class FlyByDataset(Dataset):
         landmarks_dict = markups[0]['controlPoints']
 
         landmarks_position = np.zeros([number_of_landmarks, 3])
-
+        # resc_landmarks_position = np.zeros([number_of_landmarks, 3])        
         for idx, landmark in enumerate(landmarks_dict):
             lid = int((landmark["label"]).split("-")[-1]) - 1
-            landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
+            # print('position du landmark avant rescale :',landmark["position"])
+            # landmarks_position[lid] = (landmark["position"] - mean_arr) * scale_factor
+            # print('m',mean_arr)
+            # print('s',scale_factor)
+            landmarks_position[lid] = Downscale(landmark["position"],mean_arr,scale_factor)
+            # print('position apres dowacaling :', landmarks_position[lid])
+            # resc_landmarks_position[lid] = Upscale(landmarks_position[lid],scale_factor,mean_arr)
+            # print('position apres upscaling', resc_landmarks_position[lid])
 
         landmarks_pos = np.array([np.transpose(np.append(pos,1)) for pos in landmarks_position])
 
@@ -447,7 +484,7 @@ class FlyByDatasetPrediction(Dataset):
         mean_arr = ToTensor(dtype=torch.float32, device=self.device)(mean_arr)
         scale_factor = ToTensor(dtype=torch.float32, device=self.device)(scale_factor)
 
-        return verts, faces, color_normals,mean_arr,scale_factor
+        return verts, faces, color_normals,mean_arr,scale_factor,self.df.iloc[idx]["surf"]
 
 def arrayFromVTKMatrix(vmatrix):
   """Return vtkMatrix4x4 or vtkMatrix3x3 elements as numpy array.
@@ -467,3 +504,11 @@ def arrayFromVTKMatrix(vmatrix):
   narray = np.eye(matrixSize)
   vmatrix.DeepCopy(narray.ravel(), vmatrix)
   return narray
+
+def Upscale(landmark_pos,mean_arr,scale_factor):
+    new_pos_center = (landmark_pos/scale_factor) + mean_arr
+    return new_pos_center
+
+def Downscale(pos_center,mean_arr,scale_factor):
+    landmarks_position = (pos_center - mean_arr) * scale_factor
+    return landmarks_position
