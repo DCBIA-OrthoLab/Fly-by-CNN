@@ -108,10 +108,10 @@ def merge_meshes(agents,V,F,CN,device):
         # print(agents[aid].sphere_centers[image])
         # print(agents[aid].sphere_centers[...,0])
         center_mesh,agent_verts,agent_faces,textures= generate_sphere_mesh(agents.sphere_centers[image],0.02,device,0.9)
-        text = torch.ones_like(agent_verts)
+        text = torch.ones_like(agent_verts).to(device)
         center_text = torch.cat((center_text,text.unsqueeze(0)),dim=0)
-        center_vert = torch.cat((center_vert,agent_verts.unsqueeze(0)),dim=0)
-        center_faces = torch.cat((center_faces,agent_faces.unsqueeze(0)),dim=0)
+        center_vert = torch.cat((center_vert,agent_verts.to(device).unsqueeze(0)),dim=0)
+        center_faces = torch.cat((center_faces,agent_faces.to(device).unsqueeze(0)),dim=0)
     
 
     # print(center_vert.shape)
