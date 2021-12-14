@@ -99,6 +99,53 @@ def generate_sphere_mesh(center,radius,device,col):
     
     return mesh,verts_teeth,faces_teeth,verts_rgb
 
+def merge_meshes(agents,V,F,CN):
+    center_vert = torch.empty((0)).to(device)
+    center_faces = torch.empty((0)).to(device)
+    center_text = torch.empty((0)).to(device)
+
+    for image in range(V.shape[0]):
+        # print(agents[aid].sphere_centers[image])
+        # print(agents[aid].sphere_centers[...,0])
+        center_mesh,agent_verts,agent_faces,textures= generate_sphere_mesh(agents.sphere_centers[image],0.02,device,0.9)
+        text = torch.ones_like(agent_verts)
+        center_text = torch.cat((center_text,text.unsqueeze(0)),dim=0)
+        center_vert = torch.cat((center_vert,agent_verts.unsqueeze(0)),dim=0)
+        center_faces = torch.cat((center_faces,agent_faces.unsqueeze(0)),dim=0)
+    
+
+    # print(center_vert.shape)
+    # print(center_faces.shape)
+    # print(V.shape)
+    # print(F.shape)
+    # print(CN.shape)
+    # print(center_text.shape)
+    # print(center_vert.shape)
+    # print(center_faces.shape)
+    # print(center_faces[-1])
+    
+
+    verts = torch.cat([center_vert,V], dim=1)
+    faces = torch.cat([center_faces,F+center_vert.shape[1]], dim=1)
+    text = torch.cat([center_text,CN], dim=1)
+    
+    # verts = center_vert
+    # faces = center_faces
+    # text = center_text
+    # print(verts.shape)
+    # print(faces.shape)
+    # print(text.shape)
+
+
+    textures = TexturesVertex(verts_features=text)
+        
+    meshes =  Meshes(
+        verts=verts,   
+        faces=faces, 
+        textures=textures
+    )
+    return meshes
+
 def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device):
     # for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
         
@@ -146,51 +193,8 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
             for i in range(NSteps):
                 print('---------- step :', i,'----------')
                 # print(agents[aid].sphere_centers)
-                center_vert = torch.empty((0)).to(device)
-                center_faces = torch.empty((0)).to(device)
-                center_text = torch.empty((0)).to(device)
-
-                for image in range(V.shape[0]):
-                    # print(agents[aid].sphere_centers[image])
-                    # print(agents[aid].sphere_centers[...,0])
-                    center_mesh,agent_verts,agent_faces,textures= generate_sphere_mesh(agents[aid].sphere_centers[image],0.02,device,0.9)
-                    text = torch.ones_like(agent_verts)
-                    center_text = torch.cat((center_text,text.unsqueeze(0)),dim=0)
-                    center_vert = torch.cat((center_vert,agent_verts.unsqueeze(0)),dim=0)
-                    center_faces = torch.cat((center_faces,agent_faces.unsqueeze(0)),dim=0)
                 
-
-                # print(center_vert.shape)
-                # print(center_faces.shape)
-                # print(V.shape)
-                # print(F.shape)
-                # print(CN.shape)
-                # print(center_text.shape)
-                # print(center_vert.shape)
-                # print(center_faces.shape)
-                # print(center_faces[-1])
-                
-
-                verts = torch.cat([center_vert,V], dim=1)
-                faces = torch.cat([center_faces,F+center_vert.shape[1]], dim=1)
-                text = torch.cat([center_text,CN], dim=1)
-                
-                # verts = center_vert
-                # faces = center_faces
-                # text = center_text
-                # print(verts.shape)
-                # print(faces.shape)
-                # print(text.shape)
-
-
-                textures = TexturesVertex(verts_features=text)
-                    
-                meshes =  Meshes(
-                    verts=verts,   
-                    faces=faces, 
-                    textures=textures
-                )
-
+                meshes = merge_meshes(agents[aid],V,F,CN)
                 # dic = {"teeth_mesh": meshes}
                 # plot_fig(dic)
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
@@ -222,12 +226,12 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
         running_loss = 0
 
         for batch, (V, F, CN, LP, MR, SF) in enumerate(test_dataloader):
-            textures = TexturesVertex(verts_features=CN)
-            meshes = Meshes(
-                verts=V,   
-                faces=F, 
-                textures=textures
-            )
+            # textures = TexturesVertex(verts_features=CN)
+            # meshes = Meshes(
+            #     verts=V,   
+            #     faces=F, 
+            #     textures=textures
+            # )
             batch_loss = 0
 
             for aid in agents_ids: #aid == idlandmark_id
@@ -243,6 +247,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
                 for i in range(NSteps):
                     print('---------- step :', i,'----------')
+                    meshes = merge_meshes(agents[aid],V,F,CN)
 
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                     
