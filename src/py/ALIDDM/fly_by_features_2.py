@@ -75,7 +75,7 @@ def main(args):
     feat_net = FeaturesNet().to(device)
     # new_move_net = TimeDistributed(move_net).to(device)
     loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-    early_stopping = EarlyStopping(patience=10, verbose=True, path=args.out)
+    early_stopping = EarlyStopping(patience=20, verbose=True, path=args.out)
 
     epoch_loss = 0
     best_score = 9999

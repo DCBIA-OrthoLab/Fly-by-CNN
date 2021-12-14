@@ -99,7 +99,7 @@ def generate_sphere_mesh(center,radius,device,col):
     
     return mesh,verts_teeth,faces_teeth,verts_rgb
 
-def merge_meshes(agents,V,F,CN):
+def merge_meshes(agents,V,F,CN,device):
     center_vert = torch.empty((0)).to(device)
     center_faces = torch.empty((0)).to(device)
     center_text = torch.empty((0)).to(device)
@@ -194,7 +194,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                 print('---------- step :', i,'----------')
                 # print(agents[aid].sphere_centers)
                 
-                meshes = merge_meshes(agents[aid],V,F,CN)
+                meshes = merge_meshes(agents[aid],V,F,CN,device)
                 # dic = {"teeth_mesh": meshes}
                 # plot_fig(dic)
                 x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
@@ -247,7 +247,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
 
                 for i in range(NSteps):
                     print('---------- step :', i,'----------')
-                    meshes = merge_meshes(agents[aid],V,F,CN)
+                    meshes = merge_meshes(agents[aid],V,F,CN,device)
 
                     x = agents[aid](meshes)  #[batchsize,time_steps,3,224,224]
                     
