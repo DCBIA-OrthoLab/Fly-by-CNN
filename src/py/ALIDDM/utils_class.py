@@ -100,7 +100,7 @@ class Agent(nn.Module):
         x = self.features_net(x)
         x, s = self.attention(x)
         x = self.delta_move(x)
-        x = self.tanh(x)
+        # x = self.tanh(x)
 
         return x        
 
