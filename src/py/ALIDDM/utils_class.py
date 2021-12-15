@@ -55,6 +55,10 @@ class Agent(nn.Module):
     def reset_sphere_center(self,radius, center_agent, batch_size=1, random=False):
         self.batch_size = batch_size
         if(random):
+            print(torch.rand(self.batch_size, 3))
+            print(radius)
+            print(center_agent)
+            
             self.sphere_centers = (torch.rand(self.batch_size, 3) * radius + center_agent).to(self.device)
         else:
             self.sphere_centers = torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
@@ -406,10 +410,8 @@ class FlyByDataset(Dataset):
 
         if angle:
             transform = GetTransform(angle, vector)
-
             transform_matrix = arrayFromVTKMatrix(transform.GetMatrix())
-            
-            landmarks_pos = np.matmul(landmarks_pos, transform_matrix)
+            landmarks_pos = np.matmul(transform_matrix,landmarks_pos.T).T
 
         return landmarks_pos[:, 0:3]
 

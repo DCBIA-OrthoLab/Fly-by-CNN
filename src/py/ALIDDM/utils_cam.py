@@ -159,7 +159,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
     discount_factor = torch.tensor(0.8)
     
     if (epoch) % interval == 0:
-        RADIUS = 0.5
+        RADIUS = torch.tensor(0.5).cpu()
 
     for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
         # textures = TexturesVertex(verts_features=CN)
@@ -190,7 +190,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                     center_agent = lm_pos
             else :
                 center_agent = 0
-            
+            center_agent = center_agent.cpu()
             agents[aid].reset_sphere_center(RADIUS, center_agent, V.shape[0], random=True)
 
 
