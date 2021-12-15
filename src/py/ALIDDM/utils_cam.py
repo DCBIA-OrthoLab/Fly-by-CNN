@@ -146,7 +146,7 @@ def merge_meshes(agents,V,F,CN,device):
     )
     return meshes
 
-def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device,interval = 2):
+def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function, optimizer, device,batch_size,interval = 5):
     # for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
         
     torch.autograd.set_detect_anomaly(True)
@@ -160,6 +160,8 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
     
     if (epoch) % interval == 0:
         RADIUS = torch.tensor(0.5).cpu()
+    else :
+        RADIUS = torch.tensor(1).cpu()
 
     for batch, (V, F, CN, LP, MR, SF) in enumerate(train_dataloader):
         # textures = TexturesVertex(verts_features=CN)
@@ -189,7 +191,8 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
                 for lst in LP:
                     center_agent = lm_pos
             else :
-                center_agent = 0
+                center_agent = torch.zeros([batch_size, 3]).type(torch.float32).to(device)
+
             center_agent = center_agent.cpu()
             agents[aid].reset_sphere_center(RADIUS, center_agent, V.shape[0], random=True)
 

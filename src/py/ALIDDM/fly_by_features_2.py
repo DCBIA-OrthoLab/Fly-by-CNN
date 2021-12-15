@@ -82,7 +82,7 @@ def main(args):
     # print(args.run_folder)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
 
-    agents = [Agent(renderer=phong_renderer, features_net=feat_net,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
+    agents = [Agent(renderer=phong_renderer, features_net=feat_net,image_run_folder= args.image_run_folder,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())
 
@@ -99,7 +99,7 @@ def main(args):
 
         print('-------- TRAINING --------')          
         print('---------- epoch :', epoch,'----------')
-        Training(epoch, agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device)
+        Training(epoch, agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device, args.batch_size)
 
         if (epoch) % args.test_interval == 0:
             print('-------- VALIDATION --------')
@@ -127,10 +127,10 @@ if __name__ == '__main__':
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
     input_param.add_argument('--train_size',type=int, help='proportion of dat for training', default=0.9)
     input_param.add_argument('--test',type=str, help='all the datas for testing', default='' )
-
     input_param.add_argument('--batch_size',type=int, help='batch size', default=4)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='./runs')
+    input_param.add_argument('--image_run_folder',type=str, help='where you save tour run', default='./image_runs')
     input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.01)
     input_param.add_argument('--num_agents',type=int, help=' number of agents = number of maximum of landmarks in dataset', default=1)
     input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=8)
