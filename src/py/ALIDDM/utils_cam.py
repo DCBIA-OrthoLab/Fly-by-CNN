@@ -199,7 +199,7 @@ def Training(epoch, agents, agents_ids,num_step, train_dataloader, loss_function
         
             # agents[aid].trainable(True)
             # agents[aid].train()
-
+    
             for i in range(NSteps):
                 print('---------- step :', i,'----------')
                 # print(agents[aid].sphere_centers)
@@ -245,8 +245,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
             batch_loss = 0
 
             for aid in agents_ids: #aid == idlandmark_id
-                agents[aid].reset_sphere_center(V.shape[0])
-
+                agents[aid].reset_sphere_center(batch_size = V.shape[0])
                 print('---------- agents id :', aid,'----------')
 
                 lm_pos = torch.empty((0)).to(device)
@@ -256,6 +255,7 @@ def Validation(epoch,agents,agents_ids,test_dataloader,num_step,loss_function,ou
                 NSteps = num_step
                 # for radius in [2,1.5,1]:
                 #     agents[aid].set_rad(radius)
+                
                 for i in range(NSteps):
                     print('---------- step :', i,'----------')
                     meshes = merge_meshes(agents[aid],V,F,CN,device)
