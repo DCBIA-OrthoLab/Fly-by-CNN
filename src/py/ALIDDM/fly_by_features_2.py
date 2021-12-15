@@ -101,18 +101,18 @@ def main(args):
         print('---------- epoch :', epoch,'----------')
         Training(epoch, agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device)
 
-        # if (epoch) % args.test_interval == 0:
-        #     print('-------- VALIDATION --------')
-        #     print('---------- epoch :', epoch,'----------')
-        #     Validation(epoch,agents,agents_ids,validation_dataloader,args.num_step,loss_function,output_dir,early_stopping,device)
-        #     if early_stopping.early_stop == True :
-        #         print('-------- ACCURACY --------')
-        #         Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
-        #         break
+        if (epoch) % args.test_interval == 0:
+            print('-------- VALIDATION --------')
+            print('---------- epoch :', epoch,'----------')
+            Validation(epoch,agents,agents_ids,validation_dataloader,args.num_step,loss_function,output_dir,early_stopping,device)
+            if early_stopping.early_stop == True :
+                print('-------- ACCURACY --------')
+                Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
+                break
         
-        # if (epoch + 1) % args.num_epoch == 0:
-        #     print('-------- ACCURACY --------')
-        #     Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
+        if (epoch + 1) % args.num_epoch == 0:
+            print('-------- ACCURACY --------')
+            Accuracy(agents,test_dataloader,agents_ids,args.min_variance,loss_function,device)
 
 
 
@@ -122,8 +122,6 @@ if __name__ == '__main__':
 
     input_param = parser.add_argument_group('input files')
     input_param.add_argument('--dir', type=str, help='dataset directory, if provided, it will be concatenated to the surf,landmarkrs file names', default='')
-    # input_param.add_argument('--csv', type=str, help='csv with columns surf,landmarks,landmarks_number the landmarks column is a json filename with fiducials', required=True)
-    # input_param.add_argument('--data_pred', type=str, help='dataset prediction', required=True)
     input_param.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
@@ -133,9 +131,9 @@ if __name__ == '__main__':
     input_param.add_argument('--batch_size',type=int, help='batch size', default=4)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='./runs')
-    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
-    input_param.add_argument('--num_agents',type=int, help=' number of agents = number of maximum of landmarks in dataset', default=2)
-    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=10)
+    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.01)
+    input_param.add_argument('--num_agents',type=int, help=' number of agents = number of maximum of landmarks in dataset', default=1)
+    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=8)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')

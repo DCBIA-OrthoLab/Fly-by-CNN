@@ -52,12 +52,13 @@ class Agent(nn.Module):
         self.tanh = nn.Tanh() 
         # self.trainable(False)
     
-    def reset_sphere_center(self,batch_size=1, random=False):
+    def reset_sphere_center(self,radius, center_agent, batch_size=1, random=False):
         self.batch_size = batch_size
         if(random):
-            self.sphere_centers = (torch.rand(self.batch_size, 3) * 2.0 - 1.0).to(self.device)
+            self.sphere_centers = (torch.rand(self.batch_size, 3) * radius + center_agent).to(self.device)
         else:
             self.sphere_centers = torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+        
 
     def get_parameters(self):
         att_param = self.attention.parameters()
@@ -66,6 +67,10 @@ class Agent(nn.Module):
     
     def set_radius(self,delta_rad):
         self.radius = self.tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
+        # print(self.radius)
+   
+    def set_rad(self,radius):
+        self.radius = radius
         # print(self.radius)
 
     def forward(self,x):
@@ -100,7 +105,7 @@ class Agent(nn.Module):
         x = self.features_net(x)
         x, s = self.attention(x)
         x = self.delta_move(x)
-        # x = self.tanh(x)
+        x = self.tanh(x)
 
         return x        
 
