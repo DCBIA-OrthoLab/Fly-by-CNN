@@ -52,35 +52,37 @@ def main(args):
     #     os.makedirs(output_dir)
 
     df = pd.read_csv(dataset(args.dir))
-    df_train, df_rem = train_test_split(df, train_size=args.train_size)
-    df_val, df_test = train_test_split(df_rem, test_size=args.test_size )
+    dt = pd.read_csv(dataset(args.test))
+
+    df_train, df_val = train_test_split(df, train_size=args.train_size)
     print(df_train.shape)
     print(df_val.shape)
-    print(df_test.shape)
+    print(dt.shape)
     # print(df_train)
     # df_prediction = dataset(args.data_pred)
 
     train_data = FlyByDataset(df_train,device, dataset_dir=args.dir, rotate=True)
     val_data = FlyByDataset(df_val,device , dataset_dir=args.dir, rotate=True)
-    test_data = FlyByDataset(df_test,device,dataset_dir=args.dir, rotate=False)
+    test_data = FlyByDataset(dt,device,dataset_dir=args.dir, rotate=False)
 
 
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
     validation_dataloader = DataLoader(val_data, batch_size=args.batch_size, shuffle=False, collate_fn=pad_verts_faces)
+    
     test_dataloader = DataLoader(test_data, batch_size=1, shuffle=True, collate_fn=pad_verts_faces)
 
     learning_rate = 1e-4
     feat_net = FeaturesNet().to(device)
     # new_move_net = TimeDistributed(move_net).to(device)
     loss_function = torch.nn.MSELoss(size_average=None, reduce=None, reduction='mean')
-    early_stopping = EarlyStopping(patience=10, verbose=True, path=args.out)
+    early_stopping = EarlyStopping(patience=20, verbose=True, path=args.out)
 
     epoch_loss = 0
     best_score = 9999
     # print(args.run_folder)
     # writer = SummaryWriter(os.path.join(args.run_folder,"runs"))
 
-    agents = [Agent(renderer=phong_renderer, features_net=feat_net,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
+    agents = [Agent(renderer=phong_renderer, features_net=feat_net,image_run_folder= args.image_run_folder,run_folder=args.run_folder, aid=i, device=device) for i in range(args.num_agents)]
 
     parameters = list(feat_net.parameters())
 
@@ -97,7 +99,7 @@ def main(args):
 
         print('-------- TRAINING --------')          
         print('---------- epoch :', epoch,'----------')
-        Training(epoch, agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device)
+        Training(epoch, agents, agents_ids, args.num_step, train_dataloader, loss_function, optimizer, device, args.batch_size)
 
         if (epoch) % args.test_interval == 0:
             print('-------- VALIDATION --------')
@@ -120,19 +122,18 @@ if __name__ == '__main__':
 
     input_param = parser.add_argument_group('input files')
     input_param.add_argument('--dir', type=str, help='dataset directory, if provided, it will be concatenated to the surf,landmarkrs file names', default='')
-    # input_param.add_argument('--csv', type=str, help='csv with columns surf,landmarks,landmarks_number the landmarks column is a json filename with fiducials', required=True)
-    # input_param.add_argument('--data_pred', type=str, help='dataset prediction', required=True)
     input_param.add_argument('--image_size',type=int, help='size of the picture', default=224)
     input_param.add_argument('--blur_radius',type=int, help='blur raius', default=0)
     input_param.add_argument('--faces_per_pixel',type=int, help='faces per pixels', default=1)
-    input_param.add_argument('--test_size',type=int, help='proportion of dat for validation', default=0.6)
-    input_param.add_argument('--train_size',type=int, help='proportion of dat for validation', default=0.7)
-    input_param.add_argument('--batch_size',type=int, help='batch size', default=10)
+    input_param.add_argument('--train_size',type=int, help='proportion of dat for training', default=0.9)
+    input_param.add_argument('--test',type=str, help='all the datas for testing', default='' )
+    input_param.add_argument('--batch_size',type=int, help='batch size', default=4)
     input_param.add_argument('--test_interval',type=int, help='when we do a evaluation of the model', default=1)
     input_param.add_argument('--run_folder',type=str, help='where you save tour run', default='./runs')
-    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.1)
-    input_param.add_argument('--num_agents',type=int, help=' number of agents = number of maximum of landmarks in dataset', default=2)
-    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=10)
+    input_param.add_argument('--image_run_folder',type=str, help='where you save tour run', default='./image_runs')
+    input_param.add_argument('--min_variance',type=float, help='minimum of variance', default=0.01)
+    input_param.add_argument('--num_agents',type=int, help=' number of agents = number of maximum of landmarks in dataset', default=1)
+    input_param.add_argument('--num_step',type=int, help='number of step before to rich the landmark position',default=8)
     input_param.add_argument('--num_epoch',type=int,help="numero epoch", required=True)
 
     output_param = parser.add_argument_group('output files')

@@ -19,11 +19,12 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, aid, device,run_folder = "",min_radius=0.5,max_radius=2.5,sl=1,lenque = 10):
+    def __init__(self, renderer, features_net, aid, device,image_run_folder = "",run_folder = "",min_radius=0.5,max_radius=2.5,sl=1,lenque = 10):
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
         self.writer = SummaryWriter(os.path.join(run_folder,f"runs_{aid}"))
+        self.image_writer = SummaryWriter(os.path.join(image_run_folder,f"runs_{aid}"))
         self.min_radius=min_radius
         self.max_radius=max_radius
         # self.list_cam_pos = LIST_POINT
@@ -52,12 +53,19 @@ class Agent(nn.Module):
         self.tanh = nn.Tanh() 
         # self.trainable(False)
     
-    def reset_sphere_center(self,batch_size=1, random=False):
+    def reset_sphere_center(self,radius=0, center_agent=0, batch_size=1, random=False):
         self.batch_size = batch_size
         if(random):
-            self.sphere_centers = (torch.rand(self.batch_size, 3) * 2.0 - 1.0).to(self.device)
+            # print(torch.rand(self.batch_size, 3))
+            # print(radius)
+            # print(center_agent)
+            self.sphere_centers = (torch.rand(self.batch_size, 3) * radius - (radius/2) + center_agent).to(self.device)
+            # print(self.sphere_centers)
+
         else:
             self.sphere_centers = torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+            # print(self.sphere_centers)
+   
 
     def get_parameters(self):
         att_param = self.attention.parameters()
@@ -66,6 +74,10 @@ class Agent(nn.Module):
     
     def set_radius(self,delta_rad):
         self.radius = self.tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
+        # print(self.radius)
+   
+    def set_rad(self,radius):
+        self.radius = radius
         # print(self.radius)
 
     def forward(self,x):
@@ -95,6 +107,8 @@ class Agent(nn.Module):
 
             img_lst = torch.cat((img_lst,y.unsqueeze(0)),dim=0)
         img_batch =  img_lst.permute(1,0,2,3,4)
+
+        self.image_writer.add_image('image',img_batch)
 
         x = img_batch
         x = self.features_net(x)
@@ -401,10 +415,8 @@ class FlyByDataset(Dataset):
 
         if angle:
             transform = GetTransform(angle, vector)
-
             transform_matrix = arrayFromVTKMatrix(transform.GetMatrix())
-            
-            landmarks_pos = np.matmul(landmarks_pos, transform_matrix)
+            landmarks_pos = np.matmul(transform_matrix,landmarks_pos.T).T
 
         return landmarks_pos[:, 0:3]
 
