@@ -1,7 +1,23 @@
+
+
+######## ! /tools/anaconda3/envs/SlicerModuleEnv/bin/python
+#!/tools/anaconda3/envs/monai/bin/python
+
+
+import sre_compile
+
+####
+####
+"""
+V2: Weighted voting for Ids
+"""
+####
+####
 print("Importing libraries...")
 import os
 import argparse
 import torch
+import time
 from tqdm import tqdm
 import numpy as np
 
@@ -13,7 +29,6 @@ from pytorch3d.renderer import (
     FoVPerspectiveCameras, look_at_rotation, 
     RasterizationSettings, MeshRenderer, MeshRasterizer, HardPhongShader, PointLights,TexturesVertex
 )
-
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 import sys
@@ -26,7 +41,7 @@ from monai.inferers import (sliding_window_inference,SimpleInferer)
 from monai.transforms import ToTensor
 
 # Imports for monai model
-
+ 
 
 # Set the cuda device 
 if torch.cuda.is_available():
@@ -37,7 +52,6 @@ else:
 
 
 def main(args):
-   
 
   # Initialize a perspective camera.
   cameras = FoVPerspectiveCameras(device=device)
@@ -81,59 +95,47 @@ def main(args):
   camera_position = ToTensor(dtype=torch.float32, device=device)([[0, 0, dist_cam]])
   R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
   T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+  
+  SURF = fbf.ReadSurf(path)    
+  surf_unit = fbf.GetUnitSurf(SURF)
+  #(V, F, CN) = GetSurfProp(surf_unit)
+  #num_faces = F.size(1)
+  num_faces = int(SURF.GetPolys().GetData().GetSize()/4)  
+ 
 
-
-  (V, F, Y, YF, F0, CN,surf) = GetSurfProp(path)
-  num_faces = F.size(1)
-  l_faces = []
-  for i in range(num_faces):
-      l_faces.append([])
  
   array_faces = np.zeros((num_classes,num_faces))
-  print('array faces: ',array_faces.shape)
+  tensor_faces = torch.zeros(num_classes,num_faces).to(device)
   model.eval() # Switch to eval mode
   simple_inferer = SimpleInferer()
 
   ## PREDICTION
-  for i in tqdm(range(nb_rotations),total = nb_rotations, desc = 'Prediction      '):
-      (V, F, Y, YF, F0, CN,surf) = GetSurfProp(path)
+  for i in tqdm(range(nb_rotations),total = nb_rotations, desc = 'Prediction      '):   
+    (V, F, CN) = GetSurfProp(surf_unit)  # 0.7s to compute : now 0.45s                                                
+
+    
+    ###################################################################################
+    textures = TexturesVertex(verts_features=CN)
+    meshes = Meshes(verts=V, faces=F, textures=textures)
+    image = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
+    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
+    pix_to_face = pix_to_face.squeeze()
+    image = image.permute(0,3,1,2)
+    inputs = image.to(device)
+    outputs = simple_inferer(inputs,model)
+    ###################################################################################  0.05s      
+
+    outputs_softmax = softmax(outputs).squeeze().detach().cpu().numpy() # t: negligeable 
+          
+    for x in range(image_size):
+        for y in range (image_size): # Browse pixel by pixel
+            array_faces[:,pix_to_face[x,y]] += outputs_softmax[...,x,y]      
+        
       
-      textures = TexturesVertex(verts_features=CN)
-      meshes = Meshes(verts=V, faces=F, textures=textures)
-      images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
-      pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
-      images = images.permute(0,3,1,2)
-      inputs = images.to(device)
-      outputs = simple_inferer(inputs,model)
-      print(outputs.shape)
-      outputs_softmax = softmax(outputs)
-      print(outputs[:,0,...])
-      print('outputs: \n',outputs[...,128,128])
-      print('outputs_softmax: \n',outputs_softmax[...,128,128])
-      outputs_softmax = outputs_softmax.squeeze().detach().cpu()
-      outputs_softmax = outputs_softmax.numpy()
-      outputs_argmax = torch.argmax(outputs, dim=1).detach().cpu()
-      print(outputs_argmax.shape)
-      for x in range(image_size):
-          for y in range (image_size): # Browse pixel by pixel
-              l_faces[pix_to_face[0,x,y,0]].append(outputs_argmax[0,x,y].item()) # .item(): returns number instead of tensor
-              """
-              print("shape array_faces[:,pix_to_face[0,x,y,0]] : ",array_faces[:,pix_to_face[0,x,y,0]].shape )
-              print("shape outputs_softmax[...,x,y] : ", outputs_softmax[...,x,y].shape)
-
-              print("type array_faces[:,pix_to_face[0,x,y,0]] : ",type(array_faces[:,pix_to_face[0,x,y,0]]))
-              print("type outputs_softmax[...,x,y] : ", type(outputs_softmax[...,x,y]))
-              """
-              array_faces[:,pix_to_face[0,x,y,0]] += outputs_softmax[...,x,y]           
-
-  l_faces[-1] = [x for x in l_faces[-1] if x!= 0] # pixels that are to assigned to any face get value -1: last position in the list
-  l_uniq = l_faces
-  for index, value in enumerate(l_faces):
-      if value:
-          l_uniq[index] = max(set(value),key=value.count)                
-      else:
-          l_uniq[index] = 33 #ID of the gum 
-
+  array_faces[:,-1][0] = 0 # pixels that are background (id: 0) =-1
+  faces_argmax = np.argmax(array_faces,axis=0)
+  mask = 33 * (faces_argmax == 0) # 0 when face is not assigned to any pixel : we change that to the ID of the gum
+  final_faces_array = faces_argmax + mask
 
   surf = fbf.ReadSurf(path)
   nb_points = surf.GetNumberOfPoints()
@@ -142,9 +144,8 @@ def main(args):
 
   id_points = np.full((nb_points,),33) # fill with ID 33 (gum)
 
-  for index,uid in enumerate (l_uniq):
-      id_points[np_connectivity[3*index]] = uid    
-
+  for index,uid in enumerate(final_faces_array.tolist()):
+      id_points[np_connectivity[3*index]] = uid
 
   vtk_id = numpy_to_vtk(id_points)
   vtk_id.SetName(args.scal)
@@ -162,22 +163,19 @@ def main(args):
   print("Done.")
 
 
-def GetSurfProp(path):        
-    surf = fbf.ReadSurf(path)
-    surf = fbf.GetUnitSurf(surf)
-    surf, _a, _v = fbf.RandomRotation(surf)
+
+def GetSurfProp(surf_unit):     
+    surf, _a, _v = fbf.RandomRotation(surf_unit)
     surf = fbf.ComputeNormals(surf)
+    
     color_normals = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
     verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))
     faces = ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
-    region_id = ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(surf.GetPointData().GetScalars("UniversalID")))
-    region_id = torch.clamp(region_id, min=0)
-    faces_pid0 = faces[:,0:1]
-    region_id_faces = torch.take(region_id, faces_pid0)
-    return verts.unsqueeze(0), faces.unsqueeze(0), region_id.unsqueeze(0), region_id_faces.unsqueeze(0), faces_pid0.unsqueeze(0), color_normals.unsqueeze(0),surf
+    return verts.unsqueeze(0), faces.unsqueeze(0), color_normals.unsqueeze(0)
+
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Choose a .vtk file of a jaw.')
+  parser = argparse.ArgumentParser(description='Choose a .vtk file.')
   parser.add_argument('--surf',type=str, help='Input surface (.vtk file)', required=True)
   parser.add_argument('--out',type=str, help = 'Output', required=True)
   parser.add_argument('--rot',type=int, help = 'Number of rotations (default: 70)', default=70)
