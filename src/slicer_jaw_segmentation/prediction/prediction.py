@@ -23,14 +23,13 @@ class prediction(ScriptedLoadableModule):
 
   def __init__(self, parent):
     ScriptedLoadableModule.__init__(self, parent)
-    self.parent.title = "prediction" 
+    self.parent.title = "prediction - FiboSeg" 
     self.parent.categories = ["Examples"]  # TODO: set categories (folders where the module shows up in the module selector)
     self.parent.dependencies = []  # TODO: add here list of module names that this module requires
     self.parent.contributors = ["Mathieu Leclercq"]  # TODO: replace with "Firstname Lastname (Organization)"
     # TODO: update with short description of the module and a link to online module documentation
     self.parent.helpText = """
 This is an example of scripted loadable module bundled in an extension.
-See more information in <a href="https://github.com/organization/projectname#prediction">module documentation</a>.
 """
     # TODO: replace with organization, grant and thanks
     self.parent.acknowledgementText = """
@@ -54,19 +53,19 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     """
     ScriptedLoadableModuleWidget.__init__(self, parent)
     VTKObservationMixin.__init__(self)  # needed for parameter node observation
+
     self.logic = None
     self._parameterNode = None
     self._updatingGUIFromParameterNode = False
     self.fileName = ""
     self.surfaceFile = ""
+    self.outputFolder = ""
     self.outputFile  = ""
     self.lArrays = []
     self.model = "" 
     self.resolution = 256
     self.predictedId = ""
     self.rotation = None
-
-
 
 
   def setup(self):
@@ -106,9 +105,7 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.browseSurfaceButton.connect('clicked(bool)',self.onBrowseSurfaceButton)
     self.ui.browseModelButton.connect('clicked(bool)',self.onBrowseModelButton)
     self.ui.surfaceLineEdit.textChanged.connect(self.onEditSurfaceLine)
-    self.ui.modelLineEdit.textChanged.connect(self.onEditModelLine)
-
-    
+    self.ui.modelLineEdit.textChanged.connect(self.onEditModelLine)    
 
 
     # Advanced 
@@ -127,11 +124,11 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.progressLabel.setHidden(True)
     self.ui.openOutButton.setHidden(True)
     self.ui.cancelButton.setHidden(True)
-    #self.ui.propertyComboBox.setHidden(True)
 
     #initialize variables
     self.model = self.ui.modelLineEdit.text
     self.surfaceFile = self.ui.surfaceLineEdit.text
+    self.outputFolder = self.ui.outputLineEdit.text
     self.outputFile = self.ui.outputLineEdit.text + self.ui.outputFileLineEdit.text
     self.predictedId = self.ui.predictedIdLineEdit.text
     self.resolution = self.ui.resolutionComboBox.currentText
@@ -246,19 +243,10 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def onResolutionChanged(self):
     self.resolution = int(self.ui.resolutionComboBox.currentText)
 
-  def updateProgressBar(self,caller,event):
-    """
-    self.logic.progress = self.logic.GetProgress()
-    if self.logic.progress == 100:
-      self.onProcessDone()
-    self.ui.progressBar.setValue(self.logic.progress) 
-    """
-    pass
 
   def onProcessDone(self):
     self.ui.applyChangesButton.setEnabled(True)
     self.ui.resetButton.setEnabled(True)
-
     self.ui.progressLabel.setHidden(False)
     self.ui.openOutButton.setHidden(False)    
     self.ui.cancelButton.setEnabled(False)
@@ -269,21 +257,13 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     webbrowser.open(self.outputFile)
 
 
-
-
-  def onPropertyChanged(self):
-    self.property = self.ui.propertyComboBox.currentText
-    print(self.property)
-
   def onApplyChangesButton(self):
 
-    #if os.path.isdir(self.surfaceFile) and os.path.isdir(self.outputFile) and self.property != '':
-    if self.model != '':
+    if os.path.isfile(self.surfaceFile) and os.path.isdir(self.outputFolder) and os.path.isfile(self.model):
       self.ui.applyChangesButton.setEnabled(False)
       self.ui.progressBar.setEnabled(True)
       self.logic = predictionLogic(self.surfaceFile,self.outputFile,self.resolution, self.ui.rotationSpinBox.value,self.model, self.predictedId)
       self.logic.process()
-      self.logic.cliNode.AddObserver('ModifiedEvent', self.updateProgressBar)
       self.ui.cancelButton.setHidden(False)
       self.ui.cancelButton.setEnabled(True)
       self.ui.resetButton.setEnabled(False)
@@ -295,17 +275,24 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     else:
       print('error')
       msg = qt.QMessageBox()
-      if not(os.path.isdir(self.surfaceFile)):        
+      if not(os.path.isfile(self.surfaceFile)):        
         msg.setText("Surface directory : \nIncorrect path.")
         print('Error: Incorrect path for surface directory.')
         self.ui.surfaceLineEdit.setText('')
         print(f'surface folder : {self.surfaceFile}')
      
-      elif not(os.path.isdir(self.outputFile)):
+      elif not(os.path.isdir(self.outputFolder)):
         msg.setText("Output directory : \nIncorrect path.")
         print('Error: Incorrect path for output directory.')
         self.ui.outputLineEdit.setText('')
-        print(f'output folder : {self.surfaceFile}')
+        print(f'output folder : {self.outputFolder}')
+
+      elif not(os.path.isfile(self.model)):
+        msg.setText("Model : \nIncorrect path.")
+        print('Error: Incorrect path for model.')
+        self.ui.modelLineEdit.setText('')
+        print(f'model path: {self.model}')
+
 
 
       msg.setWindowTitle("Error")
@@ -330,14 +317,12 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.progressBar.setRange(0,100)
     self.ui.progressLabel.setHidden(True)
     self.ui.cancelButton.setEnabled(False)
-
-
     
     print("Process successfully cancelled.")
 
 
   def onBrowseSurfaceButton(self):
-    newsurfaceFile = qt.QFileDialog.getOpenFileName(self.parent, "Select a surface")
+    newsurfaceFile = qt.QFileDialog.getOpenFileName(self.parent, "Select a surface",'',".vtk file (*.vtk)")
     if newsurfaceFile != '':
       self.surfaceFile = newsurfaceFile
       self.ui.surfaceLineEdit.setText(self.surfaceFile)
@@ -355,10 +340,14 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
 
   def onBrowseOutputButton(self):
-    newoutputFile = qt.QFileDialog.getExistingDirectory(self.parent, "Select a directory")
-    if newoutputFile != '':
-      self.outputFile = newoutputFile
-      self.ui.outputLineEdit.setText(self.outputFile)
+    newoutputFolder = qt.QFileDialog.getExistingDirectory(self.parent, "Select a directory")
+    if newoutputFolder != '':
+      if newoutputFolder[-1] != "/":
+        newoutputFolder += '/'
+      self.outputFolder = newoutputFolder
+      print(self.outputFolder)
+      self.ui.outputLineEdit.setText(self.outputFolder)
+      print(self.outputFile)
     #print(f'Output directory : {self.outputFile}')      
 
 
@@ -378,11 +367,9 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     
 
 
-  def onEditOutputLine(self):
+  def onEditOutputLine(self): # called when either output folder line or output file line is modified
+    self.outputFolder = self.ui.outputLineEdit.text
     self.outputFile = self.ui.outputLineEdit.text + self.ui.outputFileLineEdit.text
-
-
-
 
 
   def onRotationSlider(self):
@@ -496,23 +483,11 @@ class predictionLogic(ScriptedLoadableModuleLogic):
     parameters ['resolution'] = self.resolution
     parameters ['model'] = self.model
     parameters ['predictedId'] = self.predictedId
-    #self.GetNbOperation()
-    #print('nb operation : ', self.nbOperation)
     print ('parameters : ', parameters)
+
     flybyProcess = slicer.modules.predictioncli
     self.cliNode = slicer.cli.run(flybyProcess,None, parameters)    
     return flybyProcess
-
-
-  def GetProgress(self):
-    """
-    filesList = os.listdir(self.outputFile)
-    self.progress =  math.floor(100 * ((len(filesList)-self.initialNbFiles)/self.nbOperation))
-    return self.progress
-    """ 
-    return None
-
-
 
 
 #
@@ -569,61 +544,4 @@ class predictionTest(ScriptedLoadableModuleTest):
 
     # logic = predictionLogic()
 
-
-
     self.delayDisplay('Test passed')
-
-def ReadSurf(fileName):   # Copied from utils.py (https://github.com/DCBIA-OrthoLab/fly-by-cnn/tree/master/src/py)
-
-    fname, extension = os.path.splitext(fileName)
-    extension = extension.lower()
-    if extension == ".vtk":
-        
-        reader = vtk.vtkPolyDataReader()
-        reader.SetFileName(fileName)
-        reader.Update()
-        surf = reader.GetOutput()
-    elif extension == ".vtp":
-        reader = vtk.vtkXMLPolyDataReader()
-        reader.SetFileName(fileName)
-        reader.Update()
-        surf = reader.GetOutput()    
-    elif extension == ".stl":
-        reader = vtk.vtkSTLReader()
-        reader.SetFileName(fileName)
-        reader.Update()
-        surf = reader.GetOutput()
-    elif extension == ".off":
-        reader = OFFReader()
-        reader.SetFileName(fileName)
-        reader.Update()
-        surf = reader.GetOutput()
-    elif extension == ".obj":
-        if os.path.exists(fname + ".mtl"):
-            obj_import = vtk.vtkOBJImporter()
-            obj_import.SetFileName(fileName)
-            obj_import.SetFileNameMTL(fname + ".mtl")
-            textures_path = os.path.normpath(os.path.dirname(fname) + "/../images")
-            if os.path.exists(textures_path):
-                obj_import.SetTexturePath(textures_path)
-            obj_import.Read()
-
-            actors = obj_import.GetRenderer().GetActors()
-            actors.InitTraversal()
-            append = vtk.vtkAppendPolyData()
-
-            for i in range(actors.GetNumberOfItems()):
-                surfActor = actors.GetNextActor()
-                append.AddInputData(surfActor.GetMapper().GetInputAsDataSet())
-            
-            append.Update()
-            surf = append.GetOutput()
-            
-        else:
-            print('unknown extension')
-            reader = vtk.vtkOBJReader()
-            reader.SetFileName(fileName)
-            reader.Update()
-            surf = reader.GetOutput()
-
-    return surf

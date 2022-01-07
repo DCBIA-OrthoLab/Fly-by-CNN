@@ -6,6 +6,7 @@ print("Importing libraries...")
 """
 V3: Ambient lights to have faster prediction (rotate camera instead of surface)
     Icosahedron 
+    Choice: UNETR or UNET
 """
 ####
 ####
