@@ -5,12 +5,12 @@ import logging
 import vtk, qt, ctk, slicer
 from slicer.ScriptedLoadableModule import *
 from slicer.util import VTKObservationMixin
-import csv
-from pandas import read_csv
+
 import itk
 import time
 import math
 import webbrowser
+import json
 
 #
 # prediction
@@ -124,6 +124,7 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.progressLabel.setHidden(True)
     self.ui.openOutButton.setHidden(True)
     self.ui.cancelButton.setHidden(True)
+    self.ui.doneLabel.setHidden(True)
 
     #initialize variables
     self.model = self.ui.modelLineEdit.text
@@ -244,13 +245,37 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.resolution = int(self.ui.resolutionComboBox.currentText)
 
 
-  def onProcessDone(self):
-    self.ui.applyChangesButton.setEnabled(True)
-    self.ui.resetButton.setEnabled(True)
+  def onProcessUpdate(self,caller,event):
+    if self.logic.cliNode.GetStatus() & self.logic.cliNode.Completed:
+      print('PROCESS DONE.')
+      self.ui.applyChangesButton.setEnabled(True)
+      self.ui.resetButton.setEnabled(True)
+      self.ui.progressLabel.setHidden(False)
+         
+      self.ui.cancelButton.setEnabled(False)
+      self.ui.progressBar.setEnabled(False)
+      self.ui.progressBar.setHidden(True)
+      self.ui.progressLabel.setHidden(True)
+      self.ui.doneLabel.setHidden(False)
+
+      if os.path.isfile(self.outputFile):
+        self.ui.openOutButton.setHidden(False) 
+        ###
+        ### TODO load VTK file
+        ###
+      else:
+        print ('Output file could not be found.')
+
+  def onProcessStarted(self):
+
+    self.ui.cancelButton.setHidden(False)
+    self.ui.cancelButton.setEnabled(True)
+    self.ui.resetButton.setEnabled(False)
+    self.ui.progressBar.setRange(0,0)
+    self.ui.progressBar.setEnabled(True)
+    self.ui.progressBar.setHidden(False)
+    self.ui.progressBar.setTextVisible(True)
     self.ui.progressLabel.setHidden(False)
-    self.ui.openOutButton.setHidden(False)    
-    self.ui.cancelButton.setEnabled(False)
-    self.ui.progressBar.setEnabled(False)
 
 
   def onOutButton(self):
@@ -258,19 +283,14 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
 
   def onApplyChangesButton(self):
-
     if os.path.isfile(self.surfaceFile) and os.path.isdir(self.outputFolder) and os.path.isfile(self.model):
       self.ui.applyChangesButton.setEnabled(False)
       self.ui.progressBar.setEnabled(True)
       self.logic = predictionLogic(self.surfaceFile,self.outputFile,self.resolution, self.ui.rotationSpinBox.value,self.model, self.predictedId)
       self.logic.process()
-      self.ui.cancelButton.setHidden(False)
-      self.ui.cancelButton.setEnabled(True)
-      self.ui.resetButton.setEnabled(False)
-      self.ui.progressBar.setRange(0,0)
-      self.ui.progressBar.setEnabled(True)
-      self.ui.progressBar.setTextVisible(True)
-      self.ui.progressLabel.setHidden(False)
+      self.logic.cliNode.AddObserver('ModifiedEvent',self.onProcessUpdate)
+      self.onProcessStarted()
+
 
     else:
       print('error')
@@ -293,8 +313,6 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
         self.ui.modelLineEdit.setText('')
         print(f'model path: {self.model}')
 
-
-
       msg.setWindowTitle("Error")
       msg.exec_()
 
@@ -310,6 +328,7 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.progressBar.setValue(0)
 
   def onCancel(self):
+
     self.logic.cliNode.Cancel()
     self.ui.applyChangesButton.setEnabled(True)
     self.ui.resetButton.setEnabled(True)
@@ -317,6 +336,7 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.progressBar.setRange(0,100)
     self.ui.progressLabel.setHidden(True)
     self.ui.cancelButton.setEnabled(False)
+
     
     print("Process successfully cancelled.")
 
@@ -327,7 +347,6 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
       self.surfaceFile = newsurfaceFile
       self.ui.surfaceLineEdit.setText(self.surfaceFile)
     #print(f'Surface directory : {self.surfaceFile}')
-
 
 
   def onBrowseModelButton(self):
@@ -351,11 +370,8 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     #print(f'Output directory : {self.outputFile}')      
 
 
-
-
   def onEditModelLine(self):
     self.model = self.ui.modelLineEdit.text
-
 
 
   def onEditPredictedIdLine(self):
@@ -363,8 +379,7 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
 
   def onEditSurfaceLine(self):
-    self.surfaceFile = self.ui.surfaceLineEdit.text
-    
+    self.surfaceFile = self.ui.surfaceLineEdit.text    
 
 
   def onEditOutputLine(self): # called when either output folder line or output file line is modified
@@ -376,66 +391,13 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.rotationSpinBox.value = self.ui.rotationSlider.value
     self.rotation = self.ui.rotationSlider.value
 
-
   def onRotationSpinbox(self):
     self.ui.rotationSlider.value = self.ui.rotationSpinBox.value
     self.rotation = self.ui.rotationSlider.value
 
-  def onApplyButton(self):
-    """
-    Run processing when user clicks "Apply" button.
-    """
-    return
-
-  def ReadCsv(self,fileName):
-    fileList = []
-    try:
-      with open(fileName, newline='') as f:
-        reader = csv.reader(f, delimiter=',')
-        for row in reader:
-          fileList.append(row)
-      """
-      for item in fileList:
-        print (item)      
-      """
-      print (".csv file opened successfully")
-      return fileList
-    except IOError:  # incorrect path name
-      msg = qt.QMessageBox()
-      if self.fileName != '':
-        msg.setText("Incorrect path.")
-        print('Error: Incorrect path.')
-      else:
-        msg.setText("Please select a .csv file.")
-        print("Error: Please select a .csv file.")
-      msg.setWindowTitle("Error")
-      msg.exec_()
-      self.ui.lineEdit.setText('')
-      print(f'fileName : {self.fileName}')
-      
-      return -1
 
 
-  def ReadCsvPandas(self,fileName):
 
-    try:
-      file = read_csv(fileName)
-      #print(file.to_string())
-      for column in file:
-        print(column)
-
-    except:
-      msg = qt.QMessageBox()
-      if self.fileName != '':
-        msg.setText("Incorrect path.")
-        print('Error: Incorrect path.')
-      else:
-        msg.setText("Please select a .csv file.")
-        print("Error: Please select a .csv file.")
-      msg.setWindowTitle("Error")
-      msg.exec_()
-      self.ui.lineEdit.setText('')
-      print(f'fileName : {self.fileName}')
 
 #
 # predictionLogic
@@ -483,11 +445,18 @@ class predictionLogic(ScriptedLoadableModuleLogic):
     parameters ['resolution'] = self.resolution
     parameters ['model'] = self.model
     parameters ['predictedId'] = self.predictedId
-    print ('parameters : ', parameters)
+    env = slicer.util.startupEnvironment()
+    print('\n\n\n\n')
+    #print ('parameters : ', parameters)
 
+    with open('env.json', 'w') as convert_file:
+      convert_file.truncate(0)
+      convert_file.write(json.dumps(env))
+    
     flybyProcess = slicer.modules.predictioncli
     self.cliNode = slicer.cli.run(flybyProcess,None, parameters)    
     return flybyProcess
+    print("Process function done")
 
 
 #

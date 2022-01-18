@@ -166,7 +166,7 @@
          </font>
         </property>
         <property name="text">
-         <string>/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/notebooks/best_metric_model_segmentation2d_array.pth</string>
+         <string>/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/FiboSeg/best_metric_model_segmentation2d_array_v2_5.pth</string>
         </property>
        </widget>
       </item>
@@ -374,6 +374,13 @@
      </property>
     </widget>
    </item>
+   <item>
+    <widget class="QLabel" name="doneLabel">
+     <property name="text">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p align=&quot;center&quot;&gt;&lt;span style=&quot; font-size:18pt; font-weight:600; color:#00aa00;&quot;&gt;Prediction done.&lt;/span&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+    </widget>
+   </item>
    <item alignment="Qt::AlignHCenter">
     <widget class="QPushButton" name="openOutButton">
      <property name="font">
@@ -382,7 +389,7 @@
       </font>
      </property>
      <property name="text">
-      <string>Open directory</string>
+      <string>Open output surface</string>
      </property>
      <property name="checkable">
       <bool>false</bool>
