@@ -247,24 +247,25 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
   def onProcessUpdate(self,caller,event):
     if self.logic.cliNode.GetStatus() & self.logic.cliNode.Completed:
-      print('PROCESS DONE.')
       self.ui.applyChangesButton.setEnabled(True)
       self.ui.resetButton.setEnabled(True)
-      self.ui.progressLabel.setHidden(False)
-         
+      self.ui.progressLabel.setHidden(False)         
       self.ui.cancelButton.setEnabled(False)
       self.ui.progressBar.setEnabled(False)
       self.ui.progressBar.setHidden(True)
       self.ui.progressLabel.setHidden(True)
-      self.ui.doneLabel.setHidden(False)
 
-      if os.path.isfile(self.outputFile):
+      if os.path.isfile(self.outputFile): # if output file is found
+        print('PROCESS DONE.')
+        self.ui.doneLabel.setHidden(False)
         self.ui.openOutButton.setHidden(False) 
-        ###
-        ### TODO load VTK file
-        ###
-      else:
-        print ('Output file could not be found.')
+
+      else: # if no output file: error
+        print ('Error: Output file was not found.') 
+        msg = qt.QMessageBox()
+        msg.setText("Output file was not found.\nThere may have been an error during prediction.")
+        msg.setWindowTitle("Error")
+        msg.exec_()
 
   def onProcessStarted(self):
 
@@ -279,7 +280,11 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
 
 
   def onOutButton(self):
-    webbrowser.open(self.outputFile)
+    #webbrowser.open(self.outputFile)
+    #jaw_model = slicer.util.loadModel("/NIRAL/work/leclercq/data/flyby stuff/P25.vtk")
+    jaw_model = slicer.util.loadModel(self.outputFile)
+    print(type(jaw_model))
+
 
 
   def onApplyChangesButton(self):
@@ -326,6 +331,7 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
     self.ui.progressLabel.setHidden(True)
     self.ui.openOutButton.setHidden(True)
     self.ui.progressBar.setValue(0)
+    self.ui.doneLabel.setHidden(True)
 
   def onCancel(self):
 
@@ -394,9 +400,6 @@ class predictionWidget(ScriptedLoadableModuleWidget, VTKObservationMixin):
   def onRotationSpinbox(self):
     self.ui.rotationSlider.value = self.ui.rotationSpinBox.value
     self.rotation = self.ui.rotationSlider.value
-
-
-
 
 
 #

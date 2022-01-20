@@ -1,7 +1,6 @@
 print("Importing libraries...")
 
 
-
 ####
 ####
 """
@@ -23,7 +22,6 @@ import random
 import math
 
 
-
 # datastructures
 from pytorch3d.structures import Meshes
 
@@ -43,7 +41,7 @@ import monai
 from monai.inferers import (sliding_window_inference,SimpleInferer)
 from monai.transforms import ToTensor
 
-
+print("Initializing model...")
 # Set the cuda device 
 if torch.cuda.is_available():
   device = torch.device("cuda:0")
@@ -108,11 +106,7 @@ def main(args):
   
   SURF = fbf.ReadSurf(path)    
   surf_unit = fbf.GetUnitSurf(SURF)
-  #(V, F, CN) = GetSurfProp(surf_unit)
-  #num_faces = F.size(1)
-  num_faces = int(SURF.GetPolys().GetData().GetSize()/4)  
- 
-
+  num_faces = int(SURF.GetPolys().GetData().GetSize()/4)   
  
   array_faces = np.zeros((num_classes,num_faces))
   tensor_faces = torch.zeros(num_classes,num_faces).to(device)
@@ -126,7 +120,6 @@ def main(args):
   list_sphere_points[-1] = (0.0001, -1.35, 0.0001)
 
   ## PREDICTION
-
   for coords in tqdm(list_sphere_points, desc = 'Prediction      '):
     camera_position = ToTensor(dtype=torch.float32, device=device)([list(coords)])
     R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
@@ -166,9 +159,6 @@ def main(args):
   vtk_id.SetName(args.scal)
   surf.GetPointData().AddArray(vtk_id)
 
-
-
-
   # Remove Islands
   for label in tqdm(range(num_classes),desc = 'Removing islands'):
     post_process.RemoveIslands(surf, vtk_id, label, 200)
@@ -182,38 +172,28 @@ def main(args):
   print("Done.")
 
 
-
 def fibonacci_sphere(samples, dist_cam):
 
     points = []
-    phi = math.pi * (3. - math.sqrt(5.))  # golden angle in radians
-
+    phi = math.pi * (3. -math.sqrt(5.))  # golden angle in radians
     for i in range(samples):
         y = 1 - (i / float(samples - 1)) * 2  # y goes from 1 to -1
         radius = math.sqrt(1 - y*y)  # radius at y
-
         theta = phi*i 
-
-        x = math.cos(theta) * radius
-        z = math.sin(theta) * radius
-
+        x = math.cos(theta)*radius
+        z = math.sin(theta)*radius
         points.append((x*dist_cam, y*dist_cam, z*dist_cam))
-
     return points
 
 
 def GetSurfProp(surf_unit):     
-    surf = fbf.ComputeNormals(surf_unit)
-    
+    surf = fbf.ComputeNormals(surf_unit)    
     color_normals = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
     verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))
     faces = ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
     return verts.unsqueeze(0), faces.unsqueeze(0), color_normals.unsqueeze(0)
 
 if __name__ == '__main__':
-
-
-
 
   parser = argparse.ArgumentParser(description='Choose a .vtk file.')
   parser.add_argument('--surf',type=str, help='Input surface (.vtk file)', required=True)

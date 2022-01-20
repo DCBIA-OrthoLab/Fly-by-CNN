@@ -6,7 +6,7 @@ project(slicer_jaw_segmentation)
 # Extension meta-information
 set(EXTENSION_HOMEPAGE "https://www.slicer.org/wiki/Documentation/Nightly/Extensions/slicer_jaw_segmentation")
 set(EXTENSION_CATEGORY "Examples")
-set(EXTENSION_CONTRIBUTORS "John Doe (AnyWare Corp.)")
+set(EXTENSION_CONTRIBUTORS "Mathieu Leclercq (UNC)")
 set(EXTENSION_DESCRIPTION "This is an example of a simple extension")
 set(EXTENSION_ICONURL "http://www.example.com/Slicer/Extensions/slicer_jaw_segmentation.png")
 set(EXTENSION_SCREENSHOTURLS "http://www.example.com/Slicer/Extensions/slicer_jaw_segmentation/Screenshots/1.png")
