@@ -9,7 +9,8 @@ from readers import OFFReader
 import pandas as pd
 from multiprocessing import Pool, cpu_count
 from vtk.util.numpy_support import vtk_to_numpy
-import fly_by_features as fbf
+from vtk.util.numpy_support import numpy_to_vtk
+
 import torch
 import monai
 from monai.transforms import (
@@ -86,6 +87,16 @@ def CreateSpiral(sphereRadius=4, numberOfSpiralSamples=64, numberOfSpiralTurns=4
 
     return sphere
 
+def CleanPoly(surf, merge_points = False):
+    clean = vtk.vtkCleanPolyData()
+    clean.SetInputData(surf)
+    clean.PointMergingOff()
+    if merge_points:
+        clean.PointMergingOn()
+    clean.Update()
+
+    return clean.GetOutput()
+
 def CreatePlane(Origin,Point1,Point2,Resolution):
     plane = vtk.vtkPlaneSource()
     
@@ -128,7 +139,13 @@ def ReadSurf(fileName):
             obj_import.SetFileNameMTL(fname + ".mtl")
             textures_path = os.path.normpath(os.path.dirname(fname) + "/../images")
             if os.path.exists(textures_path):
+                textures_path = os.path.normpath(fname.replace(os.path.basename(fname), ''))
                 obj_import.SetTexturePath(textures_path)
+            else:
+                textures_path = os.path.normpath(fname.replace(os.path.basename(fname), ''))                
+                obj_import.SetTexturePath(textures_path)
+                    
+
             obj_import.Read()
 
             actors = obj_import.GetRenderer().GetActors()
@@ -150,7 +167,7 @@ def ReadSurf(fileName):
 
     return surf
 
-def WriteSurf(surf, fileName):
+def WriteSurf(surf, fileName, use_binary=False):
     fname, extension = os.path.splitext(fileName)
     extension = extension.lower()
     print("Writing:", fileName)
@@ -161,6 +178,8 @@ def WriteSurf(surf, fileName):
 
     writer.SetFileName(fileName)
     writer.SetInputData(surf)
+    if(use_binary):
+        writer.SetFileTypeToBinary()
     writer.Update()
 
 def GetAllNeighbors(vtkdata, pids):
@@ -201,10 +220,11 @@ def GetNeighborIds(vtkdata, pid, labels, label, pid_visited):
 
     return np.unique(neighbor_pids).tolist()
 
-def ScaleSurf(surf, mean_arr = None, scale_factor = None):
-    surf_copy = vtk.vtkPolyData()
-    surf_copy.DeepCopy(surf)
-    surf = surf_copy
+def ScaleSurf(surf, mean_arr = None, scale_factor = None, copy=True):
+    if(copy):
+        surf_copy = vtk.vtkPolyData()
+        surf_copy.DeepCopy(surf)
+        surf = surf_copy
 
     shapedatapoints = surf.GetPoints()
 
@@ -221,11 +241,7 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
     bounds_max_v[1] = max(bounds[2], bounds[3])
     bounds_max_v[2] = max(bounds[4], bounds[5])
 
-    shape_points = []
-    for i in range(shapedatapoints.GetNumberOfPoints()):
-        p = shapedatapoints.GetPoint(i)
-        shape_points.append(p)
-    shape_points = np.array(shape_points)
+    shape_points = vtk_to_numpy(shapedatapoints.GetData())
     
     #centering points of the shape
     if mean_arr is None:
@@ -240,13 +256,10 @@ def ScaleSurf(surf, mean_arr = None, scale_factor = None):
 
     #scale points of the shape by scale factor
     # print("Scale:", scale_factor)
-    shape_points_scaled = np.multiply(shape_points, scale_factor)
+    shape_points = np.multiply(shape_points, scale_factor)
 
     #assigning scaled points back to shape
-    for i in range(shapedatapoints.GetNumberOfPoints()):
-       shapedatapoints.SetPoint(i, shape_points_scaled[i])    
-
-    surf.SetPoints(shapedatapoints)
+    shapedatapoints.SetData(numpy_to_vtk(shape_points))
 
     return surf, mean_arr, scale_factor
 
@@ -299,8 +312,8 @@ def RandomRotation(surf):
     rotationVector = rotationVector/np.linalg.norm(rotationVector)
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
-def GetUnitSurf(surf, mean_arr = None, scale_factor = None):
-  surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor)
+def GetUnitSurf(surf, mean_arr = None, scale_factor = None, copy=True):
+  surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor, copy)
   return surf
 
 def GetColoredActor(surf, property_name, range_scalars = None):
@@ -378,7 +391,7 @@ def GetPropertyActor(surf, property_name):
 def ComputeNormals(surf):
     normals = vtk.vtkPolyDataNormals()
     normals.SetInputData(surf);
-    normals.ComputeCellNormalsOff();
+    normals.ComputeCellNormalsOn();
     normals.ComputePointNormalsOn();
     normals.SplittingOff();
     normals.Update()
@@ -713,12 +726,55 @@ def json2vtk(jsonfile,number_landmarks,radius_sphere,outdir):
         Write(vtk_landmarks.GetOutput(), output)
     return output
     
-def ArrayToTensor(vtkarray, device='cpu'):
-    return ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(vtkarray))
+def ArrayToTensor(vtkarray, device='cpu', dtype=torch.int64):
+    return ToTensor(dtype=dtype, device=device)(vtk_to_numpy(vtkarray))
 
 def PolyDataToTensors(surf, device='cpu'):
 
-    verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))
-    faces = ToTensor(dtype=torch.int32, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
+    verts, faces, edges = PolyDataToNumpy(surf)
     
-    return verts, faces
+    verts = ToTensor(dtype=torch.float32, device=device)(verts)
+    faces = ToTensor(dtype=torch.int32, device=device)(faces)
+    edges = ToTensor(dtype=torch.int32, device=device)(edges)
+    
+    return verts, faces, edges
+
+def PolyDataToNumpy(surf):
+
+    edges_filter = vtk.vtkExtractEdges()
+    edges_filter.SetInputData(surf)
+    edges_filter.Update()
+
+    verts = vtk_to_numpy(surf.GetPoints().GetData())
+    faces = vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]
+    edges = vtk_to_numpy(edges_filter.GetOutput().GetLines().GetData()).reshape(-1, 3)[:,1:]
+    
+    return verts, faces, edges
+
+def UnitVerts(verts):
+    min_verts, _ = torch.min(verts, axis=0)
+    max_verts, _ = torch.max(verts, axis=0)
+    mean_v = (min_verts + max_verts)/2.0
+    
+    verts = verts - mean_v
+    scale_factor = 1/torch.linalg.vector_norm(max_verts - mean_v)
+    verts = verts*scale_factor
+    
+    return verts, mean_v, scale_factor
+
+def ComputeVertexNormals(verts, faces):
+    face_area, face_normals = mesh_face_areas_normals(verts, faces)
+
+    vert_normals = []
+
+    for idx in range(len(v)):
+        normals = face_normals[(faces == idx).nonzero(as_tuple=True)[0]] #Get all adjacent normal faces for the given point id
+        areas = face_area[(faces == idx).nonzero(as_tuple=True)[0]] # Get all adjacent normal areas for the given point id
+
+        normals = torch.mul(normals, areas.reshape(-1, 1)) # scale each normal by the area
+        normals = torch.sum(normals, axis=0) # sum everything
+        normals = torch.nn.functional.normalize(normals, dim=0) #normalize
+
+        vert_normals.append(normals.numpy())
+    
+    return torch.as_tensor(vert_normals)

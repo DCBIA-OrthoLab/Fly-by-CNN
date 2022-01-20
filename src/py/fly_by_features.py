@@ -25,8 +25,22 @@ class FlyByGenerator():
 		renderWindow.SetMultiSamples(0)
 		renderWindow.OffScreenRenderingOn()
 
+		windowToImageN = vtk.vtkWindowToImageFilter()
+		windowToImageN.SetInputBufferTypeToRGB()
+		windowToImageN.SetInput(renderWindow)
+
+		windowFilterZ = vtk.vtkWindowToImageFilter()
+		windowFilterZ.SetInputBufferTypeToZBuffer()
+		windowFilterZ.SetInput(renderWindow)
+		windowFilterZ.SetScale(1)
+
+
 		self.renderer = renderer
 		self.renderWindow = renderWindow
+		self.windowToImageN = windowToImageN
+		self.windowFilterZ = windowFilterZ
+
+
 		self.sphere = sphere
 		self.visualize = visualize
 		self.resolution = resolution
@@ -95,12 +109,9 @@ class FlyByGenerator():
 
 			self.renderer.ResetCameraClippingRange()
 
-			windowToImageN = vtk.vtkWindowToImageFilter()
-			windowToImageN.SetInputBufferTypeToRGB()
-			windowToImageN.SetInput(self.renderWindow)
-			windowToImageN.Update()
-
-			img_o = windowToImageN.GetOutput()
+			self.windowToImageN.Modified()
+			self.windowToImageN.Update()
+			img_o = self.windowToImageN.GetOutput()
 
 			img_o_np = vtk_to_numpy(img_o.GetPointData().GetScalars())
 
@@ -110,13 +121,10 @@ class FlyByGenerator():
 			num_components = img_o.GetNumberOfScalarComponents()
 
 			if self.use_z:
-				windowFilterZ = vtk.vtkWindowToImageFilter()
-				windowFilterZ.SetInputBufferTypeToZBuffer()
-				windowFilterZ.SetInput(self.renderWindow)
-				windowFilterZ.SetScale(1)
-
-				windowFilterZ.Update()                
-				img_z = windowFilterZ.GetOutput()
+				
+				self.windowFilterZ.Modified()
+				self.windowFilterZ.Update()                
+				img_z = self.windowFilterZ.GetOutput()
 				
 				img_z_np = vtk_to_numpy(img_z.GetPointData().GetScalars())
 				img_z_np = img_z_np.reshape([-1, 1])
