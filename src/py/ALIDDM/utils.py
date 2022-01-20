@@ -722,3 +722,10 @@ def PolyDataToTensors(surf, device='cpu'):
     faces = ToTensor(dtype=torch.int32, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
     
     return verts, faces
+
+def PolyDataToNumpy(surf):
+
+    verts = vtk_to_numpy(surf.GetPoints().GetData())
+    faces = vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]
+    
+    return verts, faces

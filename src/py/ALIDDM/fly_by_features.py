@@ -124,7 +124,7 @@ class FlyByGenerator():
 				z_near, z_far = camera.GetClippingRange()
 
 				img_z_np = 2.0*z_far*z_near / (z_far + z_near - (z_far - z_near)*(2.0*img_z_np - 1.0))
-				img_z_np[img_z_np > (z_far - 0.1)] = 0
+				img_z_np[img_z_np > (z_far - 0.01)] = 0
 
 				if self.rescale_features:
 					img_z_np /= z_far

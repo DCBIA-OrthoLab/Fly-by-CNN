@@ -19,7 +19,9 @@ import os
 from torch.utils.tensorboard import SummaryWriter
 
 class Agent(nn.Module):
-    def __init__(self, renderer, features_net, aid, device,image_run_folder = "",run_folder = "",min_radius=0.5,max_radius=2.5,sl=1,lenque = 10):
+
+    def __init__(self, renderer, features_net, aid, device,image_run_folder = "",run_folder = "",min_radius=0.5,max_radius=2.0,sl=1,lenque = 10):
+
         super(Agent, self).__init__()
         self.renderer = renderer
         self.device = device
@@ -32,7 +34,7 @@ class Agent(nn.Module):
         self.position_center_memory = deque(maxlen=self.max_que)
         self.best_loss = 9999
         self.best_epoch_loss = 9999
-        self.radius = torch.tensor(2.0)
+        self.radius = torch.tensor(max_radius)
         icosahedron = CreateIcosahedron(1, sl)
         sphere_points = []
         for pid in range(icosahedron.GetNumberOfPoints()):
@@ -45,50 +47,63 @@ class Agent(nn.Module):
         self.sphere_points = torch.tensor(sphere_points).type(torch.float32).to(self.device)
 
         self.features_net = features_net
-        self.attention = TimeAttention(12, 128).to(self.device)
+        self.attention = CamAttention(512, 256).to(self.device)
         # self.delta_move = nn.Linear(512, 4).to(self.device)
         self.delta_move = nn.Linear(512, 3).to(self.device)
 
         self.agent_id = aid
         self.tanh = nn.Tanh() 
         # self.trainable(False)
-    
+        self.sphere_centers = torch.zeros([1, 3]).type(torch.float32).to(self.device)
+        self.sphere_centers_zero = torch.zeros([1, 3]).type(torch.float32).to(self.device)
+        self.sphere_radius = torch.ones([1]).type(torch.float32).to(self.device)
+
+
     def reset_sphere_center(self,radius=0, center_agent=0, batch_size=1, random=False):
         self.batch_size = batch_size
         if(random):
             # print(torch.rand(self.batch_size, 3))
             # print(radius)
             # print(center_agent)
-            self.sphere_centers = (torch.rand(self.batch_size, 3) * radius - (radius/2) + center_agent).to(self.device)
+            self.sphere_centers = (torch.rand(self.batch_size, 3) * 2.0 - 1.0).to(self.device)
             # print(self.sphere_centers)
 
         else:
             self.sphere_centers = torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
             # print(self.sphere_centers)
-   
+
+        self.sphere_centers_zero = torch.zeros([self.batch_size, 3]).type(torch.float32).to(self.device)
+
 
     def get_parameters(self):
         att_param = self.attention.parameters()
         move_param = self.delta_move.parameters()
-        return list(att_param) + list(move_param)
+        return list(att_param) + list(move_param)    
     
-    def set_radius(self,delta_rad):
-        self.radius = self.tanh(delta_rad) * self.max_radius + self.min_radius #[batchsize,1]
-        # print(self.radius)
    
     def set_rad(self,radius):
         self.radius = radius
-        # print(self.radius)
+         
+    def reset_radius(self, batch_size=1, random=False):
+        if(random):
+            self.sphere_radius = (torch.rand(batch_size, 1) * (self.max_radius - self.min_radius) + self.min_radius).to(self.device)
+        else:
+            self.sphere_radius = torch.ones([batch_size, 1]).type(torch.float32).to(self.device)*self.max_radius
+
+    def set_radius(self, r):
+        self.radius = torch.clip(r*self.max_radius, min=self.min_radius, max=self.max_radius)
 
     def forward(self,x):
 
-        spc = self.sphere_centers
+        spc = self.sphere_centers_zero
         img_lst = torch.empty((0)).to(self.device)
 
+        cam_coords = []
         for sp in self.sphere_points:
             sp_i = sp*self.radius
             # sp = sp.unsqueeze(0).repeat(self.batch_size,1)
             current_cam_pos = spc + sp_i
+            
             R = look_at_rotation(current_cam_pos, at=spc, device=self.device)  # (1, 3, 3)
             # print( 'R shape :',R.shape)
             # print(R)
@@ -106,15 +121,14 @@ class Agent(nn.Module):
             # print(y)
 
             img_lst = torch.cat((img_lst,y.unsqueeze(0)),dim=0)
-        img_batch =  img_lst.permute(1,0,2,3,4)
 
-        self.image_writer.add_image('image',img_batch)
+        img_batch =  img_lst.permute(1,0,2,3,4)
+        # self.image_writer.add_image('image',img_batch)
 
         x = img_batch
         x = self.features_net(x)
-        x, s = self.attention(x)
-        x = self.delta_move(x)
-        x = self.tanh(x)
+        x = self.attention(x)
+        x = torch.sum(x*self.sphere_points, dim=1)
 
         return x        
 
@@ -173,6 +187,20 @@ class Agent(nn.Module):
     #             k += 1
     #     plt.show()
 
+class CamAttention(nn.Module):
+    def __init__(self, in_units, out_units):
+        super(CamAttention, self).__init__()
+        self.W1 = nn.Linear(in_units, out_units)
+        self.V = nn.Linear(out_units, 1)
+
+    def forward(self, x):
+        
+        x = self.V(self.W1(x))
+        x = nn.Sigmoid()(x)
+        x = x/torch.sum(x, dim=1, keepdim=True)
+
+        return x
+
 class SelfAttention(nn.Module):
     def __init__(self, in_units, out_units):
         super(SelfAttention, self).__init__()
@@ -190,7 +218,7 @@ class SelfAttention(nn.Module):
         context_vector = attention_weights * x
         context_vector = torch.sum(context_vector, dim=1)
 
-        return context_vector, score
+        return context_vector, attention_weights
 
 class TimeAttention(nn.Module):
     def __init__(self, in_units, out_units):

@@ -51,19 +51,22 @@ def main(args):
     # if not os.path.exists(output_dir):
     #     os.makedirs(output_dir)
 
+    print("Reading:", args.dir)
     df = pd.read_csv(dataset(args.dir))
-    dt = pd.read_csv(dataset(args.test))
+    # print("Reading:", args.test)
+    # dt = pd.read_csv(dataset(args.test))
 
-    df_train, df_val = train_test_split(df, train_size=args.train_size)
+    df_train, df_test = train_test_split(df, train_size=0.8)
+    df_train, df_val = train_test_split(df_train, train_size=0.9)
     print(df_train.shape)
     print(df_val.shape)
-    print(dt.shape)
+    print(df_test.shape)
     # print(df_train)
     # df_prediction = dataset(args.data_pred)
 
     train_data = FlyByDataset(df_train,device, dataset_dir=args.dir, rotate=True)
     val_data = FlyByDataset(df_val,device , dataset_dir=args.dir, rotate=True)
-    test_data = FlyByDataset(dt,device,dataset_dir=args.dir, rotate=False)
+    test_data = FlyByDataset(df_test,device,dataset_dir=args.dir, rotate=False)
 
 
     train_dataloader = DataLoader(train_data, batch_size=args.batch_size, shuffle=True, collate_fn=pad_verts_faces)
