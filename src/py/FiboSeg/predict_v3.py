@@ -7,6 +7,7 @@ print("Importing libraries...")
 V3: Ambient lights to have faster prediction (rotate camera instead of surface)
     Icosahedron 
     Choice: UNETR or UNET
+    Random crown removal
 """
 ####
 ####
@@ -104,7 +105,22 @@ def main(args):
   ## Camera position
   dist_cam = 1.35
   
-  SURF = fbf.ReadSurf(path)    
+  SURF = fbf.ReadSurf(path)
+
+  if args.rem != 0:
+    surf_point_data = SURF.GetPointData().GetScalars("UniversalID") 
+    ## Remove crown
+    unique, counts  = np.unique(surf_point_data, return_counts = True)
+    id_to_remove = args.rem
+    if id_to_remove not in unique:
+      print(f'Warning: ID {id_to_remove} not in id list. Removing random label...')
+    while (id_to_remove in [-1,33]) or (id_to_remove not in unique): 
+        id_to_remove = random.choice(unique)
+    print(f'ID to remove: {id_to_remove}')
+    SURF = post_process.Threshold(SURF, "UniversalID" ,id_to_remove-0.5,id_to_remove+0.5, invert=True)
+
+
+
   surf_unit = fbf.GetUnitSurf(SURF)
   num_faces = int(SURF.GetPolys().GetData().GetSize()/4)   
  
@@ -114,7 +130,7 @@ def main(args):
   simple_inferer = SimpleInferer()
 
 
-  (V, F, CN) = GetSurfProp(surf_unit)  # 0.7s to compute : now 0.45s 
+  (V, F, CN) = GetSurfProp(args,surf_unit)  # 0.7s to compute : now 0.45s 
   list_sphere_points = fibonacci_sphere(samples=nb_rotations, dist_cam=dist_cam)
   list_sphere_points[0] = (0.0001, 1.35, 0.0001) # To avoid "invalid rotation matrix" error
   list_sphere_points[-1] = (0.0001, -1.35, 0.0001)
@@ -145,7 +161,7 @@ def main(args):
   mask = 33 * (faces_argmax == 0) # 0 when face is not assigned to any pixel : we change that to the ID of the gum
   final_faces_array = faces_argmax + mask
 
-  surf = fbf.ReadSurf(path)
+  surf = SURF
   nb_points = surf.GetNumberOfPoints()
   polys = surf.GetPolys()
   np_connectivity = vtk_to_numpy(polys.GetConnectivityArray())
@@ -158,6 +174,9 @@ def main(args):
   vtk_id = numpy_to_vtk(id_points)
   vtk_id.SetName(args.scal)
   surf.GetPointData().AddArray(vtk_id)
+
+
+
 
   # Remove Islands
   for label in tqdm(range(num_classes),desc = 'Removing islands'):
@@ -186,8 +205,11 @@ def fibonacci_sphere(samples, dist_cam):
     return points
 
 
-def GetSurfProp(surf_unit):     
-    surf = fbf.ComputeNormals(surf_unit)    
+def GetSurfProp(args,surf_unit):     
+    surf = fbf.ComputeNormals(surf_unit)
+
+
+
     color_normals = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
     verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))
     faces = ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
@@ -203,5 +225,6 @@ if __name__ == '__main__':
   parser.add_argument('--res',type=int, help = 'Image resolution for the fly-by (default: 256)', default=320)
   parser.add_argument('--scal',type=str, help = 'Predicted ID name', default="PredictedID")
   parser.add_argument('--unetr',type=int, help = '1: unetr', default=0)
+  parser.add_argument('--rem',type=int, help = 'remove crown (-1 for random removal)',default=0)
   args = parser.parse_args()
   main(args)
