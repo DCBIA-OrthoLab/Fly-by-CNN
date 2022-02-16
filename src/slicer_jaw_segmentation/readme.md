@@ -38,4 +38,6 @@ To visualize the results, open the output file and set scalars to "visible" and 
 
 <!-- ![Example of a jaw model](examples/segmentation_example.png?raw=true) -->
 
+![Example of a jaw model](examples/segmentation_example.png?raw=true)
+
 
