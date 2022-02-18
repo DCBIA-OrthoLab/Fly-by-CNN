@@ -279,7 +279,7 @@ def NeighborLabel(vtkdata, labels, label, connected_pids):
 
 
 
-def RemoveIslands(vtkdata, labels, label, min_count):
+def RemoveIslands(vtkdata, labels, label, min_count,ignore_neg1 = False):
 
 	pid_visited = np.zeros(labels.GetNumberOfTuples())
 	for pid in range(labels.GetNumberOfTuples()):
@@ -287,8 +287,9 @@ def RemoveIslands(vtkdata, labels, label, min_count):
 			connected_pids = ConnectedRegion(vtkdata, pid, labels, label, pid_visited)
 			if connected_pids.shape[0] < min_count:
 				neighbor_label = NeighborLabel(vtkdata, labels, label, connected_pids)
-				for cpid in connected_pids:
-					labels.SetTuple(int(cpid), (neighbor_label,))
+				if ignore_neg1 == True and neighbor_label != -1:
+					for cpid in connected_pids:
+						labels.SetTuple(int(cpid), (neighbor_label,))
 
 def ConnectivityLabeling(vtkdata, labels, label, start_label):
 	pid_visited = np.zeros(labels.GetNumberOfTuples())
@@ -365,12 +366,13 @@ def ReLabel(surf, labels, label, relabel):
 		if labels.GetTuple(pid)[0] == label:
 			labels.SetTuple(pid, (relabel,))
 
-def Threshold(vtkdata, labels, threshold_min, threshold_max):
+def Threshold(vtkdata, labels, threshold_min, threshold_max, invert=False):
 	
 	threshold = vtk.vtkThreshold()
-	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, "RegionId")
+	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, labels)
 	threshold.SetInputData(vtkdata)
 	threshold.ThresholdBetween(threshold_min,threshold_max)
+	threshold.SetInvert(invert)
 	threshold.Update()
 
 	geometry = vtk.vtkGeometryFilter()
