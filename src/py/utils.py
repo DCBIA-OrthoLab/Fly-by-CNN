@@ -5,6 +5,7 @@ import math
 import os
 import sys
 import itk
+import json
 from readers import OFFReader
 import pandas as pd
 from multiprocessing import Pool, cpu_count
@@ -778,3 +779,15 @@ def ComputeVertexNormals(verts, faces):
         vert_normals.append(normals.numpy())
     
     return torch.as_tensor(vert_normals)
+
+def ReadJSONMarkups(fname, idx=0):
+    fiducials = json.load(open(fname))
+    markups = fiducials['markups']
+    controlPoints = markups[idx]['controlPoints']
+
+    controlPoints_np = []
+
+    for cp in controlPoints:
+        controlPoints_np.append(cp["position"])
+
+    return np.array(controlPoints_np)
