@@ -144,7 +144,6 @@ if __name__ == '__main__':
   parser.add_argument('--surf',type=str, help='Input surface (.vtk file)', required=True)
   parser.add_argument('--truth',type=str, help='groundtruth surface (.vtk file)', required=True)
   parser.add_argument('--scal',type=str, help='Name of the scalar', required=True)
-  parser.add_argument('--metric',type=int, help='0: Dice ; 1: Mean Distance', default=0)
   parser.add_argument('--csv',type=str, help='Append to existing .csv. If none: will create data.csv', default=None)
 
   args = parser.parse_args()

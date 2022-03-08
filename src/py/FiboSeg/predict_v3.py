@@ -12,7 +12,6 @@ V3: Ambient lights to have faster prediction (rotate camera instead of surface)
 ####
 ####
 
-
 import os
 import argparse
 import torch
@@ -21,7 +20,6 @@ from tqdm import tqdm
 import numpy as np
 import random
 import math
-
 
 # datastructures
 from pytorch3d.structures import Meshes
@@ -107,21 +105,29 @@ def main(args):
   
   SURF = fbf.ReadSurf(path)
 
+
   if args.rem != 0:
     surf_point_data = SURF.GetPointData().GetScalars("UniversalID") 
     ## Remove crown
     unique, counts  = np.unique(surf_point_data, return_counts = True)
-    id_to_remove = args.rem
-    if id_to_remove not in unique:
-      print(f'Warning: ID {id_to_remove} not in id list. Removing random label...')
-    while (id_to_remove in [-1,33]) or (id_to_remove not in unique): 
-        id_to_remove = random.choice(unique)
-    print(f'ID to remove: {id_to_remove}')
-    SURF = post_process.Threshold(SURF, "UniversalID" ,id_to_remove-0.5,id_to_remove+0.5, invert=True)
 
+    if unique != [None]:
+      id_to_remove = args.rem
+      if id_to_remove not in unique:
+        print(f'Warning: ID {id_to_remove} not in id list. Removing random label...')
+      while (id_to_remove in [-1,33]) or (id_to_remove not in unique): 
+          id_to_remove = random.choice(unique)
+      print(f'ID to remove: {id_to_remove}')
+      SURF = post_process.Threshold(SURF, "UniversalID" ,id_to_remove-0.5,id_to_remove+0.5, invert=True)
+    else:
+      print ('Could not access UniversalID array. No crown will be removed.')
 
 
   surf_unit = fbf.GetUnitSurf(SURF)
+
+
+
+
   num_faces = int(SURF.GetPolys().GetData().GetSize()/4)   
  
   array_faces = np.zeros((num_classes,num_faces))
@@ -150,16 +156,24 @@ def main(args):
     inputs = image.to(device)
     outputs = simple_inferer(inputs,model)  
 
-    outputs_softmax = softmax(outputs).squeeze().detach().cpu().numpy() # t: negligeable           
+    outputs_softmax = softmax(outputs).squeeze().detach().cpu().numpy() # t: negligeable  
+      
     for x in range(image_size):
         for y in range (image_size): # Browse pixel by pixel
             array_faces[:,pix_to_face[x,y]] += outputs_softmax[...,x,y]
-      
-      
+    
+  """
+  print(f'outputs_softmax.shape {outputs_softmax.shape}')     
+  print(f'array_faces.shape {array_faces.shape}')
+  print(array_faces[:,-1][0])
+  print(array_faces[:,-1])
+  """
+
   array_faces[:,-1][0] = 0 # pixels that are background (id: 0) =-1
   faces_argmax = np.argmax(array_faces,axis=0)
   mask = 33 * (faces_argmax == 0) # 0 when face is not assigned to any pixel : we change that to the ID of the gum
   final_faces_array = faces_argmax + mask
+  unique, counts  = np.unique(final_faces_array, return_counts = True)
 
   surf = SURF
   nb_points = surf.GetNumberOfPoints()
@@ -176,12 +190,14 @@ def main(args):
   surf.GetPointData().AddArray(vtk_id)
 
 
-
-
   # Remove Islands
   for label in tqdm(range(num_classes),desc = 'Removing islands'):
-    post_process.RemoveIslands(surf, vtk_id, label, 200)
+    post_process.RemoveIslands(surf, vtk_id, label, 200,ignore_neg1 = True)  # adds -1 labels to isolated points: removed later
 
+
+  array = surf.GetPointData().GetScalars("PredictedID") 
+
+  unique, counts  = np.unique(array, return_counts = True)
 
   out_filename = args.out
   polydatawriter = vtk.vtkPolyDataWriter()
@@ -207,8 +223,6 @@ def fibonacci_sphere(samples, dist_cam):
 
 def GetSurfProp(args,surf_unit):     
     surf = fbf.ComputeNormals(surf_unit)
-
-
 
     color_normals = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
     verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))

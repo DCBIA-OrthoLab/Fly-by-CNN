@@ -314,7 +314,7 @@ def main():
                 meshes = Meshes(verts=V, faces=F, textures=textures)
                 images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
                 pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
-                y_p = torch.take(YF, pix_to_face)*(pix_to_face >= 0)
+                y_p = torch.take(YF, pix_to_face)*(pix_to_face >= 0) # YF=input, pix_to_face=index. shape of y_p=shape of pix_to_face
                 images = images.permute(0,3,1,2)
                 y_p = y_p.permute(0,3,1,2)
                 inputs, labels = images.to(device), y_p.to(device)
