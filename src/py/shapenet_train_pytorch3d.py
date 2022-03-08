@@ -3,13 +3,18 @@ import os
 import pandas as pd
 import numpy as np
 import fly_by_features as fbf
+import math
+from tqdm import tqdm
+from icecream import ic
+
 
 import torch
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import Dataset
 import torchvision.models as models
-# from torchvision.transforms import ToTensor
+from torch import from_numpy
+#from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence as pack_sequence, pad_packed_sequence as unpack_sequence
 
@@ -19,6 +24,18 @@ from torch.utils.data import DataLoader
 import utils
 
 from pytorch3d.ops.graph_conv import GraphConv
+
+# rendering components
+from pytorch3d.renderer import (
+    FoVPerspectiveCameras, look_at_view_transform, look_at_rotation, 
+    RasterizationSettings, MeshRenderer, MeshRasterizer, BlendParams,
+    SoftSilhouetteShader, HardPhongShader, SoftPhongShader, AmbientLights, PointLights, TexturesUV, TexturesVertex,
+)
+
+# datastructures
+from pytorch3d.structures import Meshes
+
+print('Imports done')
 
 
 class EarlyStopping:
@@ -159,18 +176,191 @@ class ShapeNet_GraphClass(nn.Module):
         return x
 
 
+def main():
 
-num_epochs = 200
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        torch.cuda.set_device(device)
+    else:
+        device = torch.device("cpu")
 
-data_dir = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1"
-csv_split = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/all.csv"
-model_fn = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/train/03012021/checkpoint.pt"
 
-early_stop = EarlyStopping(patience=50, verbose=True, path=model_fn)
+    data_dir = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1"
+    csv_split = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/all.csv"
+    model_fn = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/train/03012021/checkpoint.pt"
 
-snd_train = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="train", concat=True, use_vtk=True)
-snd_val = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="val", concat=True, use_vtk=True)
+    early_stop = EarlyStopping(patience=50, verbose=True, path=model_fn)
 
+    snd_train = snd.ShapeNetDataset_Torch(data_dir, csv_split=csv_split, split="train", concat=True, use_vtk=True)
+    snd_val = snd.ShapeNetDataset_Torch(data_dir, csv_split=csv_split, split="val", concat=True, use_vtk=True)
+
+    batch_size = 1
+    train_dataloader = DataLoader(snd_train, batch_size=batch_size, shuffle=True, collate_fn=pad_verts_faces)
+    val_dataloader = DataLoader(snd_val, batch_size=batch_size,shuffle=True, collate_fn=pad_verts_faces)
+
+    # Initialize a perspective camera.
+    cameras = FoVPerspectiveCameras(device=device)
+    image_size = 256
+    # We will also create a Phong renderer. This is simpler and only needs to render one face per pixel.
+    raster_settings = RasterizationSettings(
+        image_size=image_size, 
+        blur_radius=0, 
+        faces_per_pixel=1, 
+    )
+    # We can add a point light in front of the object. 
+
+    lights = AmbientLights(device=device)
+    rasterizer = MeshRasterizer(
+            cameras=cameras, 
+            raster_settings=raster_settings
+        )
+    phong_renderer = MeshRenderer(
+        rasterizer=rasterizer,
+        shader=HardPhongShader(device=device, cameras=cameras, lights=lights)
+    )
+
+
+
+    model = ShapeNet_GraphClass(snd_train.ico_sphere_edges.to(device))
+    # model.load_state_dict(torch.load(model_fn))
+    model.to(device)
+
+
+    loss_fn = nn.CrossEntropyLoss(weight=torch.tensor(snd_train.unique_class_weights, dtype=torch.float32).to(device))
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
+
+    num_epochs = 200
+
+
+
+    """
+    dist_cam = 1.35
+    nb_loop = 8
+    list_sphere_points = fibonacci_sphere(samples=nb_loop, dist_cam=dist_cam)
+    list_sphere_points[0],list_sphere_points[-1] = (0.0001, 1.35, 0.0001),(0.0001, -1.35, 0.0001) # To avoid "invalid rotation matrix" error
+    """
+
+    list_sphere_points = snd_train.ico_sphere_verts.tolist()
+    ic(list_sphere_points)
+
+    ##
+    ## STARTING TRAINING
+    ##
+
+    torch.autograd.set_detect_anomaly(True)
+
+    for epoch in range(num_epochs):
+
+        model.train()
+        running_loss = 0.0
+        print("-" * 20)
+        print(f'epoch {epoch+1}/{num_epochs}')
+
+        for batch, (V,F,CN,Y) in tqdm(enumerate(train_dataloader),desc='training:'):
+
+            ic(Y)
+            V = from_numpy(V).float().to(device)
+            F = from_numpy(F).long().to(device)
+            Y = torch.LongTensor(Y).to(device)
+            CN = from_numpy(CN).float().to(device)
+
+            l_inputs = []
+
+            for coords in list_sphere_points:  # multiple views of the object
+
+                camera_position = torch.FloatTensor([coords]).to(device)
+                R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
+                T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+
+                textures = TexturesVertex(verts_features=CN)
+
+                meshes = Meshes(verts=V, faces=F, textures=textures)
+                batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
+                #pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
+
+                batch_views = batch_views.permute(0,3,1,2)
+                batch_views = torch.unsqueeze(batch_views, 1)
+                l_inputs.append(batch_views)              
+
+            ic(batch_views.shape)
+            X = torch.cat(l_inputs,dim=1).to(device)
+            X = X.type(torch.float32)
+            X = X/128.0 - 1.0 
+
+            optimizer.zero_grad()
+            x = model(X)   
+
+            ic(torch.min(X))
+            ic(torch.max(X))
+            assert not torch.isnan(X).any()
+            ic(torch.max(torch.isnan(X)))
+            ic(x)
+
+            loss = loss_fn(x, Y)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+
+            r = torch.cuda.memory_reserved(0)
+            a = torch.cuda.memory_allocated(0)
+            free_memory = (r-a) / 10**9  # free inside reserved
+            ic(free_memory)
+            ic(loss.item())
+
+            if batch % 100 == 0:
+                loss, current = loss.item(), batch * len(X)
+                print(f"loss: {loss:>7f}  [{current:>5d}/{len(snd_train):>5d}]")
+
+        train_loss = running_loss / len(train_dataloader)
+        print(f"average epoch loss: {train_loss:>7f}  [{epoch:>5d}/{num_epochs:>5d}]")
+
+
+        model.eval()
+        with torch.no_grad():
+            running_loss = 0.0
+            for batch, (V,F,CN,Y) in enumerate(val_dataloader):
+                ic(batch)
+
+                V = from_numpy(V).float().to(device)
+                F = from_numpy(F).long().to(device)
+                Y = torch.LongTensor(Y).to(device)
+                CN = from_numpy(CN).float().to(device)
+
+
+                l_inputs = []
+
+                for coords in list_sphere_points:   # multiple views of the object
+
+                    camera_position = torch.FloatTensor([list(coords)]).to(device)
+                    R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
+                    T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+
+                    textures = TexturesVertex(verts_features=CN)
+                    meshes = Meshes(verts=V, faces=F, textures=textures)
+                    batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
+                    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
+
+                    batch_views = batch_views.permute(0,3,1,2)
+                    batch_views = torch.unsqueeze(batch_views, 1)
+                    l_inputs.append(batch_views)    
+
+                X = torch.cat(l_inputs,dim=1).to(device)
+
+
+
+                x = model(X)   
+                loss = loss_fn(x, Y)
+
+                running_loss += loss.item()
+
+        val_loss = running_loss / len(val_dataloader)
+
+        early_stop(val_loss, model)
+
+        if early_stop.early_stop:
+            print("Early stopping")
+            break
 
 def pad_verts_faces(batch):
     verts = [v for v, f, cn, sc  in batch]
@@ -178,78 +368,22 @@ def pad_verts_faces(batch):
     color_normals = [cn for v, f, cn, sc, in batch]
     synset_class = [sc for v, f, cn, sc, in batch]
 
-    return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), synset_class
+    max_length_verts = max(arr.shape[0] for arr in verts)
+    max_length_faces = max(arr.shape[0] for arr in faces)
+    max_length_normals = max(arr.shape[0] for arr in color_normals)
 
 
-train_dataloader = DataLoader(snd_train, batch_size=4, shuffle=True, collate_fn=pad_verts_faces)
-val_dataloader = DataLoader(snd_val, batch_size=1)
+    pad_verts = [np.pad(v,[(0,max_length_verts-v.shape[0]),(0,0)],constant_values=0.0) for v in verts]  # pad every array so that they have the same shape
+    pad_seq_verts = np.stack(pad_verts)  # stack on a new dimension (batch first)
+    pad_faces = [np.pad(f,[(0,max_length_faces-f.shape[0]),(0,0)],constant_values=-1) for f in faces] 
+    pad_seq_faces = np.stack(pad_faces)
+    pad_cn = [np.pad(cn,[(0,max_length_normals-cn.shape[0]),(0,0)],constant_values=0.) for cn in color_normals]  
+    pad_seq_cn = np.stack(pad_cn)
+
+    #return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), synset_class
+    return pad_seq_verts, pad_seq_faces,  pad_seq_cn, synset_class
 
 
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-    torch.cuda.set_device(device)
-else:
-    device = torch.device("cpu")
 
-
-model = ShapeNet_GraphClass(snd_train.ico_sphere_edges.to(device))
-# model.load_state_dict(torch.load(model_fn))
-model.to(device)
-
-
-loss_fn = nn.CrossEntropyLoss(weight=torch.tensor(snd_train.unique_class_weights, dtype=torch.float32).to(device))
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
-
-for epoch in range(num_epochs):
-
-    model.train()
-    running_loss = 0.0
-
-    for batch, (X, y) in enumerate(train_dataloader):
-
-        optimizer.zero_grad()        
-
-        X = X.permute(0, 1, 4, 2, 3)
-        X = X.type(torch.float32)
-        X = X/128.0 - 1.0 
-
-        X = X.to(device)
-        y = y.to(device)
-
-        x = model(X)
-        
-        loss = loss_fn(x, y)
-        loss.backward()
-        optimizer.step()
-
-        running_loss += loss.item()
-
-        if batch % 100 == 0:
-            loss, current = loss.item(), batch * len(X)
-            print(f"loss: {loss:>7f}  [{current:>5d}/{len(snd_train):>5d}]")
-
-    train_loss = running_loss / len(train_dataloader)
-    print(f"average epoch loss: {train_loss:>7f}  [{epoch:>5d}/{num_epochs:>5d}]")
-
-    model.eval()
-    with torch.no_grad():
-        running_loss = 0.0
-        for batch, (X, y) in enumerate(val_dataloader):
-            
-            X = X.to(device)
-            y = y.to(device)
-
-            x = model(X)
-            
-            loss = loss_fn(x, y)
-
-            running_loss += loss.item()
-
-    val_loss = running_loss / len(val_dataloader)
-
-    early_stop(val_loss, model)
-
-    if early_stop.early_stop:
-        print("Early stopping")
-        break
+if __name__ == '__main__':
+    main()
