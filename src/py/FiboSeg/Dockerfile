@@ -25,7 +25,7 @@ WORKDIR /app
 RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/archive/refs/tags/$RELEASE_VERSION.zip
 RUN unzip $RELEASE_VERSION.zip
 
-RUN mv /fly-by-cnn-$RELEASE_VERSION/src/py/FiboSeg FiboSeg
+RUN mv fly-by-cnn-$RELEASE_VERSION/src/py/FiboSeg FiboSeg
 RUN rm -rf $RELEASE_VERSION.zip \
 	rm -rf $RELEASE_VERSION
 
