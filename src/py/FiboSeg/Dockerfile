@@ -31,7 +31,7 @@ RUN mv fly-by-cnn-$RELEASE_VERSION/src/py/FiboSeg FiboSeg
 RUN rm -rf $RELEASE_VERSION.zip \
 	rm -rf $RELEASE_VERSION
 
-#RUN pip install -r MULTI_SEG/requirements.txt
+RUN pip install -r /app/data/requirements.txt
 
 
 #RUN mkdir scans
