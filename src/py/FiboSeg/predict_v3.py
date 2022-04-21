@@ -29,11 +29,11 @@ from pytorch3d.renderer import (
     FoVPerspectiveCameras, look_at_rotation, 
     RasterizationSettings, MeshRenderer, MeshRasterizer, HardPhongShader, PointLights,AmbientLights,TexturesVertex
 )
-import vtk
+from vtk import vtkPolyDataWriter
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 import sys
 sys.path.insert(0,'..')
-import fly_by_features as fbf
+import utils
 import post_process
 
 import monai
@@ -103,8 +103,7 @@ def main(args):
   ## Camera position
   dist_cam = 1.35
   
-  SURF = fbf.ReadSurf(path)
-
+  SURF = utils.ReadSurf(path)
 
   if args.rem != 0:
     surf_point_data = SURF.GetPointData().GetScalars("UniversalID") 
@@ -123,10 +122,7 @@ def main(args):
       print ('Could not access UniversalID array. No crown will be removed.')
 
 
-  surf_unit = fbf.GetUnitSurf(SURF)
-
-
-
+  surf_unit = utils.GetUnitSurf(SURF)
 
   num_faces = int(SURF.GetPolys().GetData().GetSize()/4)   
  
@@ -155,19 +151,11 @@ def main(args):
     image = image.permute(0,3,1,2)
     inputs = image.to(device)
     outputs = simple_inferer(inputs,model)  
-
     outputs_softmax = softmax(outputs).squeeze().detach().cpu().numpy() # t: negligeable  
       
     for x in range(image_size):
         for y in range (image_size): # Browse pixel by pixel
             array_faces[:,pix_to_face[x,y]] += outputs_softmax[...,x,y]
-    
-  """
-  print(f'outputs_softmax.shape {outputs_softmax.shape}')     
-  print(f'array_faces.shape {array_faces.shape}')
-  print(array_faces[:,-1][0])
-  print(array_faces[:,-1])
-  """
 
   array_faces[:,-1][0] = 0 # pixels that are background (id: 0) =-1
   faces_argmax = np.argmax(array_faces,axis=0)
@@ -200,7 +188,7 @@ def main(args):
   unique, counts  = np.unique(array, return_counts = True)
 
   out_filename = args.out
-  polydatawriter = vtk.vtkPolyDataWriter()
+  polydatawriter = vtkPolyDataWriter()
   polydatawriter.SetFileName(out_filename)
   polydatawriter.SetInputData(surf)
   polydatawriter.Write()
@@ -222,9 +210,9 @@ def fibonacci_sphere(samples, dist_cam):
 
 
 def GetSurfProp(args,surf_unit):     
-    surf = fbf.ComputeNormals(surf_unit)
+    surf = utils.ComputeNormals(surf_unit)
 
-    color_normals = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(fbf.GetColorArray(surf, "Normals"))/255.0)
+    color_normals = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(utils.GetColorArray(surf, "Normals"))/255.0)
     verts = ToTensor(dtype=torch.float32, device=device)(vtk_to_numpy(surf.GetPoints().GetData()))
     faces = ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:])
     return verts.unsqueeze(0), faces.unsqueeze(0), color_normals.unsqueeze(0)
