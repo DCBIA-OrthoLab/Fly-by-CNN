@@ -20,6 +20,7 @@ RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/releases/download/3.2/dat
 RUN unzip dataset_Fiboseg.zip
 RUN rm -rf dataset_Fiboseg.zip
 
+RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/releases/download/3.2/requirements.txt
 
 ARG RELEASE_VERSION="3.2"
 WORKDIR /app
