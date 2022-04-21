@@ -20,20 +20,18 @@ RUN unzip dataset_Fiboseg.zip
 RUN rm -rf dataset_Fiboseg.zip
 
 
-ARG 
+ARG RELEASE_VERSION="3.2"
 WORKDIR /app
-RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/archive/refs/tags/3.2.zip
-RUN unzip 3.2.zip
-# RUN unzip AMASSS_CBCT-$RELEASE.zip
-# RUN unzip AMASSS_CBCT-1.0.0-alpha.zip
-RUN mv AMASSS_CBCT-$RELEASE_VERSION/MULTI_SEG MULTI_SEG
-# RUN mv /app/3.2/src/py/FiboSeg FiboSeg
-RUN rm -rf 3.2.zip \
-	rm -rf 3.2
+RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/archive/refs/tags/$RELEASE_VERSION.zip
+RUN unzip $RELEASE_VERSION.zip
 
-RUN pip install -r MULTI_SEG/requirements.txt
+RUN mv /fly-by-cnn-$RELEASE_VERSION/src/py/FiboSeg FiboSeg
+RUN rm -rf $RELEASE_VERSION.zip \
+	rm -rf $RELEASE_VERSION
+
+#RUN pip install -r MULTI_SEG/requirements.txt
 
 
-RUN mkdir scans
+#RUN mkdir scans
 
 
