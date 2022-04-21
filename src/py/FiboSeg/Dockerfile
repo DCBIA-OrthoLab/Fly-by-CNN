@@ -1,4 +1,5 @@
-FROM pytorch/pytorch:1.10.0-cuda11.3-cudnn8-devel
+#FROM pytorch/pytorch:1.10.0-cuda11.3-cudnn8-devel
+FROM python:3.9-bullseye
 
 RUN apt-get update && \
 	apt-get install -y git \
