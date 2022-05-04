@@ -3,6 +3,8 @@ import os
 import pandas as pd
 import numpy as np
 import fly_by_features as fbf
+from icecream import ic
+
 
 import torch
 import torch.optim as optim
@@ -164,7 +166,8 @@ num_epochs = 200
 
 data_dir = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1"
 csv_split = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/all.csv"
-model_fn = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/train/03012021/checkpoint.pt"
+#model_fn = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/train/03012021/checkpoint.pt"
+model_fn = "/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/classification/train/03012021/checkpoint.pt"
 
 early_stop = EarlyStopping(patience=50, verbose=True, path=model_fn)
 
@@ -172,7 +175,7 @@ snd_train = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="train", co
 snd_val = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="val", concat=True, use_vtk=True)
 
 
-train_dataloader = DataLoader(snd_train, batch_size=8, shuffle=True)
+train_dataloader = DataLoader(snd_train, batch_size=1, shuffle=True)
 val_dataloader = DataLoader(snd_val, batch_size=1)
 
 
@@ -182,13 +185,9 @@ if torch.cuda.is_available():
 else:
     device = torch.device("cpu")
 
-
-
-
 model = ShapeNet_GraphClass(snd_train.ico_sphere_edges.to(device))
 # model.load_state_dict(torch.load(model_fn))
 model.to(device)
-
 
 
 loss_fn = nn.CrossEntropyLoss(weight=torch.tensor(snd_train.unique_class_weights, dtype=torch.float32).to(device))
@@ -206,6 +205,7 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()        
 
         X = X.permute(0, 1, 4, 2, 3)
+
         X = X.type(torch.float32)
         X = X/128.0 - 1.0 
 
@@ -213,10 +213,16 @@ for epoch in range(num_epochs):
         y = y.to(device)
 
         x = model(X)
-        
+
+
         loss = loss_fn(x, y)
         loss.backward()
         optimizer.step()
+        """
+        ic(torch.max(torch.isnan(X)))
+        ic(x)
+        ic(loss.item())
+        """
 
         running_loss += loss.item()
 
@@ -233,11 +239,19 @@ for epoch in range(num_epochs):
     
     print(f"average epoch loss: {train_loss:>7f}, [{epoch:>5d}/{num_epochs:>5d}]")
 
+
+
     model.eval()
     with torch.no_grad():
         running_loss = 0.0
         running_acc = 0.0
         for batch, (X, y) in enumerate(val_dataloader):
+            if batch+1 % 25 == 0:
+                print(f'batch {batch+1}')
+
+            X = X.permute(0, 1, 4, 2, 3)
+            X = X.type(torch.float32)
+            X = X/128.0 - 1.0 
             
             X = X.to(device)
             y = y.to(device)
@@ -245,7 +259,6 @@ for epoch in range(num_epochs):
             x = model(X)
             
             loss = loss_fn(x, y)
-
             running_loss += loss.item()
 
             _, predicted = torch.max(x, 1)

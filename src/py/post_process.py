@@ -11,7 +11,6 @@ from utils import *
 # parser.add_argument('--out', help='Insert output path+name')
 # arg = parser.parse_args()
 
-
 def ChangeLabel(vtkdata, label_array, label2change, change):
 	# Set all the label 'label2change' in 'change'
 	for pid in range (vtkdata.GetNumberOfPoints()):
@@ -280,7 +279,7 @@ def NeighborLabel(vtkdata, labels, label, connected_pids):
 
 
 
-def RemoveIslands(vtkdata, labels, label, min_count):
+def RemoveIslands(vtkdata, labels, label, min_count,ignore_neg1 = False):
 
 	pid_visited = np.zeros(labels.GetNumberOfTuples())
 	for pid in range(labels.GetNumberOfTuples()):
@@ -288,8 +287,9 @@ def RemoveIslands(vtkdata, labels, label, min_count):
 			connected_pids = ConnectedRegion(vtkdata, pid, labels, label, pid_visited)
 			if connected_pids.shape[0] < min_count:
 				neighbor_label = NeighborLabel(vtkdata, labels, label, connected_pids)
-				for cpid in connected_pids:
-					labels.SetTuple(int(cpid), (neighbor_label,))
+				if ignore_neg1 == True and neighbor_label != -1:
+					for cpid in connected_pids:
+						labels.SetTuple(int(cpid), (neighbor_label,))
 
 def ConnectivityLabeling(vtkdata, labels, label, start_label):
 	pid_visited = np.zeros(labels.GetNumberOfTuples())
@@ -366,24 +366,13 @@ def ReLabel(surf, labels, label, relabel):
 		if labels.GetTuple(pid)[0] == label:
 			labels.SetTuple(pid, (relabel,))
 
-def ThresholdPoints(vtkdata, array_name, threshold_min, threshold_max):
-	threshold = vtk.vtkThresholdPoints()
-	threshold.SetInputData(vtkdata)
-	threshold.ThresholdBetween(threshold_min, threshold_max)
-	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, array_name)
-	threshold.Update()
-
-	return threshold.GetOutput()
-
-def Threshold(vtkdata, array_name, threshold_min, threshold_max):
+def Threshold(vtkdata, labels, threshold_min, threshold_max, invert=False):
 	
-	if type(array_name) != str:
-		raise Exception("array_name is not a string")
-
 	threshold = vtk.vtkThreshold()
-	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, array_name)
+	threshold.SetInputArrayToProcess(0, 0, 0, vtk.vtkDataObject.FIELD_ASSOCIATION_POINTS, labels)
 	threshold.SetInputData(vtkdata)
 	threshold.ThresholdBetween(threshold_min,threshold_max)
+	threshold.SetInvert(invert)
 	threshold.Update()
 
 	geometry = vtk.vtkGeometryFilter()
@@ -443,7 +432,6 @@ if __name__ == '__main__':
 		surf = Threshold(surf, labels, args.threshold_min, args.threshold_max)
 
 	Write(surf, args.out)
-
 
 
 

@@ -135,23 +135,28 @@ def UniversalID(surf, labels, LowerOrUpper):
 
 def main(args):
     surf, labels = ReadFile(args.surf)
+    surf_unit = GetUnitSurf(surf)
 
-    print("Prediction...")
-    # Load the code & prediction model to know if it is a lower or upper scan
-    split_obj = {}
-    split_obj["surf"] = args.surf
-    split_obj["spiral"] = 64
-    split_obj["model_feature"] = args.model_feature
-    split_obj["model_LU"] = args.model_LU
-    split_obj["out_feature"] = args.out_feature
+    LowerOrUpper = 0
+    if args.uol is None:
+        print("Prediction...")
+        # Load the code & prediction model to know if it is a lower or upper scan
+        split_obj = {}
+        split_obj["surf"] = args.surf
+        split_obj["spiral"] = 64
+        split_obj["model_feature"] = args.model_feature
+        split_obj["model_LU"] = args.model_LU
+        split_obj["out_feature"] = args.out_feature
 
-    split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
-    LowerOrUpper = predict_LU.main(split_args)
-    LowerOrUpper = LowerOrUpper[0][0]
+        split_args = namedtuple("Split", split_obj.keys())(*split_obj.values())
+        LowerOrUpper = predict_LU.main(split_args)
+        LowerOrUpper = LowerOrUpper[0][0]
+    else:
+        LowerOrUpper = args.uol
 
     # LowerOrUpper = 0.8
 
-    if LowerOrUpper<=0.5: 
+    if (LowerOrUpper<=0.5): 
         print("Lower:", LowerOrUpper)
         path_groundtruth = [os.path.join(args.label_groundtruth,path) for path in os.listdir(args.label_groundtruth) if "Lower" in path][0]
         print(path_groundtruth)
@@ -162,7 +167,11 @@ def main(args):
 
     print("Labelizing...")
     surf_groundtruth, labels_groundtruth = ReadFile(path_groundtruth)
-    surf, copy_surf = Alignement(surf,surf_groundtruth)
+    
+    # surf_groundtruth = GetUnitSurf(surf_groundtruth)
+    surf_groundtruth, mean_gt, scale_gt = ScaleSurf(surf_groundtruth)
+    print(mean_gt, scale_gt)
+    surf_unit, copy_surf = Alignement(surf_unit,surf_groundtruth)
     Lsurf = MeanCoordinatesTeeth(copy_surf,labels)
     Lsurf_GT = MeanCoordinatesTeeth(surf_groundtruth,labels_groundtruth)
     Labelize(surf,labels,Lsurf,Lsurf_GT)
@@ -180,6 +189,7 @@ if __name__ == '__main__':
 
     labelize_parser = parser.add_argument_group('Label parameters')
     labelize_parser.add_argument('--label_groundtruth', type=str, help='directory of the template labels', required=True)
+    labelize_parser.add_argument('--uol', type=int, help='Upper=1,  Lower=0', default=None)
 
     prediction_parser = parser.add_argument_group('Prediction parameters')
     prediction_parser.add_argument('--model_feature', type=str, help='path of the VGG19 model', required=True)
