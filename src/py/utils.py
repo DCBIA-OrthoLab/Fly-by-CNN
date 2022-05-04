@@ -5,7 +5,11 @@ import math
 import os
 import sys
 import itk
+
 import json
+
+import SimpleITK as sitk
+
 from readers import OFFReader
 import pandas as pd
 from multiprocessing import Pool, cpu_count
@@ -419,7 +423,7 @@ def GetNormalsActor(surf):
         # mapper
         surf_actor = GetActor(surf)
 
-        if vtk.VTK_MAJOR_VERSION > 8:
+        if vtk.vtkVersion().GetVTKMajorVersion() > 8:
 
             sp = surf_actor.GetShaderProperty();
             sp.AddVertexShaderReplacement(
@@ -726,9 +730,22 @@ def json2vtk(jsonfile,number_landmarks,radius_sphere,outdir):
         output = os.path.join(outdir, filename)
         Write(vtk_landmarks.GetOutput(), output)
     return output
-    
-def ArrayToTensor(vtkarray, device='cpu', dtype=torch.int64):
-    return ToTensor(dtype=dtype, device=device)(vtk_to_numpy(vtkarray))
+
+def WriteNrrd(itk_img,fileName):
+    print("writing .nrrd file...")
+    new_sitk_img = sitk.GetImageFromArray(itk.GetArrayFromImage(itk_img), isVector=itk_img.GetNumberOfComponentsPerPixel()>1)
+    new_sitk_img.SetOrigin(tuple(itk_img.GetOrigin()))
+    new_sitk_img.SetSpacing(tuple(itk_img.GetSpacing()))
+    new_sitk_img.SetDirection(itk.GetArrayFromMatrix(itk_img.GetDirection()).flatten()) 
+
+    writer = sitk.ImageFileWriter()
+    writer.SetFileName(fileName)
+    writer.UseCompressionOn()
+    writer.Execute(new_sitk_img)
+
+
+def ArrayToTensor(vtkarray, device='cpu'):
+    return ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(vtkarray))
 
 def PolyDataToTensors(surf, device='cpu'):
 

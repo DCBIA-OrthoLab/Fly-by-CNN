@@ -4,7 +4,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Dict
 import json
-
+import warnings
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
@@ -124,24 +124,20 @@ class ShapeNetDataset(Dataset):
 
     def __getitem__(self, idx):
         
-        model = self.df.iloc[idx]
-        
+        model = self.df.iloc[idx]        
         model_path = os.path.join(
             self.shapenet_dir, model["synsetId"], model["modelId"], self.model_dir
         )
         
         surf = utils.ReadSurf(model_path)        
         surf = utils.GetUnitSurf(surf, copy=False)
-        surf, _a, _v = utils.RandomRotation(surf)
-        
+        surf, _a, _v = utils.RandomRotation(surf)        
         surf_actor = utils.GetNormalsActor(surf)        
-        
         self.renderer.AddActor(surf_actor)
 
         img_o_views_np = []
         img_z_views_np = []
         for idx, camera in enumerate(self.cameras):
-
             self.renderer.SetActiveCamera(camera)
             self.renderer.ResetCameraClippingRange()
 
@@ -240,10 +236,8 @@ class ShapeNetDataset_Torch(Dataset):
         self.synset_num_models = dict(zip(list(synset_unique_ids), list(synset_unique_counts)))
         self.synset_class_num = dict(zip(list(synset_unique_ids), range(len(list(synset_unique_ids)))))
         
-        self.unique_class_weights = np.array(class_weight.compute_class_weight(class_weight='balanced', classes=synset_unique_ids, y=df_split['synsetId']))
-        
-        self.df = df_split.reset_index(drop=True)
-        
+        self.unique_class_weights = np.array(class_weight.compute_class_weight(class_weight='balanced', classes=synset_unique_ids, y=df_split['synsetId']))        
+        self.df = df_split.reset_index(drop=True)        
         ico_sphere = utils.CreateIcosahedron(3.0, 1)
         
         ico_sphere_verts, ico_sphere_faces, ico_sphere_edges = utils.PolyDataToTensors(ico_sphere)
@@ -257,12 +251,11 @@ class ShapeNetDataset_Torch(Dataset):
 
     def __getitem__(self, idx):
         
-        model = self.df.iloc[idx]
-        
+        model = self.df.iloc[idx]        
         model_path = os.path.join(
             self.shapenet_dir, model["synsetId"], model["modelId"], self.model_dir
         )
-        
+        print(model_path)
         surf = utils.ReadSurf(model_path)        
         surf = utils.GetUnitSurf(surf, copy=False)
         surf = utils.ComputeNormals(surf) 
@@ -348,8 +341,7 @@ class ShapeNetDatasetNrrd(Dataset):
 
     def __getitem__(self, idx):
         
-        model = self.df.iloc[idx]
-        
+        model = self.df.iloc[idx]        
         model_path = os.path.join(
             self.shapenet_dir, model["synsetId"], model["modelId"], str(self.epoch)
         )
@@ -360,7 +352,6 @@ class ShapeNetDatasetNrrd(Dataset):
         z_path = model_path + "_z.nrrd"
         z_np, _ = nrrd.read(z_path)        
 
-        img_np = np.concatenate([normals_np, z_np], axis=-1).astype(np.float32)
-        
+        img_np = np.concatenate([normals_np, z_np], axis=-1).astype(np.float32)        
         return img_np, self.synset_class_num[model["synsetId"]]
         
