@@ -1,5 +1,6 @@
 import vtk
 
+
 class OFFReader():
 	def __init__(self):
 		FileName = None

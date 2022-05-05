@@ -273,4 +273,3 @@ for epoch in range(num_epochs):
     if early_stop.early_stop:
         print("Early stopping")
         break
-
