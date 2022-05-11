@@ -4,7 +4,6 @@ import time
 import itk
 import argparse
 import os
-# import fly_by_features as fbf
 import vtk
 import pandas as pd
 import glob
@@ -21,50 +20,43 @@ def Write(vtkdata, output_name):
 
 
 def main(args):
-    img_fn_array = []
+
+    list_file = []
+    normpath = os.path.normpath("/".join([args.dir, '**', '*']))
 
     if args.dir:
-        normpath = os.path.normpath("/".join([args.dir, '**', '*']))
-        for img_fn in glob.iglob(normpath, recursive=True):
-            if os.path.isfile(img_fn) and True in [ext in img_fn for ext in [".json"]]:
-                img_fn_array.append(img_fn)
-
-    L_json_path = []
-    img_fn_array = sorted(img_fn_array)
-    for i in range(0, len(img_fn_array), 2):
-        L_tmp = [img_fn_array[i], img_fn_array[i+1]]
-        L_json_path.append(L_tmp)
+        for jsonfile in sorted(glob.iglob(normpath, recursive=True)):
+            if os.path.isfile(jsonfile) and True in [ext in jsonfile for ext in [".json"]]:
+                list_file.append(jsonfile)
 
     
-    for json_obj in L_json_path:
+    for file in sorted(list_file):
         vtk_landmarks = vtk.vtkAppendPolyData()
+        json_file = pd.read_json(file)
+        json_file.head()
+        markups = json_file.loc[0,'markups']
+        controlPoints = markups['controlPoints']
+        number_landmarks = len(controlPoints)
 
-        for file in json_obj:
-            json_file = pd.read_json(file)
-            json_file.head()
-            markups = json_file.loc[0,'markups']
-            controlPoints = markups['controlPoints']
-            number_landmarks = len(controlPoints)
+        L_landmark = []
+        for i in range(number_landmarks):
+            L_landmark.append(controlPoints[i])
+        
+        for cp in L_landmark:
+            # Create a sphere
+            sphereSource = vtk.vtkSphereSource()
+            sphereSource.SetCenter(cp["position"][0],cp["position"][1],cp["position"][2])
+            sphereSource.SetRadius(args.radius_sphere)
 
-            L_landmark_position = []
-            for i in range(number_landmarks):
-                L_landmark_position.append(controlPoints[i]["position"])
+            # Make the surface smooth.
+            sphereSource.SetPhiResolution(100)
+            sphereSource.SetThetaResolution(100)
+            sphereSource.Update()
 
-            for i in range(number_landmarks):
-                # Create a sphere
-                sphereSource = vtk.vtkSphereSource()
-                sphereSource.SetCenter(L_landmark_position[i][0],L_landmark_position[i][1],L_landmark_position[i][2])
-                sphereSource.SetRadius(args.radius_sphere)
+            vtk_landmarks.AddInputData(sphereSource.GetOutput())
+            vtk_landmarks.Update()
 
-                # Make the surface smooth.
-                sphereSource.SetPhiResolution(100)
-                sphereSource.SetThetaResolution(100)
-                sphereSource.Update()
-
-                vtk_landmarks.AddInputData(sphereSource.GetOutput())
-                vtk_landmarks.Update()
-
-        basename = os.path.basename(json_obj[0]).split("_")[0]
+        basename = os.path.basename(file).split(".")[0]
         filename = basename + "_landmarks.vtk"
         output = os.path.join(args.out, filename)
         Write(vtk_landmarks.GetOutput(), output)
@@ -94,10 +86,10 @@ def main(args):
 
 
 
-if __name__ == '__main__':
+if __name__ == '__main__' :
     parser = argparse.ArgumentParser(description='Convert a json file with landmarks position in it into a vtk file', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     input_parser = parser.add_argument_group('Input parameters')
-    input_parser.add_argument('--dir', type=str, help='input dir', requiered=True)
+    input_parser.add_argument('--dir', type=str, help='input dir', required=True)
 
     param_parser = parser.add_argument_group('Shere parameters')
     param_parser.add_argument('--radius_sphere', type=float, help='sphere radius', default=0.5)

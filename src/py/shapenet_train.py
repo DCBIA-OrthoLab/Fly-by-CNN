@@ -262,6 +262,12 @@ def main():
             print("Early stopping")
             break
 
+<<<<<<< HEAD
 
 if __name__ == '__main__':
     main()
+=======
+    if early_stop.early_stop:
+        print("Early stopping")
+        break
+>>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
