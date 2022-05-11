@@ -17,6 +17,8 @@ from vtk.util.numpy_support import vtk_to_numpy
 from sklearn.utils import class_weight
 
 import utils
+from icecream import ic
+import random
 
 class ShapeNetDataset(Dataset):
     def __init__(self, data_dir, csv_split, version=1, split="train", concat=False, use_vtk=False):        
@@ -235,9 +237,15 @@ class ShapeNetDataset_Torch(Dataset):
         synset_unique_ids, synset_unique_counts = np.unique(self.synset_ids, return_counts=True)
         self.synset_num_models = dict(zip(list(synset_unique_ids), list(synset_unique_counts)))
         self.synset_class_num = dict(zip(list(synset_unique_ids), range(len(list(synset_unique_ids)))))
+
+        #ic(synset_unique_ids)
+
+        #ic(df_split['synsetId'])
         
-        self.unique_class_weights = np.array(class_weight.compute_class_weight(class_weight='balanced', classes=synset_unique_ids, y=df_split['synsetId']))        
-        self.df = df_split.reset_index(drop=True)        
+        self.unique_class_weights = np.array(class_weight.compute_class_weight(class_weight='balanced', classes=synset_unique_ids, y=df_split['synsetId']))  
+        #ic(self.unique_class_weights)      
+        self.df = df_split.reset_index(drop=True) 
+             
         ico_sphere = utils.CreateIcosahedron(3.0, 1)
         
         ico_sphere_verts, ico_sphere_faces, ico_sphere_edges = utils.PolyDataToTensors(ico_sphere)
@@ -253,18 +261,23 @@ class ShapeNetDataset_Torch(Dataset):
         
         model = self.df.iloc[idx]        
         model_path = os.path.join(
-            self.shapenet_dir, model["synsetId"], model["modelId"], self.model_dir
+           self.shapenet_dir, model["synsetId"], model["modelId"], self.model_dir
         )
-        print(model_path)
-        surf = utils.ReadSurf(model_path)        
+        # if random.random() > 0.5:
+        #     model_path = '/work/jprieto/data/ShapeNet/ShapeNetCore.v1/03691459/137c1194efbdcc1bfa0892265dbce8fd/model.vtk' # armoire
+        # else:
+        #     model_path = '/work/jprieto/data/ShapeNet/ShapeNetCore.v1/03001627/c97f8f3d828173607301b41e73e277b0/model.vtk' # chaise
+        #ic(model_path)
+        surf = utils.ReadSurf(model_path) 
+   
         surf = utils.GetUnitSurf(surf, copy=False)
         surf = utils.ComputeNormals(surf) 
         
-        color_normals = vtk_to_numpy(utils.GetColorArray(surf, "Normals"))/128.0 - 1.0
-
+        #color_normals = vtk_to_numpy(utils.GetColorArray(surf, "Normals"))/128.0 - 1.0
+        color_normals = vtk_to_numpy(surf.GetPointData().GetArray("Normals"))  # [-1;1] 
+        #color_normals = vtk_to_numpy(utils.GetColorArray(surf, "Normals"))/255.0
         verts = vtk_to_numpy(surf.GetPoints().GetData())
         faces = vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]
-        
 
         return verts, faces, color_normals, self.synset_class_num[model["synsetId"]]
         
@@ -354,4 +367,132 @@ class ShapeNetDatasetNrrd(Dataset):
 
         img_np = np.concatenate([normals_np, z_np], axis=-1).astype(np.float32)        
         return img_np, self.synset_class_num[model["synsetId"]]
+
+class ModelNet40(Dataset):  # from https://github.com/meder411/PointNet-PyTorch/blob/master/dataloader.py
+
+    def __init__(self, csv_split,  split="train", concat=False):
+
+        """
+        self.test = test
         
+        # Build path list
+        self.input_pairs, self.gt_key = self.create_input_list(
+            dataset_root_path, test)
+
+
+        ico_sphere = utils.CreateIcosahedron(3.0, 1)        
+        ico_sphere_verts, ico_sphere_faces, ico_sphere_edges = utils.PolyDataToTensors(ico_sphere)
+        self.ico_sphere_verts = ico_sphere_verts
+        self.ico_sphere_faces = ico_sphere_faces
+        self.ico_sphere_edges = ico_sphere_edges.type(torch.int64)
+
+
+        self.unique_class_weights = np.array(class_weight.compute_class_weight(class_weight='balanced', classes=self.gt_key, y=df_split['synsetId'])) 
+        """
+
+        self.concat = concat
+        if split not in ["train", "val", "test"]:
+            raise ValueError("Split must be 'train', 'val', or 'test'")
+            
+        df_split = pd.read_csv(csv_split, dtype = str)
+        df_split = df_split.query("split == @split")
+
+        self.class_ids = []
+        self.model_ids = []
+
+        for idx, row in df_split.iterrows():            
+            self.class_ids.append(row["class"])
+            self.model_ids.append(row["surf"])
+
+        class_unique_ids, class_unique_counts = np.unique(self.class_ids, return_counts=True)
+        self.class_num_models = dict(zip(list(class_unique_ids), list(class_unique_counts)))
+        self.class_num = dict(zip(list(class_unique_ids), range(len(list(class_unique_ids)))))
+
+
+
+        self.unique_class_weights = np.array(class_weight.compute_class_weight(class_weight='balanced', classes=class_unique_ids, y=df_split['class']))  
+      
+        self.df = df_split.reset_index(drop=True)    
+
+
+        # Create ico-sphere
+        ico_sphere = utils.CreateIcosahedron(3.0, 1)        
+        ico_sphere_verts, ico_sphere_faces, ico_sphere_edges = utils.PolyDataToTensors(ico_sphere)
+        self.ico_sphere_verts = ico_sphere_verts
+        self.ico_sphere_faces = ico_sphere_faces
+        self.ico_sphere_edges = ico_sphere_edges.type(torch.int64)
+
+
+    def __len__(self):
+        return len(self.df.index)
+
+   
+    def __getitem__(self, idx):
+        # Select the path
+        model = self.df.iloc[idx] 
+        #model_path = model['surf']
+        #model_path = '/NIRAL/work/leclercq/data/ModelNet40/chair/train/chair_0276.off'
+        label = self.class_num[model['class']]
+        ic(model_path)
+        ic(model['class'])
+        ic(label)
+        """
+        # Parse the vertices from the file
+        vertices = self.off_vertex_parser(path)
+        
+        if not self.test:
+            vertices = self.augment_data(vertices)
+
+        # Convert numpy format to torch variable
+        return [torch.from_numpy(vertices), label, path]
+        """
+
+        surf = utils.ReadSurf(model_path)        
+        surf = utils.GetUnitSurf(surf, copy=False)
+        surf = utils.ComputeNormals(surf) 
+        
+        color_normals = vtk_to_numpy(utils.GetColorArray(surf, "Normals"))/128.0 - 1.0
+
+        verts = vtk_to_numpy(surf.GetPoints().GetData())
+        faces = vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]        
+
+        return verts, faces, color_normals, label
+
+
+
+    """    
+    def augment_data(self, vertices):
+        # Random rotation about the Y-axis
+        theta = 2 * np.pi * np.random.rand(1)
+        Ry = np.array([[np.cos(theta), 0, np.sin(theta)],
+                [0, 1, 0],
+                [-np.sin(theta), 0, np.cos(theta)]])
+        vertices = np.matmul(Ry, vertices)
+
+        # Add Gaussian noise with standard deviation of 0.2
+        vertices += np.random.normal(scale=0.02, size=vertices.shape)
+
+        return vertices
+    
+
+    def off_vertex_parser(self, path_to_off_file):
+        # Read the OFF file
+        with open(path_to_off_file, 'r') as f:
+            contents = f.readlines()
+
+        # Find the number of vertices contained
+        # (Handle mangled header lines in .off files)
+        if contents[0].strip().lower() != 'off':
+            num_vertices = int(contents[0].strip()[4:].split(' ')[0])
+            start_line = 1
+        else:
+            num_vertices = int(contents[1].strip().split(' ')[0])
+            start_line = 2
+
+        # Convert all the vertex lines to a list of lists
+        vertex_list = [map(float, contents[i].strip().split(' ')) 
+                    for i in range(start_line, start_line+num_vertices)]
+        
+        # Return the vertices as a 3 x N numpy array
+        return np.array(vertex_list).transpose(1,0)
+    """

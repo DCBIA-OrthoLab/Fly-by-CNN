@@ -283,7 +283,7 @@ def main():
     nb_loop = 64
 
     # initialize the early_stopping object
-    model_name= "early_stopping/checkpoint_1156.pt"
+    model_name= "early_stopping/trash.pt"
     patience = 500
     early_stopping = EarlyStopping(patience=patience, verbose=True,path=model_name)
 
@@ -395,7 +395,7 @@ def main():
                 if metric > best_metric:
                     best_metric = metric
                     best_metric_epoch = epoch + 1
-                    torch.save(model.state_dict(), "best_metric_model_segmentation2d_array_02_07_unet_csv1_restarted_batch20.pth")
+                    torch.save(model.state_dict(), "trash.pth")
                     print("saved new best metric model")
                     print(model_name)
                 print(

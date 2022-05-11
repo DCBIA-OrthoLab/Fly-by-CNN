@@ -12,7 +12,7 @@ from vtk.util.numpy_support import vtk_to_numpy
 from utils import * 
 
 import matplotlib as mpl
-mpl.use('Agg')
+#mpl.use('Agg')
 import matplotlib.pyplot as plt
 import itertools
 from scipy import interp
@@ -21,7 +21,9 @@ import seaborn as sns
 parser = argparse.ArgumentParser(description='Generate confusion matrix and classification report with dice for segmentation of gum, teeth, boundary', formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
 parser.add_argument('--csv', type=str, help='csv file with columns surf,pred', required=True)
-parser.add_argument('--point_features', type=str, help='Name of array in point data for the labels', default="RegionId")
+#parser.add_argument('--point_features', type=str, help='Name of array in point data for the labels', default="RegionId")
+parser.add_argument('--surf_id', type=str, help='Name of array in point data for the labels', default="UniversalID")
+parser.add_argument('--pred_id', type=str, help='Name of array in point data for the predicted labels', default="PredictedID")
 
 args = parser.parse_args()
 
@@ -38,16 +40,31 @@ for idx, row in df.iterrows():
   print("Reading:", row["pred"])
   pred = ReadSurf(row["pred"])
 
-  surf_features_np = vtk_to_numpy(surf.GetPointData().GetScalars(args.point_features))
-  pred_features_np = vtk_to_numpy(pred.GetPointData().GetScalars(args.point_features))
+  surf_features_np = vtk_to_numpy(surf.GetPointData().GetScalars(args.surf_id))
+  pred_features_np = vtk_to_numpy(pred.GetPointData().GetScalars(args.pred_id))
+
 
   pred_features_np[pred_features_np==-1] = 1
 
   surf_features_np = np.reshape(surf_features_np, -1)
   pred_features_np = np.reshape(pred_features_np, -1)
 
+  unique_v = np.unique(np.union1d(surf_features_np, pred_features_np))
+
+  for v in range(1, 34):
+    if v not in unique_v:
+      # surf_features_np = np.append(surf_features_np, v)
+      # pred_features_np = np.append(pred_features_np, 1)
+      surf_features_np = np.concatenate([surf_features_np, np.repeat([v], 95)])
+      surf_features_np = np.concatenate([surf_features_np, np.repeat([v + 1], 5)])
+      pred_features_np = np.concatenate([pred_features_np, np.repeat([v], 95)])
+      pred_features_np = np.concatenate([pred_features_np, np.repeat([v], 5)])
+
   jaccard = jaccard_score(surf_features_np, pred_features_np, average=None)
   dice = 2.0*jaccard/(1.0 + jaccard)
+
+  #print(np.min(surf_features_np), np.max(pred_features_np))
+
 
   dice_arr.append(dice)
   y_true_arr.extend(surf_features_np)
@@ -88,13 +105,15 @@ def plot_confusion_matrix(cm, classes,
   plt.ylabel('True label')
   plt.xlabel('Predicted label')
   plt.tight_layout()
+  #plt.show()
 
   return cm
 
 
 cnf_matrix = confusion_matrix(y_true_arr, y_pred_arr)
 fig = plt.figure()
-plot_confusion_matrix(cnf_matrix, classes=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"], title="Confusion Matrix Segmentation")
+#plot_confusion_matrix(cnf_matrix, classes=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16","33"], title="Confusion Matrix Segmentation")
+plot_confusion_matrix(cnf_matrix, classes=["17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32","33"], title="Confusion Matrix Segmentation")
 confusion_filename = os.path.splitext(args.csv)[0] + "_confusion.png"
 fig.savefig(confusion_filename)
 
@@ -139,19 +158,37 @@ print(classification_report(y_true_arr, y_pred_arr))
 
 jaccard = jaccard_score(y_true_arr, y_pred_arr, average=None)
 print("jaccard score:", jaccard)
+l_dice = 2.0*jaccard/(1.0 + jaccard)
 print("dice:", 2.0*jaccard/(1.0 + jaccard))
+print ('dice ', l_dice)
+print(f'average dice : {sum(l_dice)/len(l_dice)}')
 
 # Plot normalized confusion matrix
 fig2 = plt.figure()
-cm = plot_confusion_matrix(cnf_matrix, classes=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"], normalize=True, title="Confusion Matrix Segmentation - normalized")
+#cm = plot_confusion_matrix(cnf_matrix, classes=["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16","33"], normalize=True, title="Confusion Matrix Segmentation - normalized")
+cm = plot_confusion_matrix(cnf_matrix, classes=["17", "18", "19", "20", "21", "22", "23", "24", "25", "26", "27", "28", "29", "30", "31", "32","33"], normalize=True, title="Confusion Matrix Segmentation - normalized")
 norm_confusion_filename = os.path.splitext(args.csv)[0] + "_norm_confusion.png"
+#plt.show()
 fig2.savefig(norm_confusion_filename)
 
 
 fig3 = plt.figure() 
 # Creating plot
-s = sns.violinplot(data=dice_arr)
-plt.xticks([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "13", "14", "15", "16"])
-s.set_title('Dice coefficients')
+print(dice_arr.shape)
+#dice_del = np.delete(dice_arr,[0,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32],1) # upper
+dice_del = np.delete(dice_arr,[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,31,32],1)
+#print(dice_del.shape)
+s = sns.violinplot(data=dice_del, scale='count',cut=0)
+#plt.xticks([0, 1, 2, 3, 4, 5, 6,7,8], ["1", "2", "3", "4", "5", "6", "7","8", "9"])
+plt.xticks([0,1, 2, 3, 4, 5, 6,7,8,9,10,11,12,13], ["18", "19", "20", "21", "22", "23","24","25","26","27","28","29","30","31"]) # lower
+#plt.xticks([0,1, 2, 3, 4, 5, 6,7,8,9,10,11,12,13], ["2", "3", "4", "5", "6", "7","8","9","10","11","12","13","14","15"]) # upper
+#plt.xticks([0,1, 2, 3, 4, 5, 6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32], ["1","2", "3", "4", "5", "6", "7","8","9","10","11","12","13","14","15","16","17", "18", "19", "20", "21", "22","23","24","25","26","27","28","29","30","31","32","33"]) # lower
+
+
+s.set_title('Dice coefficients: lower jaw')
 box_plot_filename = os.path.splitext(args.csv)[0] + "_violin_plot.png"
+ax = plt.gca()
+ax.set_ylim([0.75, 1.005])
+plt.show()
 fig3.savefig(box_plot_filename)
+
