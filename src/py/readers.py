@@ -13,10 +13,19 @@ class OFFReader():
 
 	def Update(self):
 		with open(self.FileName) as file:
-			if 'OFF' != file.readline().strip():
-				raise('Not a valid OFF header')
 
-			n_verts, n_faces, n_dontknow = tuple([int(s) for s in file.readline().strip().split(' ')])
+			first_string = file.readline() # either 'OFF' or 'OFFxxxx xxxx x'
+
+			if 'OFF' != first_string[0:3]:
+				raise('Not a valid OFF header!')
+
+			elif first_string[3:4] != '\n':
+				new_first = 'OFF'
+				new_second = first_string[3:]
+				n_verts, n_faces, n_dontknow = tuple([int(s) for s in new_second.strip().split(' ')])		
+
+			else:
+				n_verts, n_faces, n_dontknow = tuple([int(s) for s in file.readline().strip().split(' ')])
 
 			surf = vtk.vtkPolyData()
 			points = vtk.vtkPoints()
