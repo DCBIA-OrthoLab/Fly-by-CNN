@@ -161,116 +161,107 @@ class ShapeNet_GraphClass(nn.Module):
         return x
 
 
+def main():
+    num_epochs = 200
 
-num_epochs = 200
+    data_dir = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1"
+    csv_split = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/all.csv"
+    #model_fn = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/train/03012021/checkpoint.pt"
+    model_fn = "/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/classification/train/03012021/checkpoint.pt"
 
-data_dir = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1"
-csv_split = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/all.csv"
-#model_fn = "/work/jprieto/data/ShapeNet/ShapeNetCore.v1/train/03012021/checkpoint.pt"
-model_fn = "/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/classification/train/03012021/checkpoint.pt"
+    early_stop = EarlyStopping(patience=50, verbose=True, path=model_fn)
 
-early_stop = EarlyStopping(patience=50, verbose=True, path=model_fn)
+    snd_train = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="train", concat=True, use_vtk=True)
+    snd_val = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="val", concat=True, use_vtk=True)
 
-snd_train = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="train", concat=True, use_vtk=True)
-snd_val = snd.ShapeNetDataset(data_dir, csv_split=csv_split, split="val", concat=True, use_vtk=True)
-
-
-train_dataloader = DataLoader(snd_train, batch_size=1, shuffle=True)
-val_dataloader = DataLoader(snd_val, batch_size=1)
-
-
-if torch.cuda.is_available():
-    device = torch.device("cuda:0")
-    torch.cuda.set_device(device)
-else:
-    device = torch.device("cpu")
-
-model = ShapeNet_GraphClass(snd_train.ico_sphere_edges.to(device))
-# model.load_state_dict(torch.load(model_fn))
-model.to(device)
+    train_dataloader = DataLoader(snd_train, batch_size=4, shuffle=True)
+    val_dataloader = DataLoader(snd_val, batch_size=4)
 
 
-loss_fn = nn.CrossEntropyLoss(weight=torch.tensor(snd_train.unique_class_weights, dtype=torch.float32).to(device))
-optimizer = optim.Adam(model.parameters(), lr=1e-4)
+    if torch.cuda.is_available():
+        device = torch.device("cuda:0")
+        torch.cuda.set_device(device)
+    else:
+        device = torch.device("cpu")
+
+    model = ShapeNet_GraphClass(snd_train.ico_sphere_edges.to(device))
+    model.load_state_dict(torch.load(model_fn))
+    model.to(device)
+
+    loss_fn = nn.CrossEntropyLoss(weight=torch.tensor(snd_train.unique_class_weights, dtype=torch.float32).to(device))
+    optimizer = optim.Adam(model.parameters(), lr=1e-4)
 
 
-for epoch in range(num_epochs):
+    for epoch in range(num_epochs):
 
-    model.train()
-    running_loss = 0.0
-    running_acc = 0.0
-
-    for batch, (X, y) in enumerate(train_dataloader):
-
-        optimizer.zero_grad()        
-
-        X = X.permute(0, 1, 4, 2, 3)
-
-        X = X.type(torch.float32)
-        X = X/128.0 - 1.0 
-
-        X = X.to(device)
-        y = y.to(device)
-
-        x = model(X)
-
-
-        loss = loss_fn(x, y)
-        loss.backward()
-        optimizer.step()
-        """
-        ic(torch.max(torch.isnan(X)))
-        ic(x)
-        ic(loss.item())
-        """
-
-        running_loss += loss.item()
-
-
-        if batch % 100 == 0:
-            _, predicted = torch.max(x, 1)
-
-            loss, current = loss.item(), (batch) * len(X)
-            acc = (predicted == y).sum()/len(y)
-
-            print(f"loss: {loss:>7f}, acc: {acc:>7f},  [{current:>5d}/{len(snd_train):>5d}]")
-
-    train_loss = running_loss / len(train_dataloader)
-    
-    print(f"average epoch loss: {train_loss:>7f}, [{epoch:>5d}/{num_epochs:>5d}]")
-
-
-
-    model.eval()
-    with torch.no_grad():
+        model.train()
         running_loss = 0.0
         running_acc = 0.0
-        for batch, (X, y) in enumerate(val_dataloader):
-            if batch+1 % 25 == 0:
-                print(f'batch {batch+1}')
+        
+        for batch, (X, y) in enumerate(train_dataloader):
+
+            optimizer.zero_grad()        
 
             X = X.permute(0, 1, 4, 2, 3)
+
             X = X.type(torch.float32)
             X = X/128.0 - 1.0 
-            
             X = X.to(device)
             y = y.to(device)
-
             x = model(X)
-            
             loss = loss_fn(x, y)
+            loss.backward()
+            optimizer.step()
+
             running_loss += loss.item()
 
-            _, predicted = torch.max(x, 1)
-            running_acc += (predicted == y).sum()
+            if batch % 100 == 0:
+                _, predicted = torch.max(x, 1)
 
-    val_loss = running_loss / len(val_dataloader)
-    val_acc = running_acc / len(train_dataloader)
+                loss, current = loss.item(), (batch) * len(X)
+                acc = (predicted == y).sum()/len(y)
 
-    print(f"val loss: {val_loss:>7f}, val_acc: {val_acc:>7f}")
-    early_stop(val_loss, model)
+                print(f"loss: {loss:>7f}, acc: {acc:>7f},  [{current:>5d}/{len(snd_train):>5d}]")
 
-    if early_stop.early_stop:
-        print("Early stopping")
-        break
+        train_loss = running_loss / len(train_dataloader)
+        
+        print(f"average epoch loss: {train_loss:>7f}, [{epoch:>5d}/{num_epochs:>5d}]")
 
+
+
+        model.eval()
+        with torch.no_grad():
+            running_loss = 0.0
+            running_acc = 0.0
+            for batch, (X, y) in enumerate(val_dataloader):
+                if batch+1 % 25 == 0:
+                    print(f'batch {batch+1}')
+
+                X = X.permute(0, 1, 4, 2, 3)
+                X = X.type(torch.float32)
+                X = X/128.0 - 1.0 
+                
+                X = X.to(device)
+                y = y.to(device)
+
+                x = model(X)
+                
+                loss = loss_fn(x, y)
+                running_loss += loss.item()
+
+                _, predicted = torch.max(x, 1)
+                running_acc += (predicted == y).sum()
+
+        val_loss = running_loss / len(val_dataloader)
+        val_acc = running_acc / len(train_dataloader)
+
+        print(f"val loss: {val_loss:>7f}, val_acc: {val_acc:>7f}")
+        early_stop(val_loss, model)
+
+        if early_stop.early_stop:
+            print("Early stopping")
+            break
+
+
+if __name__ == '__main__':
+    main()
