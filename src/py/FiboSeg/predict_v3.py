@@ -222,7 +222,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Choose a .vtk file.')
   parser.add_argument('--surf',type=str, help='Input surface (.vtk file)', required=True)
   parser.add_argument('--out',type=str, help = 'Output', required=True)
-  parser.add_argument('--rot',type=int, help = 'Number of rotations (default: 70)', default=70)
+  parser.add_argument('--rot',type=int, help = 'Number of rotations (default: 40)', default=40)
   parser.add_argument('--model',type=str, help = 'Model for segmentation', default="best_metric_model_segmentation2d_array.pth")
   parser.add_argument('--res',type=int, help = 'Image resolution for the fly-by (default: 256)', default=320)
   parser.add_argument('--scal',type=str, help = 'Predicted ID name', default="PredictedID")
