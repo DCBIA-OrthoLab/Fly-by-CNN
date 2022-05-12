@@ -32,7 +32,12 @@ from pytorch3d.renderer import (
 from vtk import vtkPolyDataWriter
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 import sys
-sys.path.insert(0,'..')
+
+fileDir = os.path.dirname(os.path.abspath(__file__)).split('/')
+fileDir.pop()
+code_path = '/'.join(fileDir)
+sys.path.append(code_path)  
+
 import utils
 import post_process
 

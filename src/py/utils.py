@@ -5,14 +5,6 @@ import math
 import os
 import sys
 import itk
-<<<<<<< HEAD
-=======
-
-import json
-
-import SimpleITK as sitk
-
->>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
 from readers import OFFReader
 import pandas as pd
 from multiprocessing import Pool, cpu_count
@@ -148,17 +140,10 @@ def ReadSurf(fileName):
             textures_path = os.path.normpath(os.path.dirname(fname) + "/../images")
             if os.path.exists(textures_path):
                 textures_path = os.path.normpath(fname.replace(os.path.basename(fname), ''))
-<<<<<<< HEAD
                 obj_import.SetTexturePath(textures_path)
             else:
                 textures_path = os.path.normpath(fname.replace(os.path.basename(fname), ''))                
                 obj_import.SetTexturePath(textures_path)
-=======
-                obj_import.SetTexturePath(textures_path)
-            else:
-                textures_path = os.path.normpath(fname.replace(os.path.basename(fname), ''))                
-                obj_import.SetTexturePath(textures_path)
->>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
                     
 
             obj_import.Read()
@@ -328,13 +313,8 @@ def RandomRotation(surf):
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
 def GetUnitSurf(surf, mean_arr = None, scale_factor = None, copy=True):
-<<<<<<< HEAD
   unit_surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor, copy)
   return unit_surf
-=======
-  surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor, copy)
-  return surf
->>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
 
 def GetColoredActor(surf, property_name, range_scalars = None):
 
@@ -710,48 +690,11 @@ def ExtractFiber(surf, list_random_id) :
 
 def Write(vtkdata, output_name):
     outfilename = output_name
-<<<<<<< HEAD
     print("Writing:", outfilename)
-=======
-    print("Writting:", outfilename)
->>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
     polydatawriter = vtk.vtkPolyDataWriter()
     polydatawriter.SetFileName(outfilename)
     polydatawriter.SetInputData(vtkdata)
     polydatawriter.Write()
-<<<<<<< HEAD
-=======
-
-def json2vtk(jsonfile,number_landmarks,radius_sphere,outdir):
-    
-    json_file = pd.read_json(jsonfile)
-    json_file.head()
-    markups = json_file.loc[0,'markups']
-    controlPoints = markups['controlPoints']
-    number_landmarks = len(controlPoints)
-    L_landmark_position = []
-    
-    for i in range(number_landmarks):
-        L_landmark_position.append(controlPoints[i]["position"])
-        # Create a sphere
-        sphereSource = vtk.vtkSphereSource()
-        sphereSource.SetCenter(L_landmark_position[i][0],L_landmark_position[i][1],L_landmark_position[i][2])
-        sphereSource.SetRadius(radius_sphere)
-
-        # Make the surface smooth.
-        sphereSource.SetPhiResolution(100)
-        sphereSource.SetThetaResolution(100)
-        sphereSource.Update()
-        vtk_landmarks = vtk.vtkAppendPolyData()
-        vtk_landmarks.AddInputData(sphereSource.GetOutput())
-        vtk_landmarks.Update()
-
-        basename = os.path.basename(jsonfile).split(".")[0]
-        filename = basename + "_landmarks.vtk"
-        output = os.path.join(outdir, filename)
-        Write(vtk_landmarks.GetOutput(), output)
-    return output
->>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
 
 def json2vtk(jsonfile,number_landmarks,radius_sphere,outdir):
     
@@ -832,11 +775,6 @@ def ComputeVertexNormals(verts, faces):
         normals = torch.sum(normals, axis=0) # sum everything
         normals = torch.nn.functional.normalize(normals, dim=0) #normalize
 
-<<<<<<< HEAD
-        vert_normals.append(normals.numpy())
-    
-    return torch.as_tensor(vert_normals)
-=======
     verts, faces, edges = PolyDataToNumpy(surf)
     
     verts = ToTensor(dtype=torch.float32, device=device)(verts)
@@ -896,4 +834,3 @@ def ReadJSONMarkups(fname, idx=0):
         controlPoints_np.append(cp["position"])
 
     return np.array(controlPoints_np)
->>>>>>> b7556c497aa8de0872ca804a55982c77643f63f4
