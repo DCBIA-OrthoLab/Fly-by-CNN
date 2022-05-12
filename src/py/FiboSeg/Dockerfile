@@ -1,4 +1,3 @@
-
 FROM python:3.9-bullseye
 
 RUN apt-get update && \
@@ -13,14 +12,11 @@ RUN mkdir /app
 RUN mkdir data
 WORKDIR /app/data
 
+ARG RELEASE_VERSION="3.5"
 
-#RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/releases/download/3.2/examples_scans.zip
-#RUN unzip examples_scans.zip
-#RUN rm -rf examples_scans.zip
+RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/releases/download/$RELEASE_VERSION/requirements.txt
 
-RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/releases/download/3.2/requirements.txt
 
-ARG RELEASE_VERSION="3.2"
 WORKDIR /app
 RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/archive/refs/tags/$RELEASE_VERSION.zip
 RUN unzip $RELEASE_VERSION.zip
