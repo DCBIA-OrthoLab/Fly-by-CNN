@@ -5,11 +5,6 @@ import math
 import os
 import sys
 import itk
-
-import json
-
-import SimpleITK as sitk
-
 from readers import OFFReader
 import pandas as pd
 from multiprocessing import Pool, cpu_count
@@ -318,8 +313,8 @@ def RandomRotation(surf):
     return RotateSurf(surf, rotationAngle, rotationVector), rotationAngle, rotationVector
 
 def GetUnitSurf(surf, mean_arr = None, scale_factor = None, copy=True):
-  surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor, copy)
-  return surf
+  unit_surf, surf_mean, surf_scale = ScaleSurf(surf, mean_arr, scale_factor, copy)
+  return unit_surf
 
 def GetColoredActor(surf, property_name, range_scalars = None):
 
@@ -423,7 +418,7 @@ def GetNormalsActor(surf):
         # mapper
         surf_actor = GetActor(surf)
 
-        if vtk.vtkVersion().GetVTKMajorVersion() > 8:
+        if vtk.VTK_MAJOR_VERSION > 8:
 
             sp = surf_actor.GetShaderProperty();
             sp.AddVertexShaderReplacement(
@@ -581,7 +576,7 @@ def ExtractPointFeatures(surf, point_ids_rgb, point_features_name, zero=0, use_m
 
     if use_multi:
         with Pool(cpu_count()) as p:
-        	feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
+            feat = p.map(ExtractPointFeaturesClass(point_features_np, zero), point_ids_rgb)
     else:
         feat = ExtractPointFeaturesClass(point_features_np, zero)(point_ids_rgb)
     return np.array(feat).reshape(point_ids_rgb_shape[0:-1] + (number_of_components,))
@@ -695,7 +690,7 @@ def ExtractFiber(surf, list_random_id) :
 
 def Write(vtkdata, output_name):
     outfilename = output_name
-    print("Writting:", outfilename)
+    print("Writing:", outfilename)
     polydatawriter = vtk.vtkPolyDataWriter()
     polydatawriter.SetFileName(outfilename)
     polydatawriter.SetInputData(vtkdata)
@@ -730,24 +725,55 @@ def json2vtk(jsonfile,number_landmarks,radius_sphere,outdir):
         output = os.path.join(outdir, filename)
         Write(vtk_landmarks.GetOutput(), output)
     return output
-
-def WriteNrrd(itk_img,fileName):
-    print("writing .nrrd file...")
-    new_sitk_img = sitk.GetImageFromArray(itk.GetArrayFromImage(itk_img), isVector=itk_img.GetNumberOfComponentsPerPixel()>1)
-    new_sitk_img.SetOrigin(tuple(itk_img.GetOrigin()))
-    new_sitk_img.SetSpacing(tuple(itk_img.GetSpacing()))
-    new_sitk_img.SetDirection(itk.GetArrayFromMatrix(itk_img.GetDirection()).flatten()) 
-
-    writer = sitk.ImageFileWriter()
-    writer.SetFileName(fileName)
-    writer.UseCompressionOn()
-    writer.Execute(new_sitk_img)
-
-
-def ArrayToTensor(vtkarray, device='cpu'):
-    return ToTensor(dtype=torch.int64, device=device)(vtk_to_numpy(vtkarray))
+    
+def ArrayToTensor(vtkarray, device='cpu', dtype=torch.int64):
+    return ToTensor(dtype=dtype, device=device)(vtk_to_numpy(vtkarray))
 
 def PolyDataToTensors(surf, device='cpu'):
+
+    verts, faces, edges = PolyDataToNumpy(surf)
+    
+    verts = ToTensor(dtype=torch.float32, device=device)(verts)
+    faces = ToTensor(dtype=torch.int32, device=device)(faces)
+    edges = ToTensor(dtype=torch.int32, device=device)(edges)
+    
+    return verts, faces, edges
+
+def PolyDataToNumpy(surf):
+
+    edges_filter = vtk.vtkExtractEdges()
+    edges_filter.SetInputData(surf)
+    edges_filter.Update()
+
+    verts = vtk_to_numpy(surf.GetPoints().GetData())
+    faces = vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]
+    edges = vtk_to_numpy(edges_filter.GetOutput().GetLines().GetData()).reshape(-1, 3)[:,1:]
+    
+    return verts, faces, edges
+
+def UnitVerts(verts):
+    min_verts, _ = torch.min(verts, axis=0)
+    max_verts, _ = torch.max(verts, axis=0)
+    mean_v = (min_verts + max_verts)/2.0
+    
+    verts = verts - mean_v
+    scale_factor = 1/torch.linalg.vector_norm(max_verts - mean_v)
+    verts = verts*scale_factor
+    
+    return verts, mean_v, scale_factor
+
+def ComputeVertexNormals(verts, faces):
+    face_area, face_normals = mesh_face_areas_normals(verts, faces)
+
+    vert_normals = []
+
+    for idx in range(len(v)):
+        normals = face_normals[(faces == idx).nonzero(as_tuple=True)[0]] #Get all adjacent normal faces for the given point id
+        areas = face_area[(faces == idx).nonzero(as_tuple=True)[0]] # Get all adjacent normal areas for the given point id
+
+        normals = torch.mul(normals, areas.reshape(-1, 1)) # scale each normal by the area
+        normals = torch.sum(normals, axis=0) # sum everything
+        normals = torch.nn.functional.normalize(normals, dim=0) #normalize
 
     verts, faces, edges = PolyDataToNumpy(surf)
     
