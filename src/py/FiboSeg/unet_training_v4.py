@@ -10,6 +10,9 @@ V4: UNETR  & Early Stopping, multiple loops with camera rotations in training, n
 ####
 ####
 
+
+## TODO: CHECK IF F0 CAN BE REMOVED 
+
 import os
 import torch
 import numpy as np
