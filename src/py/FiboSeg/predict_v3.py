@@ -142,7 +142,11 @@ def main(args):
   list_sphere_points[0] = (0.0001, 1.35, 0.0001) # To avoid "invalid rotation matrix" error
   list_sphere_points[-1] = (0.0001, -1.35, 0.0001)
 
-  ## PREDICTION
+  ###
+  ###
+  # PREDICTION
+  ###
+  ###
   for coords in tqdm(list_sphere_points, desc = 'Prediction      '):
     camera_position = ToTensor(dtype=torch.float32, device=device)([list(coords)])
     R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
@@ -182,21 +186,36 @@ def main(args):
   vtk_id.SetName(args.scal)
   surf.GetPointData().AddArray(vtk_id)
 
+  ###
+  ###
+  # POST-PROCESS
+  ###
+  ###
 
   # Remove Islands
   for label in tqdm(range(num_classes),desc = 'Removing islands'):
     post_process.RemoveIslands(surf, vtk_id, label, 200,ignore_neg1 = True)  # adds -1 labels to isolated points: removed later
 
+  if args.sep:
+  # Isolate each label
+    surf_point_data = surf.GetPointData().GetScalars(args.scal) 
+    labels = np.unique(surf_point_data)
+    out_basename = args.out[:-4]
+    for label in tqdm(labels, desc = 'Isolating labels'):
+      thresh_label = post_process.Threshold(surf, args.scal ,label-0.5,label+0.5)
+      if label != 33:
+        utils.Write(thresh_label,f'{out_basename}_id_{label}.vtk',print_out=False) 
+      else:
+        # gum
+        utils.Write(thresh_label,f'{out_basename}_gum.vtk',print_out=False) 
+    # all teeth 
+    no_gum = post_process.Threshold(surf, args.scal ,33-0.5,33+0.5,invert=True)
+    utils.Write(no_gum,f'{out_basename}_all_teeth.vtk',print_out=False)
 
-  array = surf.GetPointData().GetScalars("PredictedID") 
 
-  unique, counts  = np.unique(array, return_counts = True)
+  # Output: all teeth + gum
+  utils.Write(surf,args.out)
 
-  out_filename = args.out
-  polydatawriter = vtkPolyDataWriter()
-  polydatawriter.SetFileName(out_filename)
-  polydatawriter.SetInputData(surf)
-  polydatawriter.Write()
   print("Done.")
 
 
@@ -233,5 +252,6 @@ if __name__ == '__main__':
   parser.add_argument('--scal',type=str, help = 'Predicted ID name', default="PredictedID")
   parser.add_argument('--unetr',type=int, help = '1: unetr', default=0)
   parser.add_argument('--rem',type=int, help = 'remove crown (-1 for random removal)',default=0)
+  parser.add_argument('--sep', help = 'Create one file per label', action='store_true')
   args = parser.parse_args()
   main(args)

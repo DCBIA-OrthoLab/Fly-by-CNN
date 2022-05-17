@@ -688,9 +688,10 @@ def ExtractFiber(surf, list_random_id) :
 
     return tubefilter
 
-def Write(vtkdata, output_name):
+def Write(vtkdata, output_name, print_out = True):
     outfilename = output_name
-    print("Writing:", outfilename)
+    if print_out == True:
+        print("Writing:", outfilename)
     polydatawriter = vtk.vtkPolyDataWriter()
     polydatawriter.SetFileName(outfilename)
     polydatawriter.SetInputData(vtkdata)
