@@ -3,6 +3,7 @@ import nibabel as nib
 from fsl.data import gifti
 from icecream import ic
 import sys
+import os
 sys.path.insert(0,'../..')
 import utils
 import vtk
@@ -37,6 +38,11 @@ from monai.transforms import (
     EnsureType,
 )
 from torch.utils.tensorboard import SummaryWriter
+import torch.multiprocessing as mp
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
+
 
 class BrainDataset(Dataset):
     def __init__(self,np_split,triangles):
@@ -49,8 +55,9 @@ class BrainDataset(Dataset):
         return(len(self.np_split))
 
     def __getitem__(self,idx):
-        data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Segmentation/Native_Space'
+        # data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Segmentation/Native_Space'
         #data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Segmentation/Template_Space'
+        data_dir = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Data/Segmentation/Native_Space'
         item = self.np_split[idx][0]
 
         # for now just try with Left
@@ -100,46 +107,54 @@ class BrainDataset(Dataset):
         ic(faces_pid0_offset)
         ic(vertex_features)
         ic(face_features)
-        ic(face_features_test)
         """
+
 
         
         return vertex_features,face_features, face_labels
 
-def main():
+def main(rank,world_size):
 
     ###
     ### TRAINING PARAMETERS
     ###
 
-    path_ico = '/CMF/data/geometric-deep-learning-benchmarking/Icospheres/ico-6.surf.gii'
+    dist.init_process_group("nccl", init_method='env://', rank=rank, world_size=world_size)
+    print(
+        f"Rank {rank + 1}/{world_size} process initialized.\n"
+    )
+    device = torch.device(f"cuda:{rank}")
+    torch.cuda.set_device(device)
+
+    path_ico = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Icospheres/ico-6.surf.gii'
     image_size = 512
     dist_cam = 2
-    batch_size = 4
-    nb_epochs = 1_000
+    batch_size = 30
+    nb_epochs = 2_000
     nb_loops = 12
-    nb_val = 0
+    
     val_interval = 2    
-    train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_train_TEA.npy'
-    val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_val_TEA.npy'
+    train_split_path = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_train_TEA.npy'
+    val_split_path = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_val_TEA.npy'
 
-    num_classes = 39 #37
+    num_classes = 37 #37
     model_name= "checkpoints/05-03.pt"
     patience = 500
     early_stopping = EarlyStopping(patience=patience, verbose=True,path=model_name)
     write_image_interval = 1
 
     ###
-    ###
+    ### TRAINING PARAMETERS
     ###
 
-
+    """
     # Set the cuda device 
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
         torch.cuda.set_device(device)
     else:
         device = torch.device("cpu")
+    """
     # Initialize a perspective camera.
     cameras = FoVPerspectiveCameras(device=device)
 
@@ -163,7 +178,6 @@ def main():
         shader=HardPhongShader(device=device, cameras=cameras)
     )
 
-
     # Setup Neural Network model
 
     dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
@@ -180,6 +194,7 @@ def main():
         strides=(2, 2, 2, 2),
         num_res_units=2,
     ).to(device)
+    model = DDP(model, device_ids=[device])
 
     # model.load_state_dict(torch.load("early_stopping/checkpoint_1.pt"))
 
@@ -230,10 +245,18 @@ def main():
 
     # load train / test splits
 
-    train_split = np.load(train_split_path)
-    val_split = np.load(val_split_path)
+    # train_split = np.load(train_split_path)
+    # val_split = np.load(val_split_path)
+    train_val_split = np.load(train_split_path)
+
+    train_split = train_val_split[:282]
+    val_split = train_val_split[282:]
+
     train_dataset = BrainDataset(train_split,triangles)
     val_dataset = BrainDataset(val_split,triangles)
+
+    train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
+    val_sampler = DistributedSampler(val_dataset, shuffle=False, num_replicas=world_size, rank=rank)
 
     # Match icosphere vertices and faces tensor with batch size
     l_ico_verts = []
@@ -248,10 +271,11 @@ def main():
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_dataloader = DataLoader(val_dataset,batch_size=batch_size, shuffle=True)
 
-
+    nb_val = 0
     for epoch in range(nb_epochs):
-        print("-" * 20)
-        print(f"epoch {epoch + 1}/{nb_epochs}")
+        if rank == 0:
+            print("-" * 20)
+            print(f"epoch {epoch + 1}/{nb_epochs}")
         epoch_loss = 0
         step = 0
 
@@ -266,6 +290,7 @@ def main():
             face_labels = torch.squeeze(face_labels,0)
             face_labels = face_labels.to(device)
             face_features = face_features.to(device)
+
 
             step += 1
             for s in range(nb_loops):
@@ -309,15 +334,22 @@ def main():
                 loss = loss_function(outputs,labels)
                 loss.backward()
                 optimizer.step()
-                epoch_loss += loss.item()
+                epoch_loss += loss
                 # epoch_len = int(np.ceil(len(train_dataloader) / train_dataloader.batch_size))
-                epoch_len = int(np.ceil(len(train_dataloader)))
+
                 
-            print(f"{step}/{epoch_len}, train_loss: {loss.item():.4f}")
-        epoch_loss /= (step*nb_loops)
-        epoch_loss_values.append(epoch_loss)
-        print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")        
-        writer.add_scalar("training_loss", epoch_loss, epoch + 1)
+            if rank == 0:  
+                epoch_len = len(train_dataloader)
+                print(f"{step}/{epoch_len}, train_loss: {loss.item():.4f}")
+
+
+        dist.all_reduce(epoch_loss)
+        if rank == 0:
+            epoch_loss /= (step*nb_loops)
+            epoch_loss_values.append(epoch_loss)
+            print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")        
+            writer.add_scalar("training_loss", epoch_loss, epoch + 1)
+
 
                 
 
@@ -393,36 +425,43 @@ def main():
                     dice_metric(y_pred=val_outputs_convert, y=val_labels_convert)
                     
                 # aggregate the final mean dice result
-                metric = dice_metric.aggregate().item()
+                metric = dice_metric.aggregate()
                 # reset the status for next validation round
                 dice_metric.reset()
+                dist.all_reduce(metric)
+
                 metric_values.append(metric)
 
                 if nb_val % 4 == 0: # save every 4 validations
                     torch.save(model.state_dict(), model_name)
                     print(f'saving model: {model_name}')
-
-                if metric > best_metric:
-                    best_metric = metric
+                metric_item = metric.item()
+                if metric_item > best_metric:
+                    best_metric = metric_item
                     best_metric_epoch = epoch + 1
                     torch.save(model.state_dict(), "trash.pth")
+
+                if rank == 0:
                     print("saved new best metric model")
                     print(model_name)
-                print(
-                    "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
-                        epoch + 1, metric, best_metric, best_metric_epoch
-                    )
-                )
+                    print(f"Epoch: {epoch + 1}: current mean dice: {metric_item:.4f}")
+                    print(f"Best mean dice: {best_metric:.4f} at epoch {best_metric_epoch}.")
+                    early_stopping(1-metric_item, model)
+                    if early_stopping.early_stop:
+                        early_stop_indicator = torch.tensor([1.0]).to(device)
+                    else:
+                        early_stop_indicator = torch.tensor([0.0]).cuda()
 
-                # early_stopping needs the validation loss to check if it has decresed, 
-                # and if it has, it will make a checkpoint of the current model
-                early_stopping(1-metric, model)
+                else:
+                    early_stop_indicator = torch.tensor([0.0]).to(device)
 
-                if early_stopping.early_stop:
-                    print("Early stopping")
-                    break 
+                dist.all_reduce(early_stop_indicator)
 
-                writer.add_scalar("validation_mean_dice", metric, epoch + 1)
+                if early_stop_indicator.cpu().item() == 1.0:
+                    print("Early stopping")            
+                    break
+
+                writer.add_scalar("validation_mean_dice", metric_item, epoch + 1)
                 imgs_output = torch.argmax(val_outputs, dim=1).detach().cpu()
                 imgs_output = imgs_output.unsqueeze(1)  # insert dim of size 1 at pos. 1
                 imgs_normals = val_inputs[:,0:3,:,:]
@@ -439,11 +478,19 @@ def main():
                     writer.add_images("output", out_rgb,epoch)
                     writer.add_images("normals",norm_rgb,epoch)
                 
-                
-    print(f"train completed, best_metric: {best_metric:.4f} at epoch: {best_metric_epoch}")
-    writer.close()
+    if rank == 0:            
+        print(f"train completed, best_metric: {best_metric:.4f} at epoch: {best_metric_epoch}")
+        writer.close()
 
 
+
+WORLD_SIZE = torch.cuda.device_count()
 if __name__ == '__main__':
-    main()
 
+    os.environ['MASTER_ADDR'] = '127.0.0.1'
+    os.environ['MASTER_PORT'] = '9999'
+
+    mp.spawn(
+        main, args=(WORLD_SIZE,),
+        nprocs=WORLD_SIZE, join=True
+    )
