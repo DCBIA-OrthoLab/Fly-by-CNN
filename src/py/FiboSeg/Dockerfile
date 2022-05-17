@@ -12,7 +12,7 @@ RUN mkdir /app
 RUN mkdir data
 WORKDIR /app/data
 
-ARG RELEASE_VERSION="3.5"
+ARG RELEASE_VERSION="3.6"
 
 RUN wget https://github.com/MathieuLeclercq/fly-by-cnn/releases/download/$RELEASE_VERSION/requirements.txt
 
