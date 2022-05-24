@@ -15,20 +15,23 @@ from post_process import *
 
 class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 
-    def __init__(self, parent=None, surf_property="", neighbors=1):
+    def __init__(self, surf, parent=None, surf_property="", neighbors=1):
         # self.AddObserver("MiddleButtonPressEvent", self.middle_button_press_event)
         # self.AddObserver("MiddleButtonReleaseEvent", self.middle_button_release_event)
         self.AddObserver("LeftButtonPressEvent", self.left_button_press_event)
         self.AddObserver("LeftButtonReleaseEvent", self.left_button_release_event)
+        self.AddObserver("MiddleButtonPressEvent", self.middle_button_press_event)
         self.AddObserver("MouseMoveEvent", self.mouse_move_event)
         self.AddObserver("CharEvent", self.char_event)
 
         self.picker = vtk.vtkCellPicker()
+        self.point_picker = vtk.vtkPointPicker()
         self.picker.SetTolerance(0.0005);
         self.surf_property = surf_property
         self.value = 0
         self.neighbors = neighbors
         self.left_button_down = False
+        self.surf_point_data = vtk_to_numpy(surf.GetPointData().GetScalars(self.surf_property)) 
 
     # def middle_button_press_event(self, obj, event):
     #     print("Middle Button pressed")
@@ -56,6 +59,14 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         self.OnLeftButtonUp()
         return
 
+    def middle_button_press_event(self, obj, event):
+         # Get cell id
+        clickPos = self.GetInteractor().GetEventPosition()
+        self.point_picker.Pick(clickPos[0], clickPos[1], 0,self.GetDefaultRenderer());
+        pointId = self.point_picker.GetPointId()
+        self.value = self.surf_point_data[pointId]
+        print("Label is now:", self.value)       
+
     def mouse_move_event(self, obj, event):
 
         clickPos = self.GetInteractor().GetEventPosition()
@@ -70,7 +81,6 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 
     def char_event(self, obj, event):
         key = self.GetInteractor().GetKeySym()
-        #print(key)
         if key.isnumeric():
             self.value = int(key)
             print("Label is now:", self.value)
@@ -80,6 +90,14 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
         elif key == 'KP_Subtract':
             self.value -= 1
             print("Label is now:", self.value)
+        elif key == 'd':
+            # Get cell id
+            clickPos = self.GetInteractor().GetEventPosition()
+            self.point_picker.Pick(clickPos[0], clickPos[1], 0,self.GetDefaultRenderer());
+            pointId = self.point_picker.GetPointId()
+            self.value = self.surf_point_data[pointId]
+            print("Label is now:", self.value)
+
         else:
             self.OnChar()
 
@@ -123,7 +141,7 @@ def main(args):
     renwin.AddRenderer(renderer)
     renwin.SetSize(1080, 960)
 
-    interactorstyle = MyInteractorStyle(surf_property=args.property, neighbors=args.neighbors)
+    interactorstyle = MyInteractorStyle(surf,surf_property=args.property, neighbors=args.neighbors)
     interactorstyle.SetDefaultRenderer(renderer)
 
     interactor = vtk.vtkRenderWindowInteractor()
