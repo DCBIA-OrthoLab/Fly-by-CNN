@@ -64,28 +64,13 @@ class BrainDataset(Dataset):
         #path_features = f'{data_dir}/segmentation_template_space_features/{item}_L.shape.gii'
         #path_labels = f'{data_dir}/segmentation_template_space_labels/{item}_L.label.gii'
         
-        path_features = f"{data_dir}/segmentation_native_space_features/{item}_L.shape.gii"
-        path_labels = f"{data_dir}/segmentation_native_space_labels/{item}_L.label.gii"
+        path_features = f"{data_dir}/segmentation_native_space_features/{item}_R.shape.gii"
+        path_labels = f"{data_dir}/segmentation_native_space_labels/{item}_R.label.gii"
         
         vertex_features = gifti.loadGiftiVertexData(path_features)[1] # vertex features
                 
         vertex_labels = gifti.loadGiftiVertexData(path_labels)[1] # vertex labels
-        faces_pid0 = self.triangles[:,0:1]
-
-        # vertex_features_0 = vertex_features[:,0]
-        # vertex_features_1 = vertex_features[:,1]
-        # vertex_features_2 = vertex_features[:,2]
-        # vertex_features_3 = vertex_features[:,3]  
-        
-        # face_features_0 = np.take(vertex_features_0,faces_pid0)
-        # face_features_1 = np.take(vertex_features_1,faces_pid0)
-        # face_features_2 = np.take(vertex_features_2,faces_pid0)
-        # face_features_3 = np.take(vertex_features_3,faces_pid0)
-        # l_face_features = [face_features_0,face_features_1,face_features_2,face_features_3]
-        
-        # face_features = np.stack(l_face_features,axis=-1)
-        # face_features = np.squeeze(face_features)        
-        
+        faces_pid0 = self.triangles[:,0:1]        
         
         face_labels = np.take(vertex_labels,faces_pid0) # face labels (taking first vertex for each face)        
         
@@ -93,22 +78,7 @@ class BrainDataset(Dataset):
         offset = np.zeros((self.nb_triangles,4), dtype=int) + np.array([0,1,2,3])
         faces_pid0_offset = offset + np.multiply(faces_pid0,4)        
         
-        face_features = np.take(vertex_features,faces_pid0_offset)
-        
-        
-        """
-        ic(vertex_features.shape)
-        ic(face_features.shape)
-        ic(vertex_labels.shape)
-        ic(face_labels.shape)
-        ic(faces_pid0.shape)
-        ic(faces_pid0_offset.shape)
-        ic(faces_pid0)
-        ic(faces_pid0_offset)
-        ic(vertex_features)
-        ic(face_features)
-        """
-
+        face_features = np.take(vertex_features,faces_pid0_offset)    
 
         
         return vertex_features,face_features, face_labels
@@ -138,7 +108,7 @@ def main(rank,world_size):
     val_split_path = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_val_TEA.npy'
 
     num_classes = 37 #37
-    model_name= "checkpoints/05-03.pt"
+    model_name= "checkpoints/06-09(RIGHT_NATIVE).pt"
     patience = 500
     early_stopping = EarlyStopping(patience=patience, verbose=True,path=model_name)
     write_image_interval = 1
@@ -196,7 +166,7 @@ def main(rank,world_size):
     ).to(device)
     model = DDP(model, device_ids=[device])
 
-    # model.load_state_dict(torch.load("early_stopping/checkpoint_1.pt"))
+    model.load_state_dict(torch.load("checkpoints/05-19(RIGHT).pt"))
 
     loss_function = monai.losses.DiceCELoss(to_onehot_y=True,softmax=True)
     optimizer = torch.optim.AdamW(model.parameters(), 1e-4)
@@ -290,9 +260,9 @@ def main(rank,world_size):
             face_labels = torch.squeeze(face_labels,0)
             face_labels = face_labels.to(device)
             face_features = face_features.to(device)
+            l_inputs = []
 
-
-            step += 1
+            
             for s in range(nb_loops):
                 textures = TexturesVertex(verts_features=vertex_features)
                 try:
@@ -317,36 +287,44 @@ def main(rank,world_size):
                 array_coord = np.random.normal(0, 1, 3)
                 array_coord *= dist_cam/(np.linalg.norm(array_coord))
                 camera_position = ToTensor(dtype=torch.float32, device=device)([array_coord.tolist()])
+                
                 R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
                 T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
 
                 images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)    
                 pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone()) 
                 labels = torch.take(face_labels, pix_to_face)*(pix_to_face >= 0) 
-                l_inputs = []
+
+                l_features = []
                 for index in range(4):
-                    l_inputs.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
-                inputs = torch.cat(l_inputs,dim=3)            
+                    l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
+                inputs = torch.cat(l_features,dim=3)        
                 inputs, labels  = inputs.permute(0,3,1,2), labels.permute(0,3,1,2)
-                
-                optimizer.zero_grad()
-                outputs = model(inputs)
-                loss = loss_function(outputs,labels)
-                loss.backward()
-                optimizer.step()
-                epoch_loss += loss
-                # epoch_len = int(np.ceil(len(train_dataloader) / train_dataloader.batch_size))
+                inputs = torch.unsqueeze(inputs, 1)
+                l_inputs.append(inputs)  
+
+
+            X = torch.cat(l_inputs,dim=1).to(device)
+            X = X.type(torch.float32)
+            optimizer.zero_grad()
+            ic(X.shape)
+            outputs = model(X)
+            loss = loss_function(outputs,labels)
+            loss.backward()
+            optimizer.step()
+            epoch_loss += loss
+            # epoch_len = int(np.ceil(len(train_dataloader) / train_dataloader.batch_size))
+            step += 1
 
                 
             if rank == 0:  
                 epoch_len = len(train_dataloader)
-                print(f"{step}/{epoch_len}, train_loss: {loss.item():.4f}")
+                print(f"{batch + 1}/{epoch_len}, train_loss: {loss.item():.4f}")
 
-
+        epoch_loss /= (step*world_size)
         dist.all_reduce(epoch_loss)
         if rank == 0:
-            epoch_loss /= (step*nb_loops)
-            epoch_loss_values.append(epoch_loss)
+            
             print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")        
             writer.add_scalar("training_loss", epoch_loss, epoch + 1)
 
@@ -359,6 +337,7 @@ def main(rank,world_size):
             nb_val += 1 
             model.eval()
             with torch.no_grad():
+                epoch_loss = 0
                 val_inputs = None
                 val_labels = None
                 val_outputs = None
@@ -407,22 +386,25 @@ def main(rank,world_size):
                     val_inputs, val_labels  = inputs.permute(0,3,1,2), labels.permute(0,3,1,2)
 
 
-                    roi_size = (image_size, image_size)
-                    sw_batch_size = batch_size
-                    val_outputs = sliding_window_inference(val_inputs, roi_size, sw_batch_size, model)               
+                    val_loss = loss_function(outputs,labels)
 
 
-                    val_labels_list = decollate_batch(val_labels)                
-                    val_labels_convert = [
-                        post_label(val_label_tensor) for val_label_tensor in val_labels_list
-                    ]
+                    # roi_size = (image_size, image_size)
+                    # sw_batch_size = batch_size
+                    # val_outputs = sliding_window_inference(val_inputs, roi_size, sw_batch_size, model)               
+
+
+                    # val_labels_list = decollate_batch(val_labels)                
+                    # val_labels_convert = [
+                    #     post_label(val_label_tensor) for val_label_tensor in val_labels_list
+                    # ]
                     
-                    val_outputs_list = decollate_batch(val_outputs)
-                    val_outputs_convert = [
-                        post_pred(val_pred_tensor) for val_pred_tensor in val_outputs_list
-                    ]
+                    # val_outputs_list = decollate_batch(val_outputs)
+                    # val_outputs_convert = [
+                    #     post_pred(val_pred_tensor) for val_pred_tensor in val_outputs_list
+                    # ]
                     
-                    dice_metric(y_pred=val_outputs_convert, y=val_labels_convert)
+                    # dice_metric(y_pred=val_outputs_convert, y=val_labels_convert)
                     
                 # aggregate the final mean dice result
                 metric = dice_metric.aggregate()
@@ -436,17 +418,20 @@ def main(rank,world_size):
                     torch.save(model.state_dict(), model_name)
                     print(f'saving model: {model_name}')
                 metric_item = metric.item()
+
+                """
                 if metric_item > best_metric:
                     best_metric = metric_item
                     best_metric_epoch = epoch + 1
-                    torch.save(model.state_dict(), "trash.pth")
-
-                if rank == 0:
+                    torch.save(model.state_dict(), "RIGHT.pth")
                     print("saved new best metric model")
                     print(model_name)
+                """
+                if rank == 0:
+
                     print(f"Epoch: {epoch + 1}: current mean dice: {metric_item:.4f}")
                     print(f"Best mean dice: {best_metric:.4f} at epoch {best_metric_epoch}.")
-                    early_stopping(1-metric_item, model)
+                    early_stopping(1-metric_item, model.module)
                     if early_stopping.early_stop:
                         early_stop_indicator = torch.tensor([1.0]).to(device)
                     else:
