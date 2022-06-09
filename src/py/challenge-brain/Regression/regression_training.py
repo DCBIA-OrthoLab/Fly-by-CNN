@@ -254,11 +254,15 @@ class ShapeNet_GraphClass(nn.Module):
     def __init__(self, edges):
         super(ShapeNet_GraphClass, self).__init__()
 
-        resnet50 = models.resnet50()
-        resnet50.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # resnet50 = models.resnet50()
+        # resnet50.conv1 = nn.Conv2d(4, 64, kernel_size=7, stride=2, padding=3, bias=False)
         #resnet50.fc = Identity()
 
-        efficient_net = effnetv2_s()
+        # efficient_net = effnetv2_s()
+        # efficient_net.classifier = Identity()
+
+        efficient_net = models.efficientnet_b0(pretrained=True)
+        efficient_net.features[0][0] = nn.Conv2d(4, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
         efficient_net.classifier = Identity()
 
 
@@ -267,10 +271,10 @@ class ShapeNet_GraphClass(nn.Module):
 
 
         #self.WV = nn.Linear(2048, 512)
-        self.WV = nn.Linear(1792, 512)
+        self.WV = nn.Linear(1280, 512)
 
         #self.Attention = SelfAttention(2048, 128)
-        self.Attention = SelfAttention(1792, 128)
+        self.Attention = SelfAttention(1280, 128)
         self.Prediction = nn.Linear(512, 1)
 
         
@@ -291,9 +295,9 @@ class ShapeNet_GraphClass(nn.Module):
 
 
 def main():
-    batch_size = 4
-    image_size = 256
-    num_epochs = 200
+    batch_size = 6
+    image_size = 320
+    num_epochs = 600
 
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
@@ -301,8 +305,8 @@ def main():
     else:
         device = torch.device("cpu")
 
-    model_fn = "checkpoints/regression_left1.pt"
-    early_stop = EarlyStopping(patience=50, verbose=True, path=model_fn)
+    model_fn = "checkpoints/regression_left3_res320"
+    early_stop = EarlyStopping(patience=100, verbose=True, path=model_fn)
 
     path_ico = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Icospheres/ico-6.surf.gii'
 
@@ -321,15 +325,6 @@ def main():
 
     # rescale icosphere [0,1]
     coords = np.multiply(coords,0.01)
-
-
-    # # convert to vtk
-    # vtk_coords = vtk.vtkPoints()
-    # vtk_coords.SetData(numpy_to_vtk(coords))
-    # vtk_triangles = vtk.vtkCellArray()
-    # vtk_offsets = numpy_to_vtkIdTypeArray(offsets)
-    # vtk_connectivity = numpy_to_vtkIdTypeArray(connectivity)
-    # vtk_triangles.SetData(vtk_offsets,vtk_connectivity)
 
 
     # convert ico verts / faces to tensor
@@ -353,9 +348,8 @@ def main():
     val_dataset = BrainDataset(val_split,triangles)
 
     
-    #train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True,num_workers=4,pin_memory=True)
+
     train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
-    # val_dataloader = DataLoader(snd_val, batch_size=batch_size,shuffle=True, collate_fn=pad_verts_faces, num_workers=4,pin_memory=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size,shuffle=True)
 
 
@@ -383,18 +377,11 @@ def main():
 
     model = ShapeNet_GraphClass(train_dataset.ico_sphere_edges.to(device))
 
-    #model = ShapeNet_GraphClass(edges.to(device))
     #model.load_state_dict(torch.load(model_fn))
     model.to(device)
 
     loss_fn = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
-    """
-    dist_cam = 1.35
-    nb_loop = 12
-    list_sphere_points = fibonacci_sphere(samples=nb_loop, dist_cam=dist_cam)
-    list_sphere_points[0],list_sphere_points[-1] = (0.0001, 1.35, 0.0001),(0.0001, -1.35, 0.0001) # To avoid "invalid rotation matrix" error
-    """
 
     list_sphere_points = train_dataset.ico_sphere_verts.tolist()
 
@@ -413,7 +400,6 @@ def main():
         running_loss = 0.0
         print("-" * 20)
         print(f'epoch {epoch+1}/{num_epochs}')
-        sum_correct = 0
 
         for batch, (vertex_features, face_features, age) in tqdm(enumerate(train_dataloader),desc='training:'):  # TRAIN LOOP
 
@@ -446,29 +432,24 @@ def main():
                         textures=textures
                     )
 
-
                 camera_position = torch.FloatTensor([coords]).to(device)
                 R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
                 T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
 
-
-
-
                 batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
                 pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
-                depth_map = zbuf 
-                batch_views = torch.cat([batch_views[:,:,:,0:3], depth_map], dim=-1)
 
-                batch_views = batch_views.permute(0,3,1,2)
-                batch_views = torch.unsqueeze(batch_views, 1)
-                l_inputs.append(batch_views)              
+                l_features = []
 
+                for index in range(4):
+                    l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
+                inputs = torch.cat(l_features,dim=3)
+                inputs = inputs.permute(0,3,1,2)
+                inputs = torch.unsqueeze(inputs, 1)
+                l_inputs.append(inputs)            
 
-            
             X = torch.cat(l_inputs,dim=1).to(device)
             X = X.type(torch.float32)
-
-
             X = abs(X)            
             optimizer.zero_grad()
             x = model(X) 
@@ -481,18 +462,11 @@ def main():
 
             running_loss += loss.item()
 
-
-            # if batch % 100 == 0:
-            #     loss, current = loss.item(), batch * len(X)
-            #     print(f" acc: {acc:>7f}, [{current:>5d}/{len(train_dataset):>5d}]")
-
         train_loss = running_loss / len(train_dataloader)
-        # print(f"average epoch loss: {train_loss:>7f},  acc: {acc:>7f}, [{epoch:>5d}/{num_epochs:>5d}]")
         print(f"average epoch loss: {train_loss:>7f}, [{epoch:>5d}/{num_epochs:>5d}]")
 
 
         model.eval()  
-        sum_correct = 0
         with torch.no_grad():  # VALIDATION LOOP
             running_loss = 0.0
             for batch, (vertex_features, face_features, age) in enumerate(train_dataloader):
@@ -529,21 +503,21 @@ def main():
                     T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
 
                     batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
-                    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
-                    depth_map = zbuf 
-                    batch_views = torch.cat([batch_views[:,:,:,0:3], depth_map], dim=-1)
+                    
+                    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())                    
 
-                    batch_views = batch_views.permute(0,3,1,2)
-                    batch_views = torch.unsqueeze(batch_views, 1)
-                    l_inputs.append(batch_views) 
+                    l_features = []
+                    for index in range(4):
+                        l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
+                    inputs = torch.cat(l_features,dim=3) 
 
-
-
+                    inputs = inputs.permute(0,3,1,2)
+                    inputs = torch.unsqueeze(inputs, 1)
+                    l_inputs.append(inputs)
 
                 X = torch.cat(l_inputs,dim=1).to(device)
                 X = X.type(torch.float32)
-                X = abs(X)            
-
+                X = abs(X)
                 x = model(X) 
                 x = x.double() 
                 x = torch.squeeze(x)
@@ -554,37 +528,15 @@ def main():
 
         val_loss = running_loss / len(val_dataloader)
         print(f'val loss: {val_loss}')
-        # print(f'acc: {acc:>7f}')
-
         early_stop(val_loss, model)
 
         if early_stop.early_stop:
             print("Early stopping")
             break
 
-def pad_verts_faces(batch):
-    verts = [v for v, f, cn, sc  in batch]
-    faces = [f for v, f, cn, sc  in batch]
-    color_normals = [cn for v, f, cn, sc, in batch]
-    synset_class = [sc for v, f, cn, sc, in batch]
+
+def GetView():
     
-
-    max_length_verts = max(arr.shape[0] for arr in verts)
-    max_length_faces = max(arr.shape[0] for arr in faces)
-    max_length_normals = max(arr.shape[0] for arr in color_normals)
-
-
-    pad_verts = [np.pad(v,[(0,max_length_verts-v.shape[0]),(0,0)],constant_values=0.0) for v in verts]  # pad every array so that they have the same shape
-    pad_seq_verts = np.stack(pad_verts)  # stack on a new dimension (batch first)
-    pad_faces = [np.pad(f,[(0,max_length_faces-f.shape[0]),(0,0)],constant_values=-1) for f in faces] 
-    pad_seq_faces = np.stack(pad_faces)
-    pad_cn = [np.pad(cn,[(0,max_length_normals-cn.shape[0]),(0,0)],constant_values=0.) for cn in color_normals]  
-    pad_seq_cn = np.stack(pad_cn)
-
-    #return pad_sequence(verts, batch_first=True, padding_value=0.0), pad_sequence(faces, batch_first=True, padding_value=-1), pad_sequence(color_normals, batch_first=True, padding_value=0.), synset_class
-    return pad_seq_verts, pad_seq_faces,  pad_seq_cn, synset_class
-
-
 
 def fibonacci_sphere(samples, dist_cam):
 
