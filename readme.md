@@ -1,6 +1,6 @@
 # Fly by CNN
 
-Contributors: Juan Prieto, Maxime Dumont, Louis Bumbolo
+Contributors: Juan Prieto, Maxime Dumont, Louis Bumbolo, Mathieu Leclercq
 
 ## What is it?
 Fly by CNN is an approach to capture 2D views from 3D objects and use the generated images to train deep learning algorithms or make inference once you have a trained model. 

@@ -8,6 +8,7 @@ import utils
 import math
 from tqdm import tqdm
 from icecream import ic
+from random import randint
 
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk, numpy_to_vtkIdTypeArray
@@ -20,11 +21,13 @@ from torch import from_numpy
 #from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence as pack_sequence, pad_packed_sequence as unpack_sequence
+from torch.utils.tensorboard import SummaryWriter
 
-import matplotlib.pyplot as plt
+
 from torch.utils.data import DataLoader
 
 from fsl.data import gifti
+
 
 
 from pytorch3d.ops.graph_conv import GraphConv
@@ -39,18 +42,18 @@ from pytorch3d.renderer import (
 # datastructures
 from pytorch3d.structures import Meshes
 
-from effnetv2 import effnetv2_s
+# from effnetv2 import effnetv2_s
 
 print('Imports done')
 
 class BrainDataset(Dataset):
-    def __init__(self,np_split,triangles):
+    def __init__(self,np_split,triangles,ico_lvl):
         self.np_split = np_split
         self.triangles = triangles  
         self.nb_triangles = len(triangles)
 
 
-        ico_sphere = utils.CreateIcosahedron(3.0, 1)
+        ico_sphere = utils.CreateIcosahedron(2.2, ico_lvl)
         ico_sphere_verts, ico_sphere_faces, ico_sphere_edges = utils.PolyDataToTensors(ico_sphere)
         self.ico_sphere_verts = ico_sphere_verts
         self.ico_sphere_faces = ico_sphere_faces
@@ -58,19 +61,29 @@ class BrainDataset(Dataset):
 
     
     def __len__(self):
-        return(len(self.np_split))
+        return(len(self.np_split)) # *2 (Left & Right) *2 (Native & Feature space)
 
     def __getitem__(self,idx):
+        item = self.np_split[idx]
 
-        data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Native_Space'
-        item = self.np_split[idx][0]
+        idx_space = randint(0,1)
+        idx_feature = randint(0,1)
+        if idx_space == 0:
+            data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Template_Space'
+        else:
+            data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Native_Space'        
+        l_space = ['template','native']
+        l_hemishpere =['L','R']        
+        # path_features = f"{data_dir}/regression_{l_space[idx_space]}_space_features/sub-{item.split('_')[0]}_ses-{item.split('_')[1]}_{l_hemishpere[idx_feature]}.shape.gii"
+        path_features = f"{data_dir}/regression_{l_space[idx_space]}_space_features/{item[0]}_{l_hemishpere[idx_feature]}.shape.gii"
+
+
         
-        path_features = f"{data_dir}/regression_native_space_features/sub-{item.split('_')[0]}_ses-{item.split('_')[1]}_L.shape.gii"
-
-
         vertex_features = gifti.loadGiftiVertexData(path_features)[1] # vertex features
-                
-        age = self.np_split[idx][1]
+
+        age_at_birth = item[2]
+        scan_age = item[1]
+
         faces_pid0 = self.triangles[:,0:1]         
     
         #offset = np.arange(self.nb_triangles*4).reshape((self.nb_triangles,4))
@@ -80,7 +93,7 @@ class BrainDataset(Dataset):
         face_features = np.take(vertex_features,faces_pid0_offset)    
 
         
-        return vertex_features,face_features, age
+        return vertex_features,face_features, age_at_birth, scan_age
 
 
 class EarlyStopping:
@@ -174,11 +187,6 @@ class SelfAttentionSoftmax(nn.Module):
         score = self.V(nn.Tanh()(self.W1(query)))
         
         attention_weights = nn.Softmax(dim=1)(score)
-
-        ic(score.shape)
-        ic(attention_weights.shape)
-        ic(score)
-        ic(attention_weights)
         # context_vector shape after sum == (batch_size, hidden_size)
         context_vector = attention_weights * values
         context_vector = torch.sum(context_vector, dim=1)
@@ -251,7 +259,7 @@ class TimeDistributed(nn.Module):
 
 
 class ShapeNet_GraphClass(nn.Module):
-    def __init__(self, edges):
+    def __init__(self, edges,dropout_lvl):
         super(ShapeNet_GraphClass, self).__init__()
 
         # resnet50 = models.resnet50()
@@ -267,6 +275,7 @@ class ShapeNet_GraphClass(nn.Module):
 
 
         #self.TimeDistributed = TimeDistributed(resnet50)
+        self.drop = nn.Dropout(p=dropout_lvl)
         self.TimeDistributed = TimeDistributed(efficient_net)
 
 
@@ -280,12 +289,11 @@ class ShapeNet_GraphClass(nn.Module):
         
  
     def forward(self, x):
- 
+        
+        x = self.drop(x)
         x = self.TimeDistributed(x)
         x_v = self.WV(x)
-
         x_a, w_a = self.Attention(x, x_v)
-
         x = self.Prediction(x_a)
 
         return x
@@ -293,11 +301,22 @@ class ShapeNet_GraphClass(nn.Module):
 
 
 
-
 def main():
-    batch_size = 6
-    image_size = 320
-    num_epochs = 600
+    batch_size = 18
+    image_size = 224
+    num_epochs = 6_000
+    ico_lvl = 1
+    noise_lvl = 0.015
+    dropout_lvl = 0.5
+    # model_fn = f"checkpoints/regression_L&R_Template_06_25_with_test_split_res224_train_shuffle_icolvl{str(ico_lvl)}_noise{str(noise_lvl)}_dropout{str(dropout_lvl)}.pt"
+    model_fn = "checkpoints/trash.pt"
+    path_ico = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Icospheres/ico-6.surf.gii'
+    # train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/new_train.npy'
+    # val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/new_val.npy'
+    train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/train.npy'
+    val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/validation.npy'
+    load_model = True
+    model_to_load = "/NIRAL/work/leclercq/source/SLCN_challenge_Mathieu/weights/ckpt.pth"
 
     if torch.cuda.is_available():
         device = torch.device("cuda:0")
@@ -305,10 +324,10 @@ def main():
     else:
         device = torch.device("cpu")
 
-    model_fn = "checkpoints/regression_left3_res320"
-    early_stop = EarlyStopping(patience=100, verbose=True, path=model_fn)
+    
+    early_stop = EarlyStopping(patience=500, verbose=True, path=model_fn)
 
-    path_ico = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Icospheres/ico-6.surf.gii'
+    
 
     # load icosahedron
     ico_surf = nib.load(path_ico)
@@ -340,16 +359,15 @@ def main():
     batched_ico_verts = torch.cat(l_ico_verts,dim=0)
     batched_ico_faces = torch.cat(l_ico_faces,dim=0)
 
-    train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/scan_age/train.npy'
-    val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/scan_age/train.npy'
+
     train_split = np.load(train_split_path,allow_pickle=True)
     val_split = np.load(val_split_path,allow_pickle=True)
-    train_dataset = BrainDataset(train_split,triangles)
-    val_dataset = BrainDataset(val_split,triangles)
+    train_dataset = BrainDataset(train_split,triangles,ico_lvl)
+    val_dataset = BrainDataset(val_split,triangles,ico_lvl)
 
     
 
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size,shuffle=True)
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size,shuffle=True)
 
 
@@ -375,182 +393,160 @@ def main():
     )
 
 
-    model = ShapeNet_GraphClass(train_dataset.ico_sphere_edges.to(device))
-
-    #model.load_state_dict(torch.load(model_fn))
+    model = ShapeNet_GraphClass(train_dataset.ico_sphere_edges.to(device),dropout_lvl)
+    if load_model:
+        model.load_state_dict(torch.load(model_to_load))
     model.to(device)
 
     loss_fn = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
-
+    writer = SummaryWriter()
     list_sphere_points = train_dataset.ico_sphere_verts.tolist()
 
 
-    #ic(list_sphere_points)
 
     ##
     ## STARTING TRAINING
     ##
 
 
-
+    ic(model_fn)
     for epoch in range(num_epochs):
-
+        """
         model.train()
-        running_loss = 0.0
+        train_loss = 0.0
         print("-" * 20)
         print(f'epoch {epoch+1}/{num_epochs}')
-
-        for batch, (vertex_features, face_features, age) in tqdm(enumerate(train_dataloader),desc='training:'):  # TRAIN LOOP
+        if epoch % 20 == 0:
+            print(f'Model name: {model_fn}')
+        step = 0
+        for batch, (vertex_features, face_features, age_at_birth, scan_age) in tqdm(enumerate(train_dataloader),desc='training:'):  # TRAIN LOOP
 
             vertex_features = vertex_features.to(device)
             vertex_features = vertex_features[:,:,0:3]
-            Y = age.double().to(device)
+            Y = age_at_birth.double().to(device)
+            scan_age = torch.unsqueeze(scan_age.double().to(device),1)
             face_features = face_features.to(device)
+            
             l_inputs = []
-
             for coords in list_sphere_points:  # multiple views of the object
-
-                textures = TexturesVertex(verts_features=vertex_features)
-                try:
-                    meshes = Meshes(
-                        verts=batched_ico_verts,   
-                        faces=batched_ico_faces, 
-                        textures=textures
-                    )
-                except ValueError:
-                    reduced_batch_size = vertex_features.shape[0]
-                    l_ico_verts = []
-                    l_ico_faces = []
-                    for i in range(reduced_batch_size):
-                        l_ico_verts.append(ico_verts)
-                        l_ico_faces.append(ico_faces)  
-                    batched_ico_verts,batched_ico_faces  = torch.cat(l_ico_verts,dim=0), torch.cat(l_ico_faces,dim=0)
-                    meshes = Meshes(
-                        verts=batched_ico_verts,   
-                        faces=batched_ico_faces, 
-                        textures=textures
-                    )
-
-                camera_position = torch.FloatTensor([coords]).to(device)
-                R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
-                T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
-
-                batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
-                pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
-
-                l_features = []
-
-                for index in range(4):
-                    l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
-                inputs = torch.cat(l_features,dim=3)
-                inputs = inputs.permute(0,3,1,2)
+             
+                inputs = GetView(vertex_features,face_features,
+                                batched_ico_verts,batched_ico_faces,ico_verts,
+                                ico_faces,phong_renderer,device,coords)
                 inputs = torch.unsqueeze(inputs, 1)
-                l_inputs.append(inputs)            
+                l_inputs.append(inputs)    
+
 
             X = torch.cat(l_inputs,dim=1).to(device)
             X = X.type(torch.float32)
-            X = abs(X)            
+            noise = torch.normal(0.0, noise_lvl,size=X.shape).to(device)*(X!=0) # add noise on sphere (not on background)
+            X = (X + noise)
             optimizer.zero_grad()
-            x = model(X) 
-            x = x.double() 
-            x = torch.squeeze(x)
-
-            loss = loss_fn(x, Y)
+            outputs = model(X)
+            outputs = outputs.double() 
+            outputs = torch.squeeze(outputs)
+            loss = loss_fn(outputs, Y)
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            train_loss += loss.item()
+            step += 1
 
-        train_loss = running_loss / len(train_dataloader)
-        print(f"average epoch loss: {train_loss:>7f}, [{epoch:>5d}/{num_epochs:>5d}]")
+        train_loss /= step
+        print(f"average epoch loss: {train_loss:>7f}, [{epoch+1:>5d}/{num_epochs:>5d}]")
+        writer.add_scalar("training_loss", train_loss, epoch + 1)
+        """
 
 
         model.eval()  
         with torch.no_grad():  # VALIDATION LOOP
-            running_loss = 0.0
-            for batch, (vertex_features, face_features, age) in enumerate(train_dataloader):
+            val_loss = 0.0
+            step = 0
+
+            for batch, (vertex_features, face_features, age_at_birth, scan_age) in enumerate(val_dataloader):
                 vertex_features = vertex_features.to(device)
                 vertex_features = vertex_features[:,:,0:3]
-                Y = age.double().to(device)
+                Y = age_at_birth.double().to(device)
+                scan_age = torch.unsqueeze(scan_age.double().to(device),1)
                 face_features = face_features.to(device)
                 l_inputs = []
-
                 for coords in list_sphere_points:  # multiple views of the object
 
-                    textures = TexturesVertex(verts_features=vertex_features)
-                    try:
-                        meshes = Meshes(
-                            verts=batched_ico_verts,   
-                            faces=batched_ico_faces, 
-                            textures=textures
-                        )
-                    except ValueError:
-                        reduced_batch_size = vertex_features.shape[0]
-                        l_ico_verts = []
-                        l_ico_faces = []
-                        for i in range(reduced_batch_size):
-                            l_ico_verts.append(ico_verts)
-                            l_ico_faces.append(ico_faces)  
-                        batched_ico_verts,batched_ico_faces  = torch.cat(l_ico_verts,dim=0), torch.cat(l_ico_faces,dim=0)
-                        meshes = Meshes(
-                            verts=batched_ico_verts,   
-                            faces=batched_ico_faces, 
-                            textures=textures
-                        )
-                    camera_position = torch.FloatTensor([coords]).to(device)
-                    R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
-                    T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+                    val_inputs= GetView(vertex_features,face_features,
+                                batched_ico_verts,batched_ico_faces,ico_verts,
+                                ico_faces,phong_renderer,device,coords)
 
-                    batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
-                    
-                    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())                    
-
-                    l_features = []
-                    for index in range(4):
-                        l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
-                    inputs = torch.cat(l_features,dim=3) 
-
-                    inputs = inputs.permute(0,3,1,2)
-                    inputs = torch.unsqueeze(inputs, 1)
-                    l_inputs.append(inputs)
+                    val_inputs = torch.unsqueeze(val_inputs, 1)
+                    l_inputs.append(val_inputs) 
 
                 X = torch.cat(l_inputs,dim=1).to(device)
-                X = X.type(torch.float32)
-                X = abs(X)
-                x = model(X) 
-                x = x.double() 
-                x = torch.squeeze(x)
-                loss = loss_fn(x, Y)
+                X = X.type(torch.float32)              
+                #val_outputs = model(X) + scan_age
+                val_outputs = model(X)
+                val_outputs = val_outputs.double() 
+                val_outputs = torch.squeeze(val_outputs)
+                loss = loss_fn(val_outputs, Y)
 
-                running_loss += loss.item()
+                val_loss += loss.item()
+                step += 1
+
+                ic(val_outputs)
+                ic(Y)
+
+            val_loss  /= step
+            print(f'val loss: {val_loss}')
+            writer.add_scalar("val loss", val_loss, epoch + 1)
+            early_stop(val_loss, model)
+
+            if early_stop.early_stop:
+                print("Early stopping")
+                break
 
 
-        val_loss = running_loss / len(val_dataloader)
-        print(f'val loss: {val_loss}')
-        early_stop(val_loss, model)
+def GetView(vertex_features,face_features,
+            batched_ico_verts,batched_ico_faces,ico_verts,
+            ico_faces,phong_renderer,device,coords):
 
-        if early_stop.early_stop:
-            print("Early stopping")
-            break
+    textures = TexturesVertex(verts_features=vertex_features)
+    try:
+        meshes = Meshes(
+            verts=batched_ico_verts,   
+            faces=batched_ico_faces, 
+            textures=textures
+        )
+    except ValueError:
+        reduced_batch_size = vertex_features.shape[0]
+        l_ico_verts = []
+        l_ico_faces = []
+        for i in range(reduced_batch_size):
+            l_ico_verts.append(ico_verts)
+            l_ico_faces.append(ico_faces)  
+        batched_ico_verts,batched_ico_faces  = torch.cat(l_ico_verts,dim=0), torch.cat(l_ico_faces,dim=0)
+        meshes = Meshes(
+            verts=batched_ico_verts,   
+            faces=batched_ico_faces, 
+            textures=textures
+        )
+    camera_position = torch.FloatTensor([coords]).to(device)
+    R = look_at_rotation(camera_position, device=device)
+    # check if camera coords vector and up vector for R are collinear
+    if torch.equal(torch.cross(camera_position,torch.tensor([[0.,1.,0.]]).to(device)),torch.tensor([[0., 0., 0.]]).to(device)): 
+        R = look_at_rotation(camera_position, up = torch.tensor([[0.0, 0.0, 1.0]]).to(device),device=device)    
+    T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
 
+    batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
+    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
 
-def GetView():
-    
+    l_features = []
 
-def fibonacci_sphere(samples, dist_cam):
-
-    points = []
-    phi = math.pi * (3. -math.sqrt(5.))  # golden angle in radians
-    for i in range(samples):
-        y = 1 - (i / float(samples - 1)) * 2  # y goes from 1 to -1
-        radius = math.sqrt(1 - y*y)  # radius at y
-        theta = phi*i 
-        x = math.cos(theta)*radius
-        z = math.sin(theta)*radius
-        points.append((x*dist_cam, y*dist_cam, z*dist_cam))
-    return points
+    for index in range(4):
+        l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
+    inputs = torch.cat(l_features,dim=3)
+    inputs = inputs.permute(0,3,1,2)
+    return inputs
 
 
 if __name__ == '__main__':
     main()
+
