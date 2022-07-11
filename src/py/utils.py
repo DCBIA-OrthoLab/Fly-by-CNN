@@ -17,7 +17,6 @@ from monai.transforms import (
     ToTensor
 )
 
-
 def normalize_points(poly, radius):
     polypoints = poly.GetPoints()
     for pid in range(polypoints.GetNumberOfPoints()):
@@ -32,7 +31,7 @@ def normalize_points(poly, radius):
 def normalize_vector(x):
     return x/np.linalg.norm(x)
 
-def CreateIcosahedron(radius, sl):
+def CreateIcosahedron(radius, sl=0):
     icosahedronsource = vtk.vtkPlatonicSolidSource()
     icosahedronsource.SetSolidTypeToIcosahedron()
     icosahedronsource.Update()
@@ -164,6 +163,31 @@ def ReadSurf(fileName):
             reader.SetFileName(fileName)
             reader.Update()
             surf = reader.GetOutput()
+    elif extension == '.gii':
+        import nibabel as nib
+        from fsl.data import gifti
+
+        surf = nib.load(fileName)
+        coords = surf.agg_data('pointset')
+        triangles = surf.agg_data('triangle')
+
+        points = vtk.vtkPoints()
+
+        for c in coords:
+            points.InsertNextPoint(c[0], c[1], c[2])
+
+        cells = vtk.vtkCellArray()
+
+        for t in triangles:
+            t_vtk = vtk.vtkTriangle()
+            t_vtk.GetPointIds().SetId(0, t[0])
+            t_vtk.GetPointIds().SetId(1, t[1])
+            t_vtk.GetPointIds().SetId(2, t[2])
+            cells.InsertNextCell(t_vtk)
+
+        surf = vtk.vtkPolyData()
+        surf.SetPoints(points)
+        surf.SetPolys(cells)
 
     return surf
 
@@ -337,6 +361,30 @@ def GetColoredActor(surf, property_name, range_scalars = None):
     actor.GetMapper().SetUseLookupTableScalarRange(True)
 
     actor.GetMapper().SetLookupTable(hueLut)
+
+    return actor
+
+def GetRandomColoredActor(surf, property_name, range_scalars = [0, 1000]):
+
+    if range_scalars == None:
+        range_scalars = surf.GetPointData().GetScalars(property_name).GetRange()
+
+    
+    ctf = vtk.vtkColorTransferFunction()        
+    ctf.SetColorSpaceToRGB()
+
+    for i in range(range_scalars[0], range_scalars[1]):
+        ctf.AddRGBPoint(i, np.random.rand(), np.random.rand(), np.random.rand())
+
+    surf.GetPointData().SetActiveScalars(property_name)
+
+    actor = GetActor(surf)
+    actor.GetMapper().ScalarVisibilityOn()
+    actor.GetMapper().SetScalarModeToUsePointData()
+    actor.GetMapper().SetColorModeToMapScalars()
+    actor.GetMapper().SetUseLookupTableScalarRange(True)
+
+    actor.GetMapper().SetLookupTable(ctf)
 
     return actor
 
