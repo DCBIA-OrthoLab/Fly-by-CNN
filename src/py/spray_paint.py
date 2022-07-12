@@ -131,7 +131,6 @@ def main(args):
     # actor = GetColoredActor(surf, args.property)
     # actor = GetRandomColoredActor(surf, args.property)
     actor = GetSeparateColoredActor(surf, args.property)
-
     actor.GetProperty().SetInterpolationToFlat()
 
     colors = vtk.vtkNamedColors()
