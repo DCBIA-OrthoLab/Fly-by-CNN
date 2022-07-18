@@ -3,24 +3,8 @@ import numpy as np
 import os
 import glob
 import argparse
+import utils
 
-def Normalization(vtkdata):
-    polypoints = vtkdata.GetPoints()
-    
-    nppoints = []
-    for pid in range(polypoints.GetNumberOfPoints()):
-        spoint = polypoints.GetPoint(pid)
-        nppoints.append(spoint)
-
-    npmean = np.mean(np.array(nppoints), axis=0)
-    nppoints -= npmean
-    npscale = np.max([np.linalg.norm(p) for p in nppoints])
-    nppoints /= npscale
-
-    for pid in range(polypoints.GetNumberOfPoints()):
-        vtkdata.GetPoints().SetPoint(pid, nppoints[pid])
-
-    return vtkdata, npmean, npscale
 
 def main(args):
     shapes_arr = []
@@ -32,51 +16,24 @@ def main(args):
         for svtk in glob.iglob(shapes_dir, recursive=True):
             shapes_arr.append(svtk)
     
+    scale_factors = []
     max_value=-1
     for vtkfilename in shapes_arr:
         scale_factor = -1
 
-        print("Reading: ", vtkfilename)
-        vtkfilename = vtkfilename.rstrip()
-        reader = vtk.vtkPolyDataReader()
-        reader.SetFileName(vtkfilename)
-        reader.Update()
-        shapedata = reader.GetOutput()
-        #QUESTION: Do i normalize the shape before finding scale factor - bc the surface is being normalized in the utils.py file before using the scale factor
-        shapedata, shape_mean, shape_scale = Normalization(shapedata)
-        shapedatapoints = shapedata.GetPoints()
-        
-        bounds = [0.0] * 6
-        mean_v = [0.0] * 3
-        bounds_max_v = [0.0] * 3
-        bounds = shapedatapoints.GetBounds()
-        mean_v[0] = (bounds[0] + bounds[1])/2.0
-        mean_v[1] = (bounds[2] + bounds[3])/2.0
-        mean_v[2] = (bounds[4] + bounds[5])/2.0
-        bounds_max_v[0] = max(bounds[0], bounds[1])
-        bounds_max_v[1] = max(bounds[2], bounds[3])
-        bounds_max_v[2] = max(bounds[4], bounds[5])
+        surf = utils.ReadSurf(vtkfilename)
+        surf, mean_arr, scale_factor = utils.ScaleSurf(surf)
 
-        #Getting points from shape
-        shape_points = []
-        for i in range(shapedatapoints.GetNumberOfPoints()):
-            p = shapedatapoints.GetPoint(i)
-            shape_points.append(p)
-
-        #centering points of the shape
-        shape_points = np.array(shape_points)
-        mean_arr = np.array(mean_v)
-        shape_points = shape_points - mean_arr 
-
-        #Computing scale factor
-        bounds_max_arr = np.array(bounds_max_v)
-        scale_factor = 1/np.linalg.norm(bounds_max_arr - mean_arr)
-        
         if(scale_factor>max_value):
             max_value=scale_factor
 
         print("Scale factor: "+str(scale_factor))
-        with open(args.out, "a+") as f:
+        
+        scale_factors.append(scale_factor)
+
+
+    with open(args.out, "w") as f:
+        for scale_factor in scale_factors:
             f.write(str(scale_factor)+"\n")
 
     print("Max scale factor: "+str(max_value))

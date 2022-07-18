@@ -306,7 +306,15 @@ def main(args):
 			if args.property:
 				surf_actor = GetPropertyActor(surf, args.property)
 			else:
-				if args.view_features:
+
+				if args.view_features == 'colors':
+					surf_actor = GetActor(surf)
+					surf_actor.GetMapper().SetScalarModeToUsePointData()
+					surf_actor.GetProperty().LightingOff()
+					surf_actor.GetProperty().ShadingOff()
+					surf_actor.GetProperty().SetInterpolationToFlat()
+
+				elif args.view_features:
 					surf_actor = GetColoredActor(surf, args.view_features)
 				else:
 					surf_actor = GetNormalsActor(surf)

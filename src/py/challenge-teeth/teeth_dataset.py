@@ -12,15 +12,12 @@ from torchvision import transforms
 from pl_bolts.transforms.dataset_normalizations import (
     imagenet_normalization
 )
-<<<<<<< HEAD
 
-sys.path.insert(0,'..')
-=======
 import sys
 from icecream import ic
 parent_dir = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
 sys.path.append(parent_dir)
->>>>>>> 70b15b101c4d805234ffb10617d62c94aca21c8f
+
 import utils
 import post_process
 
@@ -52,18 +49,18 @@ class TeethDataset(Dataset):
         surf = utils.ComputeNormals(surf)
         color_normals = torch.tensor(vtk_to_numpy(utils.GetColorArray(surf, "Normals"))).to(torch.float32)/255.0
         verts = torch.tensor(vtk_to_numpy(surf.GetPoints().GetData())).to(torch.float32)
-        faces = torch.tensor(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]).to(torch.int64)
-        faces_pid0 = faces[:,0:1]
+        faces = torch.tensor(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]).to(torch.int64)        
 
         if self.surf_property:            
 
+            faces_pid0 = faces[:,0:1]
             surf_point_data = surf.GetPointData().GetScalars(self.surf_property)
             
             surf_point_data = torch.tensor(vtk_to_numpy(surf_point_data)).to(torch.float32)            
-            surf_point_data_faces = torch.take(surf_point_data, faces_pid0)
-            
-            surf_point_data_faces[surf_point_data_faces==-1] = 33
-            
+            surf_point_data_faces = torch.take(surf_point_data, faces_pid0)            
+
+            surf_point_data_faces[surf_point_data_faces==-1] = 33            
+
             return verts, faces, surf_point_data_faces, color_normals
 
         return verts, faces, color_normals
@@ -110,7 +107,7 @@ class TeethDataModule(pl.LightningDataModule):
         color_normals = [cn for v, f, vdf, cn in batch]        
         
         verts = pad_sequence(verts, batch_first=True, padding_value=0.0)        
-        faces = pad_sequence(faces, batch_first=True, padding_value=-1)        
+        faces = pad_sequence(faces, batch_first=True, padding_value=-1)
         verts_data_faces = torch.cat(verts_data_faces)
         color_normals = pad_sequence(color_normals, batch_first=True, padding_value=0.0)
 

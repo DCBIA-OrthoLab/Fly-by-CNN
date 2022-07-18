@@ -4,7 +4,8 @@ RUN apt update && \
 	apt install -y git \
 	wget \
 	unzip \
-	libgl1-mesa-glx
+	libgl1-mesa-glx \
+	libxrender1
 
 
 RUN mkdir /app

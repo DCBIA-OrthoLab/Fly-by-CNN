@@ -55,11 +55,12 @@ class MonaiUNet(pl.LightningModule):
         self.save_hyperparameters()        
         self.args = args
         
+        self.out_channels = out_channels
         self.class_weights = None
         if(class_weights is not None):
             self.class_weights = torch.tensor(class_weights).to(torch.float32)
             
-        self.loss = monai.losses.DiceCELoss(to_onehot_y=True,softmax=True, ce_weight=self.class_weights)
+        self.loss = monai.losses.DiceCELoss(include_background=False, to_onehot_y=True, softmax=True, ce_weight=self.class_weights)
         self.accuracy = torchmetrics.Accuracy()
 
         unet = monai.networks.nets.UNet(
@@ -99,25 +100,30 @@ class MonaiUNet(pl.LightningModule):
     def forward(self, x):
 
         V, F, CN = x
-
-        batch_size = V.shape[0]
-        textures = TexturesVertex(verts_features=CN.to(torch.float32))
-        meshes = Meshes(verts=V.to(torch.float32), faces=F, textures=textures)
         
-        X, PF = self.render(meshes, batch_size)
+        X, PF = self.render(V, F, CN)
 
         x = self.model(X)
         
         return x, X, PF
 
-    def render(self, meshes, batch_size=1):
+    def render(self, V, F, CN):
 
         X = []
         PF = []
 
+        batch_size = V.shape[0]
+
         sphere_centers = torch.zeros([batch_size, 3]).to(torch.float32).to(self.device)
-        meshes = meshes.to(self.device)
+        
         renderer = self.renderer.to(self.device)
+
+        V = V.to(self.device)
+        F = F.to(self.device)
+        CN = CN.to(self.device).to(torch.float32)
+
+        textures = TexturesVertex(verts_features=CN)
+        meshes = Meshes(verts=V, faces=F, textures=textures)
 
         for camera_position in self.ico_verts:
             
@@ -125,7 +131,6 @@ class MonaiUNet(pl.LightningModule):
 
             R = look_at_rotation(current_cam_pos, device=self.device)  # (1, 3, 3)
             T = -torch.bmm(R.transpose(1, 2), current_cam_pos[:,:,None])[:, :, 0]   # (1, 3)
-            T = T.to(self.device)
 
             images = renderer(meshes_world=meshes.clone(), R=R, T=T)            
             pix_to_face, zbuf, bary_coords, dists = renderer.rasterizer(meshes.clone())
@@ -144,14 +149,10 @@ class MonaiUNet(pl.LightningModule):
 
 
     def training_step(self, train_batch, batch_idx):
-
-        V, F, YF, CN = train_batch        
-
-        batch_size = V.shape[0]
-        textures = TexturesVertex(verts_features=CN)
-        meshes = Meshes(verts=V, faces=F, textures=textures)
         
-        X, PF = self.render(meshes, batch_size)
+        V, F, YF, CN = train_batch
+        
+        X, PF = self.render(V, F, CN)
         y = torch.take(YF, PF)*(PF >= 0) # YF=input, pix_to_face=index. shape of y = shape of pix_to_face
 
         x = self.model(X)
@@ -164,17 +165,17 @@ class MonaiUNet(pl.LightningModule):
         self.log('train_loss', loss)
 
         x = torch.argmax(x, dim=1, keepdim=True)
-        self.accuracy(torch.argmax(x, dim=1).reshape(-1, 1), y.reshape(-1, 1))
+        self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
         self.log("train_acc", self.accuracy)
         
 
         grid_X = torchvision.utils.make_grid(X[:6, 0, 0:3, :, :])
         self.logger.experiment.add_image('X', grid_X, 0)
         
-        grid_x = torchvision.utils.make_grid(x[:6, :, 0, :, :])
+        grid_x = torchvision.utils.make_grid(x[:6, :, 0, :, :]/self.out_channels)
         self.logger.experiment.add_image('x', grid_x, 0)
 
-        grid_y = torchvision.utils.make_grid(y[:6, :, 0, :, :])
+        grid_y = torchvision.utils.make_grid(y[:6, :, 0, :, :]/self.out_channels)
         self.logger.experiment.add_image('Y', grid_y, 0)
 
         return loss
@@ -182,11 +183,7 @@ class MonaiUNet(pl.LightningModule):
     def validation_step(self, val_batch, batch_idx):
         V, F, YF, CN = val_batch
         
-        batch_size = V.shape[0]
-        textures = TexturesVertex(verts_features=CN)
-        meshes = Meshes(verts=V, faces=F, textures=textures)
-        
-        X, PF = self.render(meshes, batch_size)
+        X, PF = self.render(V, F, CN)
         y = torch.take(YF, PF)*(PF >= 0)
 
         x = self.model(X)
@@ -199,5 +196,5 @@ class MonaiUNet(pl.LightningModule):
         self.log('val_loss', loss)
 
         x = torch.argmax(x, dim=1, keepdim=True)
-        self.accuracy(torch.argmax(x, dim=1).reshape(-1, 1), y.reshape(-1, 1))
+        self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
         self.log("val_acc", self.accuracy)
