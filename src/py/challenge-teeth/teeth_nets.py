@@ -48,7 +48,8 @@ class TimeDistributed(nn.Module):
         return output
 
 class MonaiUNet(pl.LightningModule):
-    def __init__(self, args = None, out_channels=3, class_weights=None, image_size=224):
+    def __init__(self, args = None, out_channels=3, class_weights=None, image_size=320):
+
         super(MonaiUNet, self).__init__()        
         
         self.save_hyperparameters()        
@@ -143,7 +144,8 @@ class MonaiUNet(pl.LightningModule):
 
 
     def training_step(self, train_batch, batch_idx):
-        V, F, Y, YF, CN = train_batch        
+
+        V, F, YF, CN = train_batch        
 
         batch_size = V.shape[0]
         textures = TexturesVertex(verts_features=CN)
@@ -178,7 +180,7 @@ class MonaiUNet(pl.LightningModule):
         return loss
 
     def validation_step(self, val_batch, batch_idx):
-        V, F, Y, YF, CN = val_batch
+        V, F, YF, CN = val_batch
         
         batch_size = V.shape[0]
         textures = TexturesVertex(verts_features=CN)

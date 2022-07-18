@@ -34,13 +34,21 @@ def main(args):
     mount_point = args.mount_point
 
     class_weights = np.load(os.path.join(mount_point, 'train_weights.npy'))
-    model = MonaiUNet(args, out_channels = 34, class_weights=class_weights)
 
-    df_train = pd.read_csv(os.path.join(mount_point, "train.csv"))
-    df_val = pd.read_csv(os.path.join(mount_point, "val.csv"))
+    model = MonaiUNet(args, out_channels = 34, class_weights=class_weights, image_size=320)
+
+    df_train = pd.read_csv(os.path.join(mount_point, "train_merged.csv"))
+    df_val = pd.read_csv(os.path.join(mount_point, "val_merged.csv"))
     df_test = pd.read_csv(os.path.join(mount_point, "test.csv"))
 
-    teeth_data = TeethDataModule(df_train, df_val, df_test, batch_size=args.batch_size, num_workers=args.num_workers, surf_column='surf', surf_property="UniversalID", train_transform=RandomRemoveTeethTransform(surf_property="UniversalID", random_rotation=True), valid_transform=UnitSurfTransform())
+
+    teeth_data = TeethDataModule(df_train, df_val, df_test, 
+                                mount_point = mount_point,
+                                batch_size = args.batch_size,
+                                num_workers = args.num_workers,
+                                surf_column = 'surf', surf_property="UniversalID",
+                                train_transform = RandomRemoveTeethTransform(surf_property="UniversalID", random_rotation=True),
+                                valid_transform = UnitSurfTransform())
 
     early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.00, patience=30, verbose=True, mode="min")
 
@@ -77,3 +85,4 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     main(args)
+

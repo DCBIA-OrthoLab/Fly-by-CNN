@@ -12,8 +12,15 @@ from torchvision import transforms
 from pl_bolts.transforms.dataset_normalizations import (
     imagenet_normalization
 )
+<<<<<<< HEAD
 
 sys.path.insert(0,'..')
+=======
+import sys
+from icecream import ic
+parent_dir = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
+sys.path.append(parent_dir)
+>>>>>>> 70b15b101c4d805234ffb10617d62c94aca21c8f
 import utils
 import post_process
 
@@ -27,14 +34,17 @@ class TeethDataset(Dataset):
         self.mount_point = mount_point
         self.transform = transform
         self.surf_column = surf_column
-        self.surf_property = surf_property
+        self.surf_property = surf_property        
 
     def __len__(self):
         return len(self.df.index)
 
     def __getitem__(self, idx):
         
-        surf = utils.ReadSurf(self.df.iloc[idx][self.surf_column])        
+
+        surf_path = f'{self.mount_point}/{self.df.iloc[idx][self.surf_column]}'
+        surf = utils.ReadSurf(surf_path)     
+
 
         if self.transform:
             surf = self.transform(surf)
@@ -52,7 +62,9 @@ class TeethDataset(Dataset):
             surf_point_data = torch.tensor(vtk_to_numpy(surf_point_data)).to(torch.float32)            
             surf_point_data_faces = torch.take(surf_point_data, faces_pid0)
             
-            return verts, faces, surf_point_data, surf_point_data_faces, color_normals
+            surf_point_data_faces[surf_point_data_faces==-1] = 33
+            
+            return verts, faces, surf_point_data_faces, color_normals
 
         return verts, faces, color_normals
 
@@ -92,19 +104,17 @@ class TeethDataModule(pl.LightningDataModule):
 
     def pad_verts_faces(self, batch):
 
-        verts = [v for v, f, rid, ridf, cn in batch]
-        faces = [f for v, f, rid, ridf, cn in batch]
-        verts_data = [vd for v, f, vd, vdf, cn in batch]
-        verts_data_faces = [vdf for v, f, vd, vdf, cn in batch]        
-        color_normals = [cn for v, f, rid, ridf, cn in batch]        
+        verts = [v for v, f, vdf, cn in batch]
+        faces = [f for v, f, vdf, cn in batch]        
+        verts_data_faces = [vdf for v, f, vdf, cn in batch]        
+        color_normals = [cn for v, f, vdf, cn in batch]        
         
         verts = pad_sequence(verts, batch_first=True, padding_value=0.0)        
         faces = pad_sequence(faces, batch_first=True, padding_value=-1)        
-        verts_data = pad_sequence(verts_data, batch_first=True, padding_value=0.0)
-        verts_data_faces = pad_sequence(verts_data_faces, batch_first=True, padding_value=0.0)                
+        verts_data_faces = torch.cat(verts_data_faces)
         color_normals = pad_sequence(color_normals, batch_first=True, padding_value=0.0)
 
-        return verts, faces, verts_data, verts_data_faces, color_normals
+        return verts, faces, verts_data_faces, color_normals
 
 
 class UnitSurfTransform:
