@@ -8,8 +8,13 @@ import json
 from icecream import ic
 import sys
 import os
-parent_dir = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
-sys.path.append(parent_dir)
+import platform
+system = platform.system()
+if system == 'Windows':
+  code_path = '\\'.join(os.path.dirname(os.path.abspath(__file__)).split('\\')[:-1])
+else:
+  code_path = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
+sys.path.append(code_path)
 import utils
 import post_process
 import vtk
@@ -208,13 +213,13 @@ def main(rank, world_size):
 		num_classes = 34 #34 # background + gum + 32 teeth
 		nb_epoch = 2000
 		dist_cam = 1.35
-		model_name= f"checkpoints/{NOW}_seed{SEED}weighted_dataset_noclass_weight.pth"
-		# model_name = 'checkpoints/trash.pt'y
-		patience = 100	
+		# model_name= f"checkpoints/{NOW}_seed{SEED}weighted_dataset_noclass_weight.pth"
+		model_name = 'checkpoints/trash.pt'
+		patience = 200	
 		nb_loop = 4
 		load_model = True
 		mount_point = "/work/leclercq/data/challenge_teeth_vtk"
-		model_to_load = f"checkpoints/15_07_14h50_seed5861weighted_dataset_class_weight.pth"
+		model_to_load = f"checkpoints/21_07_14h11_seed994weighted_dataset_noclass_weight_ val-loss0.1691.pth"
 		
 		class_weights = np.load(os.path.join(mount_point, 'train_weights.npy'))
 		
