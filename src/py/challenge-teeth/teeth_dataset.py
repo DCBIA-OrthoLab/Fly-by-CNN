@@ -14,8 +14,13 @@ from pl_bolts.transforms.dataset_normalizations import (
 )
 import sys
 from icecream import ic
-parent_dir = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
-sys.path.append(parent_dir)
+import platform
+system = platform.system()
+if system == 'Windows':
+  code_path = '\\'.join(os.path.dirname(os.path.abspath(__file__)).split('\\')[:-1])
+else:
+  code_path = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
+sys.path.append(code_path)
 import utils
 import post_process
 
@@ -155,3 +160,4 @@ class RandomRemoveTeethTransform:
                 if id_to_remove not in [1,16,17,32] and np.random.rand() > 0.5:
                     surf = post_process.Threshold(surf, self.surf_property ,id_to_remove-0.5,id_to_remove+0.5, invert=True)        
             return surf
+
