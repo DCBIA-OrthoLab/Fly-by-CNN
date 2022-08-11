@@ -45,10 +45,10 @@ from torch.utils.data.distributed import DistributedSampler
 
 
 class BrainDataset(Dataset):
-    def __init__(self,np_split,triangles):
+    def __init__(self,np_split,faces):
         self.np_split = np_split
-        self.triangles = triangles  
-        self.nb_triangles = len(triangles)
+        self.faces = faces  
+        self.nb_faces = len(faces)
 
     
     def __len__(self):
@@ -64,18 +64,18 @@ class BrainDataset(Dataset):
         #path_features = f'{data_dir}/segmentation_template_space_features/{item}_L.shape.gii'
         #path_labels = f'{data_dir}/segmentation_template_space_labels/{item}_L.label.gii'
         
-        path_features = f"{data_dir}/segmentation_native_space_features/{item}_R.shape.gii"
-        path_labels = f"{data_dir}/segmentation_native_space_labels/{item}_R.label.gii"
+        path_features = f"{data_dir}/segmentation_native_space_features/{item}_L.shape.gii"
+        path_labels = f"{data_dir}/segmentation_native_space_labels/{item}_L.label.gii"
         
         vertex_features = gifti.loadGiftiVertexData(path_features)[1] # vertex features
                 
         vertex_labels = gifti.loadGiftiVertexData(path_labels)[1] # vertex labels
-        faces_pid0 = self.triangles[:,0:1]        
+        faces_pid0 = self.faces[:,0:1]        
         
         face_labels = np.take(vertex_labels,faces_pid0) # face labels (taking first vertex for each face)        
         
-        #offset = np.arange(self.nb_triangles*4).reshape((self.nb_triangles,4))
-        offset = np.zeros((self.nb_triangles,4), dtype=int) + np.array([0,1,2,3])
+        #offset = np.arange(self.nb_faces*4).reshape((self.nb_faces,4))
+        offset = np.zeros((self.nb_faces,4), dtype=int) + np.array([0,1,2,3])
         faces_pid0_offset = offset + np.multiply(faces_pid0,4)        
         
         face_features = np.take(vertex_features,faces_pid0_offset)    
@@ -108,7 +108,7 @@ def main(rank,world_size):
     val_split_path = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_val_TEA.npy'
 
     num_classes = 37 #37
-    model_name= "checkpoints/06-09(RIGHT_NATIVE).pt"
+    model_name= "checkpoints/06-10(LEFT_NATIVE).pt"
     patience = 500
     early_stopping = EarlyStopping(patience=patience, verbose=True,path=model_name)
     write_image_interval = 1
@@ -166,7 +166,7 @@ def main(rank,world_size):
     ).to(device)
     model = DDP(model, device_ids=[device])
 
-    model.load_state_dict(torch.load("checkpoints/05-19(RIGHT).pt"))
+    #model.load_state_dict(torch.load("checkpoints/05-19(RIGHT).pt"))
 
     loss_function = monai.losses.DiceCELoss(to_onehot_y=True,softmax=True)
     optimizer = torch.optim.AdamW(model.parameters(), 1e-4)
@@ -181,36 +181,44 @@ def main(rank,world_size):
     ico_surf = nib.load(path_ico)
 
     # extract points and faces
-    coords = ico_surf.agg_data('pointset')
-    triangles = ico_surf.agg_data('triangle')
-    nb_faces = len(triangles)
-    connectivity = triangles.reshape(nb_faces*3,1) # 3 points per triangle
+    verts = ico_surf.agg_data('pointset')
+    faces = ico_surf.agg_data('triangle')
+    nb_faces = len(faces)
+    connectivity = faces.reshape(nb_faces*3,1) # 3 points per triangle
     connectivity = np.int64(connectivity)	
     offsets = [3*i for i in range (nb_faces)]
     offsets.append(nb_faces*3) #  The last value is always the length of the Connectivity array.
     offsets = np.array(offsets)
 
     # rescale icosphere [0,1]
-    coords = np.multiply(coords,0.01)
+    verts = np.multiply(verts,0.01)
 
     # convert to vtk
     vtk_coords = vtk.vtkPoints()
-    vtk_coords.SetData(numpy_to_vtk(coords))
-    vtk_triangles = vtk.vtkCellArray()
+    vtk_coords.SetData(numpy_to_vtk(verts))
+    vtk_faces = vtk.vtkCellArray()
     vtk_offsets = numpy_to_vtkIdTypeArray(offsets)
     vtk_connectivity = numpy_to_vtkIdTypeArray(connectivity)
-    vtk_triangles.SetData(vtk_offsets,vtk_connectivity)
+    vtk_faces.SetData(vtk_offsets,vtk_connectivity)
 
-    """
+
+    ic(connectivity.shape)
+    ic(offsets.shape)
+    ic(nb_faces)
+    ic(len(verts))
+    ic(faces.shape)
+
+
     # Create icosahedron as a VTK polydata 
     ico_polydata = vtk.vtkPolyData() # initialize polydata
     ico_polydata.SetPoints(vtk_coords) # add points
-    ico_polydata.SetPolys(vtk_triangles) # add polys
-    """
+    ico_polydata.SetPolys(vtk_faces) # add polys
+    utils.Write(ico_polydata,'/home/leclercq/Documents/out/brainseg.vtk')
+
 
     # convert ico verts / faces to tensor
-    ico_verts = torch.from_numpy(coords).unsqueeze(0).to(device)
-    ico_faces = torch.from_numpy(triangles).unsqueeze(0).to(device)
+    ico_verts = torch.from_numpy(verts).unsqueeze(0).to(device)
+    ico_faces = torch.from_numpy(faces).unsqueeze(0).to(device)
 
 
     # load train / test splits
@@ -222,8 +230,8 @@ def main(rank,world_size):
     train_split = train_val_split[:282]
     val_split = train_val_split[282:]
 
-    train_dataset = BrainDataset(train_split,triangles)
-    val_dataset = BrainDataset(val_split,triangles)
+    train_dataset = BrainDataset(train_split,faces)
+    val_dataset = BrainDataset(val_split,faces)
 
     train_sampler = DistributedSampler(train_dataset, num_replicas=world_size, rank=rank)
     val_sampler = DistributedSampler(val_dataset, shuffle=False, num_replicas=world_size, rank=rank)
@@ -256,65 +264,26 @@ def main(rank,world_size):
         for batch, (vertex_features, face_features, face_labels) in enumerate(train_dataloader):
             
             vertex_features = vertex_features.to(device)
+            print(vertex_features.shape)
             vertex_features = vertex_features[:,:,0:3]
             face_labels = torch.squeeze(face_labels,0)
             face_labels = face_labels.to(device)
             face_features = face_features.to(device)
-            l_inputs = []
-
             
             for s in range(nb_loops):
-                textures = TexturesVertex(verts_features=vertex_features)
-                try:
-                    meshes = Meshes(
-                        verts=batched_ico_verts,   
-                        faces=batched_ico_faces, 
-                        textures=textures
-                    )
-                except ValueError:
-                    reduced_batch_size = vertex_features.shape[0]
-                    l_ico_verts = []
-                    l_ico_faces = []
-                    for i in range(reduced_batch_size):
-                        l_ico_verts.append(ico_verts)
-                        l_ico_faces.append(ico_faces)  
-                    batched_ico_verts,batched_ico_faces  = torch.cat(l_ico_verts,dim=0), torch.cat(l_ico_faces,dim=0)
-                    meshes = Meshes(
-                        verts=batched_ico_verts,   
-                        faces=batched_ico_faces, 
-                        textures=textures
-                    )
-                array_coord = np.random.normal(0, 1, 3)
-                array_coord *= dist_cam/(np.linalg.norm(array_coord))
-                camera_position = ToTensor(dtype=torch.float32, device=device)([array_coord.tolist()])
-                
-                R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
-                T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+                inputs,labels = GetView(vertex_features,face_features,face_labels,
+                                                    batched_ico_verts,ico_verts,ico_faces,batched_ico_faces,
+                                                    phong_renderer,dist_cam,device)
 
-                images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)    
-                pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone()) 
-                labels = torch.take(face_labels, pix_to_face)*(pix_to_face >= 0) 
+                optimizer.zero_grad()
 
-                l_features = []
-                for index in range(4):
-                    l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
-                inputs = torch.cat(l_features,dim=3)        
-                inputs, labels  = inputs.permute(0,3,1,2), labels.permute(0,3,1,2)
-                inputs = torch.unsqueeze(inputs, 1)
-                l_inputs.append(inputs)  
-
-
-            X = torch.cat(l_inputs,dim=1).to(device)
-            X = X.type(torch.float32)
-            optimizer.zero_grad()
-            ic(X.shape)
-            outputs = model(X)
-            loss = loss_function(outputs,labels)
-            loss.backward()
-            optimizer.step()
-            epoch_loss += loss
-            # epoch_len = int(np.ceil(len(train_dataloader) / train_dataloader.batch_size))
-            step += 1
+                outputs = model(inputs)
+                loss = loss_function(outputs,labels)
+                loss.backward()
+                optimizer.step()
+                epoch_loss += loss
+                # epoch_len = int(np.ceil(len(train_dataloader) / train_dataloader.batch_size))
+                step += 1
 
                 
             if rank == 0:  
@@ -328,19 +297,14 @@ def main(rank,world_size):
             print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")        
             writer.add_scalar("training_loss", epoch_loss, epoch + 1)
 
-
-                
-
         # VALIDATION
 
         if (epoch) % val_interval == 0: # every two epochs : validation
             nb_val += 1 
             model.eval()
             with torch.no_grad():
-                epoch_loss = 0
-                val_inputs = None
-                val_labels = None
-                val_outputs = None
+                val_loss = 0
+                step = 0
                 for batch, (vertex_features, face_features, face_labels) in enumerate(train_dataloader):
                     
                     vertex_features = vertex_features.to(device)
@@ -348,90 +312,22 @@ def main(rank,world_size):
                     face_labels = torch.squeeze(face_labels,0)
                     face_labels = face_labels.to(device)
                     face_features = face_features.to(device)
+                    val_inputs, val_labels = GetView(vertex_features,face_features,face_labels,
+                                                    batched_ico_verts,ico_verts,ico_faces,batched_ico_faces,
+                                                    phong_renderer,dist_cam,device)
 
-                    textures = TexturesVertex(verts_features=vertex_features)
-                    try:
-                        meshes = Meshes(
-                            verts=batched_ico_verts,   
-                            faces=batched_ico_faces, 
-                            textures=textures
-                        )
-                    except ValueError:
-                        reduced_batch_size = vertex_features.shape[0]
-                        l_ico_verts = []
-                        l_ico_faces = []
-                        for i in range(reduced_batch_size):
-                            l_ico_verts.append(ico_verts)
-                            l_ico_faces.append(ico_faces)  
-                        batched_ico_verts,batched_ico_faces  = torch.cat(l_ico_verts,dim=0), torch.cat(l_ico_faces,dim=0)
-                        meshes = Meshes(
-                            verts=batched_ico_verts,   
-                            faces=batched_ico_faces, 
-                            textures=textures
-                        )
-                    array_coord = np.random.normal(0, 1, 3)
-                    array_coord *= dist_cam/(np.linalg.norm(array_coord))
-                    camera_position = ToTensor(dtype=torch.float32, device=device)([array_coord.tolist()])
-                    R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
-                    T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+                    val_outputs = model(val_inputs)
+                    loss = loss_function(val_outputs,val_labels)
+                    val_loss += loss
+                    step += 1
 
-                    images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)    
-                    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone()) 
-                    labels = torch.take(face_labels, pix_to_face)*(pix_to_face >= 0) 
-                    l_inputs = []
-                    for index in range(4):
-                        # take each feature
-                        l_inputs.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0))      
-                    inputs = torch.cat(l_inputs,dim=3)            
-                    val_inputs, val_labels  = inputs.permute(0,3,1,2), labels.permute(0,3,1,2)
+                val_loss /= (step*world_size)
+                dist.all_reduce(val_loss)
 
-
-                    val_loss = loss_function(outputs,labels)
-
-
-                    # roi_size = (image_size, image_size)
-                    # sw_batch_size = batch_size
-                    # val_outputs = sliding_window_inference(val_inputs, roi_size, sw_batch_size, model)               
-
-
-                    # val_labels_list = decollate_batch(val_labels)                
-                    # val_labels_convert = [
-                    #     post_label(val_label_tensor) for val_label_tensor in val_labels_list
-                    # ]
-                    
-                    # val_outputs_list = decollate_batch(val_outputs)
-                    # val_outputs_convert = [
-                    #     post_pred(val_pred_tensor) for val_pred_tensor in val_outputs_list
-                    # ]
-                    
-                    # dice_metric(y_pred=val_outputs_convert, y=val_labels_convert)
-                    
-                # aggregate the final mean dice result
-                metric = dice_metric.aggregate()
-                # reset the status for next validation round
-                dice_metric.reset()
-                dist.all_reduce(metric)
-
-                metric_values.append(metric)
-
-                if nb_val % 4 == 0: # save every 4 validations
-                    torch.save(model.state_dict(), model_name)
-                    print(f'saving model: {model_name}')
-                metric_item = metric.item()
-
-                """
-                if metric_item > best_metric:
-                    best_metric = metric_item
-                    best_metric_epoch = epoch + 1
-                    torch.save(model.state_dict(), "RIGHT.pth")
-                    print("saved new best metric model")
-                    print(model_name)
-                """
+                ## PRINT AND EARLY STOP
                 if rank == 0:
-
-                    print(f"Epoch: {epoch + 1}: current mean dice: {metric_item:.4f}")
-                    print(f"Best mean dice: {best_metric:.4f} at epoch {best_metric_epoch}.")
-                    early_stopping(1-metric_item, model.module)
+                    print(f"Val loss: {val_loss:.4f}")
+                    early_stopping(val_loss, model.module)
                     if early_stopping.early_stop:
                         early_stop_indicator = torch.tensor([1.0]).to(device)
                     else:
@@ -446,7 +342,7 @@ def main(rank,world_size):
                     print("Early stopping")            
                     break
 
-                writer.add_scalar("validation_mean_dice", metric_item, epoch + 1)
+                writer.add_scalar("val loss", val_loss, epoch + 1)
                 imgs_output = torch.argmax(val_outputs, dim=1).detach().cpu()
                 imgs_output = imgs_output.unsqueeze(1)  # insert dim of size 1 at pos. 1
                 imgs_normals = val_inputs[:,0:3,:,:]
@@ -464,10 +360,50 @@ def main(rank,world_size):
                     writer.add_images("normals",norm_rgb,epoch)
                 
     if rank == 0:            
-        print(f"train completed, best_metric: {best_metric:.4f} at epoch: {best_metric_epoch}")
         writer.close()
 
+def GetView(vertex_features,face_features,face_labels,
+            batched_ico_verts,ico_verts,ico_faces,batched_ico_faces,
+            phong_renderer,dist_cam,device):
 
+    textures = TexturesVertex(verts_features=vertex_features)
+    try:
+        meshes = Meshes(
+            verts=batched_ico_verts,   
+            faces=batched_ico_faces, 
+            textures=textures
+        )
+    except ValueError:
+        reduced_batch_size = vertex_features.shape[0]
+        l_ico_verts = []
+        l_ico_faces = []
+        for i in range(reduced_batch_size):
+            l_ico_verts.append(ico_verts)
+            l_ico_faces.append(ico_faces)  
+        batched_ico_verts,batched_ico_faces  = torch.cat(l_ico_verts,dim=0), torch.cat(l_ico_faces,dim=0)
+        meshes = Meshes(
+            verts=batched_ico_verts,   
+            faces=batched_ico_faces, 
+            textures=textures
+        )
+    array_coord = np.random.normal(0, 1, 3)
+    array_coord *= dist_cam/(np.linalg.norm(array_coord))
+    camera_position = ToTensor(dtype=torch.float32, device=device)([array_coord.tolist()])
+    
+    R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
+    T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+
+    images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)    
+    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone()) 
+    labels = torch.take(face_labels, pix_to_face)*(pix_to_face >= 0) 
+
+    l_features = []
+    for index in range(4):
+        l_features.append(torch.take(face_features[:,:,index],pix_to_face)*(pix_to_face >= 0)) # take each feature     
+    inputs = torch.cat(l_features,dim=3)        
+    inputs, labels  = inputs.permute(0,3,1,2), labels.permute(0,3,1,2)
+
+    return inputs,labels
 
 WORLD_SIZE = torch.cuda.device_count()
 if __name__ == '__main__':
