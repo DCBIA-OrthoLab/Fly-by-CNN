@@ -114,7 +114,7 @@ class GraphAttention(nn.Module):
 
         return context_vector, score
 
-class SelfAttention(nn.Module):
+class SelfAttentionSoftmax(nn.Module):
     def __init__(self, in_units, out_units):
         super(SelfAttention, self).__init__()
 
@@ -130,6 +130,31 @@ class SelfAttention(nn.Module):
         score = self.V(nn.Tanh()(self.W1(query)))
         
         attention_weights = nn.Softmax(dim=1)(score)
+
+        # context_vector shape after sum == (batch_size, hidden_size)
+        context_vector = attention_weights * values
+        context_vector = torch.sum(context_vector, dim=1)
+
+        return context_vector, score
+
+class SelfAttention(nn.Module):
+    def __init__(self, in_units, out_units):
+        super(SelfAttention, self).__init__()
+
+        self.W1 = nn.Linear(in_units, out_units)
+        self.V = nn.Linear(out_units, 1)
+
+    def forward(self, query, values):        
+
+        # score shape == (batch_size, max_length, 1)
+        # we get 1 at the last axis because we are applying score to self.V
+        # the shape of the tensor before applying self.V is (batch_size, max_length, units)
+
+        score = nn.Sigmoid()(self.V(nn.Tanh()(self.W1(query))))
+
+        
+        attention_weights = score/torch.sum(score, dim=1)
+
 
         # context_vector shape after sum == (batch_size, hidden_size)
         context_vector = attention_weights * values
@@ -329,6 +354,7 @@ def main():
             X = X.type(torch.float32)
             #X = X/128.0 - 1.0 
             #ic(X[0,0,0:3,127,127])
+            ic(X.shape)
             X = abs(X)            
             optimizer.zero_grad()    
             x = model(X)   

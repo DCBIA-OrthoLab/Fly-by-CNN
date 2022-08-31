@@ -8,7 +8,8 @@ import utils
 import math
 from tqdm import tqdm
 from icecream import ic
-from random import randint
+import random
+
 
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk, numpy_to_vtkIdTypeArray
@@ -44,6 +45,15 @@ from pytorch3d.structures import Meshes
 
 # from effnetv2 import effnetv2_s
 
+
+SEED = 3141592 
+torch.manual_seed(SEED)
+torch.cuda.manual_seed(SEED)
+np.random.seed(SEED)
+random.seed(SEED)
+torch.backends.cudnn.enabled=False
+torch.backends.cudnn.deterministic=True
+
 print('Imports done')
 
 class BrainDataset(Dataset):
@@ -66,8 +76,8 @@ class BrainDataset(Dataset):
     def __getitem__(self,idx):
         item = self.np_split[idx]
 
-        idx_space = randint(0,1)
-        idx_feature = randint(0,1)
+        idx_space = random.randint(0,1)
+        idx_feature = random.randint(0,1)
         if idx_space == 0:
             data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Template_Space'
         else:
@@ -306,16 +316,16 @@ def main():
     image_size = 224
     num_epochs = 6_000
     ico_lvl = 1
-    noise_lvl = 0.015
-    dropout_lvl = 0.5
-    # model_fn = f"checkpoints/regression_L&R_Template_06_25_with_test_split_res224_train_shuffle_icolvl{str(ico_lvl)}_noise{str(noise_lvl)}_dropout{str(dropout_lvl)}.pt"
-    model_fn = "checkpoints/trash.pt"
+    noise_lvl = 0.01
+    dropout_lvl = 0.1
+    model_fn = f"checkpoints/regr_L&R_06_30_with_test_split_res224_train_shuffle_icolvl{str(ico_lvl)}_noise{str(noise_lvl)}_dropout{str(dropout_lvl)}_seed{SEED}.pt"
+    #model_fn = "checkpoints/trash.pt"
     path_ico = '/NIRAL/work/leclercq/data/geometric-deep-learning-benchmarking/Icospheres/ico-6.surf.gii'
     # train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/new_train.npy'
     # val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/new_val.npy'
     train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/train.npy'
     val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/validation.npy'
-    load_model = True
+    load_model = False
     model_to_load = "/NIRAL/work/leclercq/source/SLCN_challenge_Mathieu/weights/ckpt.pth"
 
     if torch.cuda.is_available():
@@ -402,6 +412,7 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=1e-4)
     writer = SummaryWriter()
     list_sphere_points = train_dataset.ico_sphere_verts.tolist()
+    ic(list_sphere_points)
 
 
 
@@ -412,13 +423,14 @@ def main():
 
     ic(model_fn)
     for epoch in range(num_epochs):
-        """
+
         model.train()
         train_loss = 0.0
         print("-" * 20)
         print(f'epoch {epoch+1}/{num_epochs}')
         if epoch % 20 == 0:
             print(f'Model name: {model_fn}')
+            print(f'seed: {SEED}')
         step = 0
         for batch, (vertex_features, face_features, age_at_birth, scan_age) in tqdm(enumerate(train_dataloader),desc='training:'):  # TRAIN LOOP
 
@@ -456,7 +468,7 @@ def main():
         train_loss /= step
         print(f"average epoch loss: {train_loss:>7f}, [{epoch+1:>5d}/{num_epochs:>5d}]")
         writer.add_scalar("training_loss", train_loss, epoch + 1)
-        """
+
 
 
         model.eval()  
@@ -491,8 +503,8 @@ def main():
                 val_loss += loss.item()
                 step += 1
 
-                ic(val_outputs)
-                ic(Y)
+                # ic(val_outputs)
+                # ic(Y)
 
             val_loss  /= step
             print(f'val loss: {val_loss}')

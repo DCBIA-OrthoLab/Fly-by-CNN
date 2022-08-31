@@ -8,8 +8,13 @@ import json
 from icecream import ic
 import sys
 import os
-parent_dir = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
-sys.path.append(parent_dir)
+import platform
+system = platform.system()
+if system == 'Windows':
+  code_path = '\\'.join(os.path.dirname(os.path.abspath(__file__)).split('\\')[:-1])
+else:
+  code_path = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
+sys.path.append(code_path)
 import utils
 import post_process
 import vtk
@@ -58,7 +63,7 @@ from datetime import datetime
 NOW = datetime.now().strftime("%d_%m_%Hh%M")
 
 
-SEED = 5861
+SEED = 994
 torch.manual_seed(SEED)
 torch.cuda.manual_seed(SEED)
 np.random.seed(SEED)
@@ -208,13 +213,13 @@ def main(rank, world_size):
 		num_classes = 34 #34 # background + gum + 32 teeth
 		nb_epoch = 2000
 		dist_cam = 1.35
-		model_name= f"checkpoints/{NOW}_seed{SEED}weighted_dataset_class_weight.pth"
-		# model_name = 'checkpoints/trash.pt'y
-		patience = 100	
+		# model_name= f"checkpoints/{NOW}_seed{SEED}weighted_dataset_noclass_weight.pth"
+		model_name = 'checkpoints/trash.pt'
+		patience = 200	
 		nb_loop = 4
 		load_model = True
 		mount_point = "/work/leclercq/data/challenge_teeth_vtk"
-		model_to_load = f"checkpoints/15_07_13h43_seed5861weighted_dataset_noclass_weight.pth"
+		model_to_load = f"checkpoints/21_07_14h11_seed994weighted_dataset_noclass_weight_ val-loss0.1691.pth"
 		
 		class_weights = np.load(os.path.join(mount_point, 'train_weights.npy'))
 		
@@ -280,9 +285,9 @@ def main(rank, world_size):
 		val_dataloader = DataLoader(val_data, batch_size=batch_size, shuffle=True, collate_fn=pad_verts_faces, num_workers=4,pin_memory=True)
 
 
-		post_trans = AsDiscrete(argmax=True, to_onehot=num_classes, num_classes=num_classes)
-		post_label = AsDiscrete(to_onehot=num_classes, num_classes=num_classes)
-		post_pred = AsDiscrete(argmax=True, to_onehot=num_classes, num_classes=num_classes)
+		# post_trans = AsDiscrete(argmax=True, to_onehot=num_classes, num_classes=num_classes)
+		# post_label = AsDiscrete(to_onehot=num_classes, num_classes=num_classes)
+		# post_pred = AsDiscrete(argmax=True, to_onehot=num_classes, num_classes=num_classes)
 
 
 		# create UNet, DiceLoss and Adam optimizer
@@ -301,8 +306,8 @@ def main(rank, world_size):
 		model = DDP(model, device_ids=[device])
 
 		class_weights = torch.tensor(class_weights).to(torch.float32).to(device)
-		loss_function =  monai.losses.DiceCELoss(to_onehot_y=True,softmax=True, ce_weight=class_weights)
-		# loss_function =  monai.losses.DiceCELoss(to_onehot_y=True,softmax=True)
+		# loss_function =  monai.losses.DiceCELoss(to_onehot_y=True,softmax=True, ce_weight=class_weights)
+		loss_function =  monai.losses.DiceCELoss(to_onehot_y=True,softmax=True)
 		optimizer = torch.optim.AdamW(model.parameters(), 1e-4)
 		best_metric = -1
 		best_metric_epoch = -1

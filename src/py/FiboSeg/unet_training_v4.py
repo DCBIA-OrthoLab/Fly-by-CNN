@@ -11,6 +11,8 @@ V4: UNETR  & Early Stopping, multiple loops with camera rotations in training, n
 ####
 
 
+###   IMPORTANT: THIS IS NOT THE LATEST VERSION OF THE TEETH SEG TRAINING. USE ../challenge-teeth/challenge_teeth_training_mathieu.py
+
 ## TODO: CHECK IF F0 CAN BE REMOVED 
 
 import os
@@ -26,6 +28,7 @@ from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
 import time
 import random
+from icecream import ic
 
 
 import torchvision.models as models
@@ -65,10 +68,11 @@ from monai.transforms import (
 )
 from monai.config import print_config
 from monai.metrics import DiceMetric
+"""
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
+"""
 # Imports for monai model
 import logging
 import tempfile
@@ -110,13 +114,15 @@ class FlyByDataset(Dataset):
         surf = fbf.GetUnitSurf(surf)
         surf, _a, _v = fbf.RandomRotation(surf)
         
-        surf_point_data = surf.GetPointData().GetScalars("UniversalID") 
+        # surf_point_data = surf.GetPointData().GetScalars("UniversalID") 
+        surf_point_data = surf.GetPointData().GetScalars("PredictedID") 
+
         ## Remove crown
         unique, counts  = np.unique(surf_point_data, return_counts = True)
-        id_to_remove = 1
-        while id_to_remove in [1,16,17,32]: # don't remove wisdom teeth
-            id_to_remove = random.choice(unique[:-1])
-        surf = post_process.Threshold(surf, "UniversalID" ,id_to_remove-0.5,id_to_remove+0.5, invert=True)
+        # id_to_remove = 1
+        # while id_to_remove in [1,16,17,32]: # don't remove wisdom teeth
+        #     id_to_remove = random.choice(unique[:-1])
+        # surf = post_process.Threshold(surf, "UniversalID" ,id_to_remove-0.5,id_to_remove+0.5, invert=True)
 
         surf_point_data = surf.GetPointData().GetScalars("UniversalID") # update data after threshold
 
@@ -129,7 +135,17 @@ class FlyByDataset(Dataset):
         region_id = np.clip(region_id,0,None)
         faces_pid0 = faces[:,0:1]
         region_id_faces = np.take(region_id, faces_pid0)
-        
+
+
+        """
+        ic(verts.shape)
+        ic(faces.shape)
+        ic(region_id.shape)
+        ic(region_id_faces.shape)
+        ic(faces_pid0.shape)
+        ic(color_normals.shape)
+        """
+
         return verts, faces, region_id, region_id_faces, faces_pid0, color_normals
         
 def pad_verts_faces(batch):
@@ -200,15 +216,19 @@ def main():
     )
 
 
-    #df = pd.read_csv("/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/FiboSeg/train_sets_csv/1.csv")
+    df = pd.read_csv("/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/FiboSeg/train_sets_csv/1.csv")
 
     # Split data between training and validation 
-    #df_train, df_val = train_test_split(df, test_size=0.1)  
+    df_train, df_val = train_test_split(df, test_size=0.1)  
 
     
-    df_train = pd.read_csv("train_sets_csv/train_data_1.csv")
-    df_val = pd.read_csv("train_sets_csv/val_data_1.csv")
-    
+    # df_train = pd.read_csv("train_sets_csv/train_data_1.csv")
+    # df_val = pd.read_csv("train_sets_csv/val_data_1.csv")
+
+
+    # df_train = pd.read_csv('Baptiste_dataset_csv_split/train.csv')
+    # df_val = pd.read_csv('Baptiste_dataset_csv_split/val.csv')
+
     """    
     df_train.to_csv('train_sets_csv/train_data_3.csv',index=False)
     df_val.to_csv('train_sets_csv/val_data_3.csv',index = False)
@@ -219,17 +239,19 @@ def main():
     val_data = FlyByDataset(df_val)
 
     # Dataloaders
-    batch_size = 20
+    batch_size = 1
     num_classes = 34 # background + gum + 32 teeth
 
+
+    """
     train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=pad_verts_faces, num_workers=4,pin_memory=True)
     val_dataloader = DataLoader(val_data, batch_size=batch_size, shuffle=True, collate_fn=pad_verts_faces, num_workers=4,pin_memory=True)
-
-
     """
+
+
     train_dataloader = DataLoader(train_data, batch_size=batch_size, shuffle=True, collate_fn=pad_verts_faces)
     val_dataloader = DataLoader(val_data, batch_size=batch_size, shuffle=True, collate_fn=pad_verts_faces)
-    """
+
 
     dice_metric = DiceMetric(include_background=True, reduction="mean", get_not_nans=False)
     post_trans = AsDiscrete(argmax=True, to_onehot=num_classes, num_classes=num_classes)
@@ -257,7 +279,7 @@ def main():
         num_res_units=2,
     ).to(device)
 
-    model.load_state_dict(torch.load("early_stopping/checkpoint_1.pt"))
+    #model.load_state_dict(torch.load("/NIRAL/work/leclercq/source/flybyCNN/fly-by-cnn/src/py/challenge-teeth/checkpoints/1.pt"))
 
     loss_function = monai.losses.DiceCELoss(to_onehot_y=True,softmax=True)
     optimizer = torch.optim.AdamW(model.parameters(), 1e-4)
@@ -286,7 +308,7 @@ def main():
     nb_loop = 64
 
     # initialize the early_stopping object
-    model_name= "early_stopping/trash.pt"
+    model_name= "early_stopping/test.pt"
     patience = 500
     early_stopping = EarlyStopping(patience=patience, verbose=True,path=model_name)
 
@@ -316,7 +338,11 @@ def main():
                 textures = TexturesVertex(verts_features=CN)
                 meshes = Meshes(verts=V, faces=F, textures=textures)
                 images = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
-                pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
+                # pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
+                frag_object = phong_renderer.rasterizer(meshes.clone())
+                pix_to_face = frag_object.pix_to_face
+
+                # print(frag_object)
                 y_p = torch.take(YF, pix_to_face)*(pix_to_face >= 0) # YF=input, pix_to_face=index. shape of y_p=shape of pix_to_face
                 images = images.permute(0,3,1,2)
                 y_p = y_p.permute(0,3,1,2)
@@ -329,8 +355,24 @@ def main():
                 optimizer.step()
                 epoch_loss += loss.item()
                 epoch_len = int(np.ceil(len(train_data) / train_dataloader.batch_size))
+                print("step done")
             print(f"{step}/{epoch_len}, train_loss: {loss.item():.4f}")
-        #print(f'step *nb_loop = {step*nb_loop}')    
+
+            import SimpleITK as sitk
+            outputs = outputs.detach().cpu().numpy()
+            print(labels.shape)
+            labels = labels.permute(0,2,3,1).detach().cpu().numpy()            
+            pix_to_face = pix_to_face.detach().cpu().numpy()
+
+            images = images.permute(0, 2, 3, 1).cpu().numpy()
+            sitk.WriteImage(sitk.GetImageFromArray(images[3, :, :, 0:3], isVector=True), "img3.nrrd")
+            sitk.WriteImage(sitk.GetImageFromArray(outputs[3, :, :, 0:3], isVector=True), "temp3.nrrd")
+            sitk.WriteImage(sitk.GetImageFromArray(labels[3], isVector=True), "temp_label3.nrrd")
+            sitk.WriteImage(sitk.GetImageFromArray(pix_to_face[1], isVector=True), "temp_pf.nrrd")
+            print(f'label shape : {labels.shape}')
+            break
+        break
+            #print(f'step *nb_loop = {step*nb_loop}')    
         epoch_loss /= (step*nb_loop)
         epoch_loss_values.append(epoch_loss)
         print(f"epoch {epoch + 1} average loss: {epoch_loss:.4f}")
@@ -395,12 +437,12 @@ def main():
                     torch.save(model.state_dict(), model_name)
                     print(f'saving model: {model_name}')
 
-                if metric > best_metric:
-                    best_metric = metric
-                    best_metric_epoch = epoch + 1
-                    torch.save(model.state_dict(), "trash.pth")
-                    print("saved new best metric model")
-                    print(model_name)
+                # if metric > best_metric:
+                #     best_metric = metric
+                #     best_metric_epoch = epoch + 1
+                #     torch.save(model.state_dict(), "trash.pth")
+                #     print("saved new best metric model")
+                #     print(model_name)
                 print(
                     "current epoch: {} current mean dice: {:.4f} best mean dice: {:.4f} at epoch {}".format(
                         epoch + 1, metric, best_metric, best_metric_epoch
