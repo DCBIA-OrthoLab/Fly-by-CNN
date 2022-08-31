@@ -56,7 +56,9 @@ import json
 from glob import glob
 
 
+
 execute_in_docker = False
+space = "native"
 
 class Slcn_algorithm(ClassificationAlgorithm):
     def __init__(self):
@@ -83,8 +85,9 @@ class Slcn_algorithm(ClassificationAlgorithm):
         if execute_in_docker:
             self.path_model = "/opt/algorithm/checkpoints/ckpt.pth"
         else:
-            self.path_model = "/NIRAL/work/leclercq/source/SLCN_challenge_Mathieu/weights/ckpt.pth"
-
+            # self.path_model = "/NIRAL/work/leclercq/source/SLCN_challenge_Mathieu/weights/ckpt.pth"
+            # self.path_model = "checkpoints/best_metric_07_05_MSE-0.18_BINS.pt"  # native 1.36
+            self.path_model = "checkpoints/best_metric_L&R_res224_ico1_val_loss1.8.pt"
         #Model hyperparameters
         self.image_size = 224
 
@@ -108,7 +111,7 @@ class Slcn_algorithm(ClassificationAlgorithm):
         self.nb_triangles = len(self.triangles)
 
         #You may adapt this to your model/algorithm here.
-        self.model = ShapeNet_GraphClass(self.ico_sphere_edges.to(self.device),0.2)
+        self.model = ShapeNet_GraphClass(self.ico_sphere_edges.to(self.device))
         #loading model weights
         self.model.load_state_dict(torch.load(self.path_model,map_location=self.device),strict=False)
         self.model.to(self.device)
@@ -128,9 +131,9 @@ class Slcn_algorithm(ClassificationAlgorithm):
 
     def predict(self, *, input_image: SimpleITK.Image) -> Dict:
         test_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/birth_age_confounded/validation.npy'
-        data_dir = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Template_Space'
+        data_dir = f'/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/{space.capitalize()}_Space'
         test_array = np.load(test_split_path,allow_pickle=True)
-        ic(test_array)
+        #ic(test_array)
 
         l_truth = test_array[:,2]
 
@@ -164,8 +167,8 @@ class Slcn_algorithm(ClassificationAlgorithm):
         with torch.no_grad():
             for item in test_array:
 
-
-                path_features = f"{data_dir}/regression_template_space_features/{item[0]}_L.shape.gii"
+                
+                path_features = f"{data_dir}/regression_{space}_space_features/{item[0]}_R.shape.gii"
                 vertex_features = gifti.loadGiftiVertexData(path_features)[1] # vertex features
 
                 # Extract a numpy array with image data from the SimpleITK Image
@@ -193,17 +196,53 @@ class Slcn_algorithm(ClassificationAlgorithm):
                 X = torch.cat(l_inputs,dim=1).to(self.device)
                 X = X.type(torch.float32)                    
 
+                #outputs,_ = self.model(X)
                 outputs = self.model(X)
-                ic(item[2])
-                ic(outputs)
                 l_outputs.append(outputs.item())
 
         np_truth_predict = np.zeros((len(l_outputs),2))
+        l_error = []
+        l_abs_error = []
+        df = pd.DataFrame(l_error)
         for index, item in enumerate(l_outputs):
             np_truth_predict[index,0] = l_truth[index]
             np_truth_predict[index,1] = l_outputs[index]
+            l_error.append(l_outputs[index]-l_truth[index])
+            l_abs_error.append(abs(l_outputs[index]-l_truth[index]))
         ic(np_truth_predict)
-        return outputs
+        # ic(l_error)
+        #ic(l_abs_error)
+        MAE = sum(l_abs_error) / len(l_abs_error)
+        ic(MAE)
+        import statistics
+        PSTDev = statistics.pstdev(l_abs_error)
+        STDev = statistics.stdev(l_abs_error)
+        ic(PSTDev)
+        ic(STDev)
+        ic(space)
+        ic(self.path_model)
+
+        # # #print(l_truth)
+        # # #print(l_outputs)
+        # import matplotlib.pyplot as plt
+        # plt.scatter(np_truth_predict[:,0], np_truth_predict[:,1],label=f'prediction: {space} space')
+        # ax_min = 25
+        # ax_max = 43
+        # plt.xlim(ax_min,ax_max)
+        # plt.ylim(ax_min,ax_max)
+        # plt.plot([ax_min, ax_max], [ax_min, ax_max], color = 'lightcoral',label='y=x')
+        # plt.title(f'GA at birth prediction in {space} space')
+        # plt.legend()
+        # plt.grid(alpha=0.2)
+        # plt.show()
+
+
+        # import plotly.express as px
+        # fig = px.violin(l_error,box=True, points = 'all')
+        # fig.update_layout(title_text=f"GA at birth prediction error (prediction-actual): <br>{space.capitalize()} space.",
+        # )
+        # fig.show()
+        # return outputs
 
 
     def GetView(self,vertex_features,face_features,
@@ -235,23 +274,21 @@ class Slcn_algorithm(ClassificationAlgorithm):
 
 
 class ShapeNet_GraphClass(nn.Module):
-    def __init__(self, edges,dropout_lvl):
+    def __init__(self, edges):
         super(ShapeNet_GraphClass, self).__init__()
 
-
-
-        efficient_net = models.efficientnet_b0(pretrained=False)
+        efficient_net = models.efficientnet_b0()
         efficient_net.features[0][0] = nn.Conv2d(4, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
         efficient_net.classifier = Identity()
 
-        self.drop = nn.Dropout(p=dropout_lvl)
+        self.drop = nn.Dropout(p=0.1)
         self.TimeDistributed = TimeDistributed(efficient_net)
 
         self.WV = nn.Linear(1280, 512)
+
         self.Attention = SelfAttention(1280, 128)
         self.Prediction = nn.Linear(512, 1)
-
-        
+        #self.Classification = nn.Linear(512,5)
  
     def forward(self, x):
         
@@ -260,9 +297,9 @@ class ShapeNet_GraphClass(nn.Module):
         x_v = self.WV(x)
         x_a, w_a = self.Attention(x, x_v)
         x = self.Prediction(x_a)
-
+        #x_c = self.Classification(x_a)
         return x
-
+        #return x,x_c
 
 class Identity(nn.Module):
     def __init__(self):

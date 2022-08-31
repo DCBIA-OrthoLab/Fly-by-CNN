@@ -72,11 +72,12 @@ def main():
 
 	path_features = '/CMF/data/geometric-deep-learning-benchmarking/Data/Segmentation/Native_Space/segmentation_native_space_features/sub-CC00062XX05_ses-13801_R.shape.gii'
 	path_ico = '/CMF/data/geometric-deep-learning-benchmarking/Icospheres/ico-1.surf.gii'
-
+	path_reg_surf = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Native_Space/regression_native_space_surfaces/sub-CC00051XX02_ses-7702_L.pial.shape.gii'
+	path_reg_features = '/CMF/data/geometric-deep-learning-benchmarking/Data/Regression/Native_Space/regression_native_space_features/sub-CC00051XX02_ses-7702_L.shape.gii'
 	#mesh = gifti.loadGiftiMesh(path_ico)
 
 	# load icosahedron
-	surf = nib.load(path_ico)
+	surf = nib.load(path_reg_surf)
 
 	# extract points and faces
 	coords = surf.agg_data('pointset')
@@ -102,7 +103,7 @@ def main():
 	ico_polydata.SetPolys(vtk_triangles) # add polys
 
 	# test: write surface
-	# utils.Write(ico_polydata,"/home/leclercq/Documents/TOEIJT.vtk")
+	utils.Write(ico_polydata,"/home/leclercq/Documents/TOEIJT.vtk")
 
 	# convert ico verts / faces to tensor
 	ico_verts = torch.from_numpy(coords)
@@ -110,9 +111,12 @@ def main():
 
 
 	# load train / test splits
-	train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_train_TEA.npy'
+	# train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_train_TEA.npy'
+	train_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Regression/scan_age/train.npy'
 	val_split_path = '/CMF/data/geometric-deep-learning-benchmarking/Train_Val_Test_Splits/Segmentation/M-CRIB-S_val_TEA.npy'
-	train_split = np.load(train_split_path)
+	train_split = np.load(train_split_path,allow_pickle=True)
+	print(train_split.shape)
+	ic(train_split)
 	val_split = np.load(val_split_path)
 	train_data = BrainDataset(train_split)
 	val_dataset = BrainDataset(val_split)
