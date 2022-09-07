@@ -50,7 +50,7 @@ def main(args):
                                 train_transform = RandomRemoveTeethTransform(surf_property="UniversalID", random_rotation=True),
                                 valid_transform = UnitSurfTransform())
 
-    early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.00, patience=30, verbose=True, mode="min")
+    early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.00, patience=args.patience, verbose=True, mode="min")
 
     if args.tb_dir:
         logger = TensorBoardLogger(save_dir=args.tb_dir, name=args.tb_name)    
@@ -77,9 +77,10 @@ if __name__ == '__main__':
     parser.add_argument('--mount_point', help='Dataset mount directory', type=str, default="/work/leclercq/data/challenge_teeth_vtk")
     parser.add_argument('--num_workers', help='Number of workers for loading', type=int, default=4)
     parser.add_argument('--batch_size', help='Batch size', type=int, default=256)    
+    parser.add_argument('--patience', help='Patience for early stopping', type=int, default=30)    
     
     parser.add_argument('--tb_dir', help='Tensorboard output dir', type=str, default=None)
-    parser.add_argument('--tb_name', help='Tensorboard experiment name', type=str, default="moco_v2")
+    parser.add_argument('--tb_name', help='Tensorboard experiment name', type=str, default="monai")
 
 
     args = parser.parse_args()

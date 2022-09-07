@@ -103,11 +103,11 @@ class MonaiUNet(pl.LightningModule):
         
         X, PF = self.render(V, F, CN)
 
-        x = self.model(X)
+        x = self.model(X)*(PF >= 0)
         
         return x, X, PF
 
-    def render(self, V, F, CN):
+    def render(self, V, F, CN, training=False):
 
         X = []
         PF = []
@@ -125,7 +125,12 @@ class MonaiUNet(pl.LightningModule):
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(verts=V, faces=F, textures=textures)
 
-        for camera_position in self.ico_verts:
+        ico_verts = self.ico_verts
+
+        if(training):
+            ico_verts = torch.tensor([[0., 0., 1.]])
+
+        for camera_position in ico_verts:
             
             current_cam_pos = sphere_centers + camera_position.to(self.device)            
 
@@ -152,30 +157,30 @@ class MonaiUNet(pl.LightningModule):
         
         V, F, YF, CN = train_batch
         
-        X, PF = self.render(V, F, CN)
+        X, PF = self.render(V, F, CN, training=True)
         y = torch.take(YF, PF)*(PF >= 0) # YF=input, pix_to_face=index. shape of y = shape of pix_to_face
 
-        x = self.model(X)
+        x = self.model(X)*(PF >= 0)
 
         x = x.permute(0, 2, 1, 3, 4)
         y = y.permute(0, 2, 1, 3, 4).to(torch.int64)
 
         loss = self.loss(x, y)
         
-        self.log('train_loss', loss)
+        batch_size = V.shape[0]
+        self.log('train_loss', loss, batch_size=batch_size)
 
         x = torch.argmax(x, dim=1, keepdim=True)
         self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
-        self.log("train_acc", self.accuracy)
+        self.log("train_acc", self.accuracy, batch_size=batch_size)        
         
-
-        grid_X = torchvision.utils.make_grid(X[:6, 0, 0:3, :, :])
+        grid_X = torchvision.utils.make_grid(X[:batch_size, 0, 0:3, :, :])#Grab the first image, RGB channels only, X, Y. The time dimension is on dim=1
         self.logger.experiment.add_image('X', grid_X, 0)
         
-        grid_x = torchvision.utils.make_grid(x[:6, :, 0, :, :]/self.out_channels)
+        grid_x = torchvision.utils.make_grid(x[:batch_size, :, 0, :, :]/self.out_channels)# The time dimension here is swapped after the permute and is on dim=2. It will grab the firs timage
         self.logger.experiment.add_image('x', grid_x, 0)
 
-        grid_y = torchvision.utils.make_grid(y[:6, :, 0, :, :]/self.out_channels)
+        grid_y = torchvision.utils.make_grid(y[:batch_size, :, 0, :, :]/self.out_channels)# The time dimension here is swapped after the permute and is on dim=2. It will grab the first image
         self.logger.experiment.add_image('Y', grid_y, 0)
 
         return loss
@@ -186,15 +191,16 @@ class MonaiUNet(pl.LightningModule):
         X, PF = self.render(V, F, CN)
         y = torch.take(YF, PF)*(PF >= 0)
 
-        x = self.model(X)
+        x = self.model(X)*(PF >= 0)
 
         x = x.permute(0, 2, 1, 3, 4)
         y = y.permute(0, 2, 1, 3, 4).to(torch.int64)
 
         loss = self.loss(x, y)
         
-        self.log('val_loss', loss)
+        batch_size = V.shape[0]
+        self.log('val_loss', loss, batch_size=batch_size)
 
         x = torch.argmax(x, dim=1, keepdim=True)
         self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
-        self.log("val_acc", self.accuracy)
+        self.log("val_acc", self.accuracy, batch_size=batch_size)
