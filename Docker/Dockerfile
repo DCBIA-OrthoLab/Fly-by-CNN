@@ -1,26 +1,29 @@
-FROM tensorflow/tensorflow:2.4.1-gpu
+FROM pytorch/pytorch:1.11.0-cuda11.3-cudnn8-runtime
 
-RUN apt-get update && apt-get install -y \
-	git \
-	libx11-6 \
-	libgl1 \
-	libopengl0 \
-	libegl1 \
-	wget
+RUN apt update && \
+	apt install -y git \
+	wget \
+	unzip \
+	libgl1-mesa-glx \
+	libxrender1
 
-WORKDIR /usr/local/lib/python3.6/dist-packages/
-
-RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.0/vtk8.2.0.zip
-RUN unzip vtk8.2.0.zip
-
-RUN pip install itk sklearn pandas matplotlib
+RUN mkdir /app
+RUN mkdir /app/data
+RUN mkdir /app/models
 
 WORKDIR /app
 
-RUN git clone --branch 2.8 https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
+COPY requirements.txt /app/data/requirements.txt
 
-RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/2.4/u_seg_nn_3.2.zip
-RUN unzip u_seg_nn_3.2.zip
+RUN git clone https://github.com/DCBIA-OrthoLab/fly-by-cnn.git
 
-ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib/python3.6/dist-packages/vtkmodules/
-ENV MESA_GL_VERSION_OVERRIDE=3.2
+RUN pip install -r /app/data/requirements.txt
+RUN pip install --no-index --no-cache-dir pytorch3d -f https://dl.fbaipublicfiles.com/pytorch3d/packaging/wheels/py38_cu113_pyt1110/download.html
+
+RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/3.0/07-21-22_val-loss0.169.pth -O /app/models/model.pth
+RUN wget https://github.com/DCBIA-OrthoLab/fly-by-cnn/releases/download/3.0/dental_models.zip -O /app/data/dental_models.zip
+RUN unzip /app/data/dental_models.zip -d /app/data/
+
+RUN chmod +x /app/fly-by-cnn/src/py/dental_model_seg.py
+
+ENV PATH="${PATH}:/app/fly-by-cnn/src/py/"
