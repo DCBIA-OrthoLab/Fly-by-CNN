@@ -34,12 +34,13 @@ from vtk import vtkPolyDataWriter
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk
 import sys
 import platform
-system = platform.system()
-if system == 'Windows':
-  code_path = '\\'.join(os.path.dirname(os.path.abspath(__file__)).split('\\')[:-1])
-else:
-  code_path = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
-sys.path.append(code_path)  
+
+# system = platform.system()
+# if system == 'Windows':
+#   code_path = '\\'.join(os.path.dirname(os.path.abspath(__file__)).split('\\')[:-1])
+# else:
+#   code_path = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
+# sys.path.append(code_path)  
 
 import utils
 import post_process
