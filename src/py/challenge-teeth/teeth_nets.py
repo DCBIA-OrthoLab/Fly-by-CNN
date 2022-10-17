@@ -48,7 +48,7 @@ class TimeDistributed(nn.Module):
         return output
 
 class MonaiUNet(pl.LightningModule):
-    def __init__(self, args = None, out_channels=3, class_weights=None, image_size=320):
+    def __init__(self, args = None, out_channels=3, class_weights=None, image_size=320, radius=1.35, subdivision_level=1):
 
         super(MonaiUNet, self).__init__()        
         
@@ -62,7 +62,7 @@ class MonaiUNet(pl.LightningModule):
             
         self.loss = monai.losses.DiceCELoss(include_background=False, to_onehot_y=True, softmax=True, ce_weight=self.class_weights)
         self.accuracy = torchmetrics.Accuracy()
-
+        
         unet = monai.networks.nets.UNet(
             spatial_dims=2,
             in_channels=4,   # images: torch.cuda.FloatTensor[batch_size,224,224,4]
@@ -73,7 +73,7 @@ class MonaiUNet(pl.LightningModule):
         )
         self.model = nn.Sequential(TimeDistributed(unet))
         
-        self.ico_verts, self.ico_faces, self.ico_edges = utils.PolyDataToTensors(utils.CreateIcosahedron(radius=1.1, sl=1))
+        self.ico_verts, self.ico_faces, self.ico_edges = utils.PolyDataToTensors(utils.CreateIcosahedron(radius=radius, sl=subdivision_level))
         self.ico_verts = self.ico_verts.to(torch.float32)
 
         cameras = FoVPerspectiveCameras()
@@ -93,6 +93,8 @@ class MonaiUNet(pl.LightningModule):
                 shader=HardPhongShader(cameras=cameras, lights=lights)
         )
 
+        # self.automatic_optimization = False
+
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
         return optimizer
@@ -102,12 +104,11 @@ class MonaiUNet(pl.LightningModule):
         V, F, CN = x
         
         X, PF = self.render(V, F, CN)
-
         x = self.model(X)*(PF >= 0)
         
         return x, X, PF
 
-    def render(self, V, F, CN, training=False):
+    def render(self, V, F, CN):
 
         X = []
         PF = []
@@ -126,9 +127,6 @@ class MonaiUNet(pl.LightningModule):
         meshes = Meshes(verts=V, faces=F, textures=textures)
 
         ico_verts = self.ico_verts
-
-        if(training):
-            ico_verts = torch.tensor([[0., 0., 1.]])
 
         for camera_position in ico_verts:
             
@@ -154,53 +152,45 @@ class MonaiUNet(pl.LightningModule):
 
 
     def training_step(self, train_batch, batch_idx):
-        
+
+        opt = self.optimizers()
+
         V, F, YF, CN = train_batch
         
-        X, PF = self.render(V, F, CN, training=True)
-        y = torch.take(YF, PF)*(PF >= 0) # YF=input, pix_to_face=index. shape of y = shape of pix_to_face
-
-        x = self.model(X)*(PF >= 0)
-
-        x = x.permute(0, 2, 1, 3, 4)
-        y = y.permute(0, 2, 1, 3, 4).to(torch.int64)
-
-        loss = self.loss(x, y)
+        x, X, PF = self((V, F, CN))
         
+        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0) # YF=input, pix_to_face=index. shape of y = shape of pix_to_face
+
+        loss = self.loss(x.permute(0, 2, 1, 3, 4), y.permute(0, 2, 1, 3, 4))
+        
+        # for x_hat, y_hat in zip(x.permute(1, 0, 2, 3, 4), y.permute(1, 0, 2, 3, 4)): #Iterate over the time dimension
+        #     opt.zero_grad()            
+        #     loss = self.loss(x_hat, y_hat)
+        #     self.manual_backward(loss)
+        #     opt.step()
+
         batch_size = V.shape[0]
-        self.log('train_loss', loss, batch_size=batch_size)
 
-        x = torch.argmax(x, dim=1, keepdim=True)
+        x = torch.argmax(x, dim=2, keepdim=True)
         self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
-        self.log("train_acc", self.accuracy, batch_size=batch_size)        
-        
-        grid_X = torchvision.utils.make_grid(X[:batch_size, 0, 0:3, :, :])#Grab the first image, RGB channels only, X, Y. The time dimension is on dim=1
-        self.logger.experiment.add_image('X', grid_X, 0)
-        
-        grid_x = torchvision.utils.make_grid(x[:batch_size, :, 0, :, :]/self.out_channels)# The time dimension here is swapped after the permute and is on dim=2. It will grab the firs timage
-        self.logger.experiment.add_image('x', grid_x, 0)
+        self.log("train_acc", self.accuracy, batch_size=batch_size)
 
-        grid_y = torchvision.utils.make_grid(y[:batch_size, :, 0, :, :]/self.out_channels)# The time dimension here is swapped after the permute and is on dim=2. It will grab the first image
-        self.logger.experiment.add_image('Y', grid_y, 0)
+        self.log('train_loss', loss, batch_size=batch_size)     
 
         return loss
+
 
     def validation_step(self, val_batch, batch_idx):
         V, F, YF, CN = val_batch
         
-        X, PF = self.render(V, F, CN)
-        y = torch.take(YF, PF)*(PF >= 0)
+        x, X, PF = self((V, F, CN))
+        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
 
-        x = self.model(X)*(PF >= 0)
-
-        x = x.permute(0, 2, 1, 3, 4)
-        y = y.permute(0, 2, 1, 3, 4).to(torch.int64)
-
-        loss = self.loss(x, y)
+        loss = self.loss(x.permute(0, 2, 1, 3, 4), y.permute(0, 2, 1, 3, 4))
         
         batch_size = V.shape[0]
         self.log('val_loss', loss, batch_size=batch_size)
 
-        x = torch.argmax(x, dim=1, keepdim=True)
+        x = torch.argmax(x, dim=2, keepdim=True)
         self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
         self.log("val_acc", self.accuracy, batch_size=batch_size)

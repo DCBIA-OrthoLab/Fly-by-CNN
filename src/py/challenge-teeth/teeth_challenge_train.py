@@ -9,6 +9,7 @@ import torch
 
 from teeth_dataset import TeethDataset, TeethDataModule, RandomRemoveTeethTransform, UnitSurfTransform
 from teeth_nets import MonaiUNet
+from teeth_logger import TeethNetImageLogger
 
 from pl_bolts.models.self_supervised import Moco_v2
 
@@ -35,11 +36,11 @@ def main(args):
 
     class_weights = np.load(os.path.join(mount_point, 'train_weights.npy'))
 
-    model = MonaiUNet(args, out_channels = 34, class_weights=class_weights, image_size=320)
+    model = MonaiUNet(args, out_channels = 34, class_weights=class_weights, image_size=320, subdivision_level=args.sl)
 
-    df_train = pd.read_csv(os.path.join(mount_point, "train_merged.csv"))
-    df_val = pd.read_csv(os.path.join(mount_point, "val_merged.csv"))
-    df_test = pd.read_csv(os.path.join(mount_point, "test.csv"))
+    df_train = pd.read_csv(os.path.join(mount_point, args.csv_train))
+    df_val = pd.read_csv(os.path.join(mount_point, args.csv_valid))
+    df_test = pd.read_csv(os.path.join(mount_point, args.csv_test))
 
 
     teeth_data = TeethDataModule(df_train, df_val, df_test, 
@@ -55,10 +56,12 @@ def main(args):
     if args.tb_dir:
         logger = TensorBoardLogger(save_dir=args.tb_dir, name=args.tb_name)    
 
+    image_logger = TeethNetImageLogger()
+
     trainer = Trainer(
         logger=logger,
         max_epochs=args.epochs,
-        callbacks=[early_stop_callback, checkpoint_callback],
+        callbacks=[early_stop_callback, checkpoint_callback, image_logger],
         devices=torch.cuda.device_count(), 
         accelerator="gpu", 
         strategy=DDPStrategy(find_unused_parameters=False)
@@ -70,13 +73,17 @@ if __name__ == '__main__':
 
 
     parser = argparse.ArgumentParser(description='Teeth challenge Training')
+    parser.add_argument('--csv_train', help='CSV with column surf', type=str, required=True)    
+    parser.add_argument('--csv_valid', help='CSV with column surf', type=str, required=True)    
+    parser.add_argument('--csv_test', help='CSV with column surf', type=str, required=True)    
     parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float, help='Learning rate')
     parser.add_argument('--epochs', help='Max number of epochs', type=int, default=200)    
     parser.add_argument('--model', help='Model to continue training', type=str, default= None)
     parser.add_argument('--out', help='Output', type=str, default="./")
     parser.add_argument('--mount_point', help='Dataset mount directory', type=str, default="/work/leclercq/data/challenge_teeth_vtk")
     parser.add_argument('--num_workers', help='Number of workers for loading', type=int, default=4)
-    parser.add_argument('--batch_size', help='Batch size', type=int, default=256)    
+    parser.add_argument('--batch_size', help='Batch size', type=int, default=6)    
+    parser.add_argument('--sl', help='subdivision level', type=int, default=1)    
     parser.add_argument('--patience', help='Patience for early stopping', type=int, default=30)    
     
     parser.add_argument('--tb_dir', help='Tensorboard output dir', type=str, default=None)
