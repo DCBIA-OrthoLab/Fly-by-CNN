@@ -30,7 +30,6 @@ import post_process
 from vtk.util.numpy_support import vtk_to_numpy
 from vtk.util.numpy_support import numpy_to_vtk
 
-
 class TeethDataset(Dataset):
     def __init__(self, df, mount_point = "./", transform=None, surf_column="surf", surf_property=None):
         self.df = df
@@ -55,7 +54,7 @@ class TeethDataset(Dataset):
         surf = utils.ComputeNormals(surf)
         color_normals = torch.tensor(vtk_to_numpy(utils.GetColorArray(surf, "Normals"))).to(torch.float32)/255.0
         verts = torch.tensor(vtk_to_numpy(surf.GetPoints().GetData())).to(torch.float32)
-        faces = torch.tensor(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]).to(torch.int64)        
+        faces = torch.tensor(vtk_to_numpy(surf.GetPolys().GetData()).reshape(-1, 4)[:,1:]).to(torch.int64)
 
         if self.surf_property:            
 
@@ -94,16 +93,12 @@ class TeethDataModule(pl.LightningDataModule):
         # Assign train/val datasets for use in dataloaders
         self.train_ds = TeethDataset(self.df_train, self.mount_point, surf_column=self.surf_column, surf_property=self.surf_property, transform=self.train_transform)
         self.val_ds = TeethDataset(self.df_val, self.mount_point, surf_column=self.surf_column, surf_property=self.surf_property, transform=self.valid_transform)
-        self.test_ds = TeethDataset(self.df_test, self.mount_point, surf_column=self.surf_column, surf_property=self.surf_property, transform=self.valid_transform)
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True, pin_memory=True, drop_last=self.drop_last, collate_fn=self.pad_verts_faces)
 
     def val_dataloader(self):
         return DataLoader(self.val_ds, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True, pin_memory=True, drop_last=self.drop_last, collate_fn=self.pad_verts_faces)
-
-    def test_dataloader(self):
-        return DataLoader(self.test_ds, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True, pin_memory=True, drop_last=self.drop_last, collate_fn=self.pad_verts_faces)
 
     def pad_verts_faces(self, batch):
 
