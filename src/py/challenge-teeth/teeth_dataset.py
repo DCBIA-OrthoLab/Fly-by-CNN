@@ -92,6 +92,7 @@ class TeethDataModule(pl.LightningDataModule):
         # Assign train/val datasets for use in dataloaders
         self.train_ds = TeethDataset(self.df_train, self.mount_point, surf_column=self.surf_column, surf_property=self.surf_property, transform=self.train_transform)
         self.val_ds = TeethDataset(self.df_val, self.mount_point, surf_column=self.surf_column, surf_property=self.surf_property, transform=self.valid_transform)
+        self.test_ds = TeethDataset(self.df_test, self.mount_point, surf_column=self.surf_column, surf_property=self.surf_property, transform=self.valid_transform)
 
     def train_dataloader(self):
         return DataLoader(self.train_ds, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True, pin_memory=True, drop_last=self.drop_last, collate_fn=self.pad_verts_faces)

@@ -44,7 +44,7 @@ def main(args):
     df_test = pd.read_csv(os.path.join(mount_point, args.csv_valid))
 
 
-    teeth_data = TeethDataModule(df_train, df_val, 
+    teeth_data = TeethDataModule(df_train, df_val, df_test,
                                 mount_point = mount_point,
                                 batch_size = args.batch_size,
                                 num_workers = args.num_workers,
