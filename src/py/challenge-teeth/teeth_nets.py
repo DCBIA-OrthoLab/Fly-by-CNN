@@ -114,8 +114,8 @@ class MonaiUNet(pl.LightningModule):
 
         for camera_position in self.ico_verts:
             images, pix_to_face = self.render(V, F, CN, camera_position.unsqueeze(0))
-            X.append(images.unsqueeze(0))
-            PF.append(pix_to_face.unsqueeze(0))
+            X.append(images.unsqueeze(1))
+            PF.append(pix_to_face.unsqueeze(1))
 
         X = torch.cat(X, dim=1)
         PF = torch.cat(PF, dim=1)
@@ -207,3 +207,19 @@ class MonaiUNet(pl.LightningModule):
         
         self.log("val_acc", val_accuracy/self.hparams.train_sphere_samples, batch_size=batch_size, sync_dist=True)
         self.log('val_loss', val_loss/self.hparams.train_sphere_samples, batch_size=batch_size, sync_dist=True)
+
+    def test_step(self, batch, batch_idx):
+
+        V, F, YF, CN = val_batch
+
+        x, X, PF = self(V, F, CN)
+        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
+        
+        x = x.permute(0, 2, 1, 3, 4) #batch, time, channels, h, w -> batch, channels, time, h, w
+        y = y.permute(0, 2, 1, 3, 4) 
+
+        loss = self.loss(x, y)
+
+        self.accuracy(torch.argmax(x, dim=1, keepdim=True).reshape(-1, 1), y.reshape(-1, 1).to(torch.int32))        
+
+        return {'test_loss': loss, 'test_correct': self.accuracy}
