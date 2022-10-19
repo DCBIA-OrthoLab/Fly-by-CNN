@@ -29,3 +29,12 @@ python fly-by-cnn/src/py/challenge-teeth/obj_to_vtk.py --csv challenge_teeth_all
 This command will create the corresponding splits and also the files "test.csv",  "train.csv"  and "val.csv". These are used to start the training.
 
 ## Install all required dependencies
+
+```
+conda env create -f flyby.yml
+```
+## Start training
+
+```
+CUDA_VISIBLE_DEVICES=0,1 python fly-by-cnn/src/py/challenge-teeth/teeth_challenge_train.py --csv_train teeth-grand_challenge_vtk/train.csv --csv_valid teeth-grand_challenge_vtk/val.csv --csv_test teeth-grand_challenge_vtk/test.csv --out training_output/ --tb_dir tensorboard/ --tb_name flyby --num_workers 16 --batch_size 60
+```
