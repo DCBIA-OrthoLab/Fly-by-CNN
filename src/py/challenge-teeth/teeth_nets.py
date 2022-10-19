@@ -9,6 +9,8 @@ from torchvision import models
 from torchvision import transforms
 import torchmetrics
 
+import utils
+
 import monai
 from pytorch3d.renderer import (
         FoVPerspectiveCameras, look_at_view_transform, look_at_rotation, 
@@ -18,7 +20,6 @@ from pytorch3d.renderer import (
 from pytorch3d.structures import Meshes
 
 import pytorch_lightning as pl
-import utils
 
 class TimeDistributed(nn.Module):
     def __init__(self, module):
@@ -48,7 +49,7 @@ class TimeDistributed(nn.Module):
         return output
 
 class MonaiUNet(pl.LightningModule):
-    def __init__(self, args = None, out_channels=3, class_weights=None, image_size=320, radius=1.35, subdivision_level=1):
+    def __init__(self, args = None, out_channels=3, class_weights=None, image_size=320, radius=1.35, subdivision_level=1, train_sphere_samples=4):
 
         super(MonaiUNet, self).__init__()        
         
@@ -71,17 +72,18 @@ class MonaiUNet(pl.LightningModule):
             strides=(2, 2, 2, 2),
             num_res_units=2,
         )
-        self.model = nn.Sequential(TimeDistributed(unet))
-        
-        self.ico_verts, self.ico_faces, self.ico_edges = utils.PolyDataToTensors(utils.CreateIcosahedron(radius=radius, sl=subdivision_level))
-        self.ico_verts = self.ico_verts.to(torch.float32)
+        self.model = TimeDistributed(unet)
+
+        ico_verts, ico_faces, ico_edges = utils.PolyDataToTensors(utils.CreateIcosahedron(radius=radius, sl=subdivision_level))
+        ico_verts = ico_verts.to(torch.float32)
+        self.register_buffer("ico_verts", ico_verts)
 
         cameras = FoVPerspectiveCameras()
         raster_settings = RasterizationSettings(
             image_size=image_size, 
             blur_radius=0, 
-            faces_per_pixel=1, 
-            bin_size=0,
+            faces_per_pixel=1,
+            max_faces_per_bin=100000
         )        
         rasterizer = MeshRasterizer(
             cameras=cameras, 
@@ -93,104 +95,115 @@ class MonaiUNet(pl.LightningModule):
                 shader=HardPhongShader(cameras=cameras, lights=lights)
         )
 
-        # self.automatic_optimization = False
+        self.automatic_optimization = False
 
     def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        optimizer = torch.optim.AdamW(self.parameters(), lr=self.args.lr)
         return optimizer
+
+    def to(self, device=None):
+        self.renderer = self.renderer.to(device)
+        return super().to(device)
 
     def forward(self, x):
 
         V, F, CN = x
         
-        X, PF = self.render(V, F, CN)
-        x = self.model(X)*(PF >= 0)
-        
-        return x, X, PF
-
-    def render(self, V, F, CN):
-
         X = []
         PF = []
 
-        batch_size = V.shape[0]
+        for camera_position in self.ico_verts:
+            images, pix_to_face = self.render(V, F, CN, camera_position.unsqueeze(0))
+            X.append(images.unsqueeze(0))
+            PF.append(pix_to_face.unsqueeze(0))
 
-        sphere_centers = torch.zeros([batch_size, 3]).to(torch.float32).to(self.device)
+        X = torch.cat(X, dim=1)
+        PF = torch.cat(PF, dim=1)
+
+        x = self.model(X)
         
-        renderer = self.renderer.to(self.device)
+        return x*(PF >= 0), X, PF
 
-        V = V.to(self.device)
-        F = F.to(self.device)
-        CN = CN.to(self.device).to(torch.float32)
+    def render(self, V, F, CN, camera_position):
 
         textures = TexturesVertex(verts_features=CN)
-        meshes = Meshes(verts=V, faces=F, textures=textures)
+        meshes = Meshes(verts=V, faces=F, textures=textures)        
 
-        ico_verts = self.ico_verts
+        R = look_at_rotation(camera_position, device=self.device)  # (1, 3, 3)
+        T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+        
+        images = self.renderer(meshes_world=meshes.clone(), R=R, T=T)
+        
+        fragments = self.renderer.rasterizer(meshes.clone())
+        pix_to_face = fragments.pix_to_face
+        zbuf = fragments.zbuf
 
-        for camera_position in ico_verts:
-            
-            current_cam_pos = sphere_centers + camera_position.to(self.device)            
+        images = torch.cat([images[:,:,:,0:3], zbuf], dim=-1)
+        images = images.permute(0,3,1,2)
 
-            R = look_at_rotation(current_cam_pos, device=self.device)  # (1, 3, 3)
-            T = -torch.bmm(R.transpose(1, 2), current_cam_pos[:,:,None])[:, :, 0]   # (1, 3)
+        pix_to_face = pix_to_face.permute(0,3,1,2)
 
-            images = renderer(meshes_world=meshes.clone(), R=R, T=T)            
-            pix_to_face, zbuf, bary_coords, dists = renderer.rasterizer(meshes.clone())
-
-            pix_to_face = pix_to_face.permute(0, 3, 1, 2)
-            images = images.permute(0, 3, 1, 2)            
-            zbuf = zbuf.permute(0, 3, 1, 2)
-
-            images = images[:,:-1,:,:] #grab RGB components only
-            images = torch.cat([images, zbuf], dim=1) #append the zbuf as a channel
-
-            X.append(images.unsqueeze(dim=1))
-            PF.append(pix_to_face.unsqueeze(dim=1))
-            
-        return torch.cat(X, dim=1), torch.cat(PF, dim=1)
-
+        return images, pix_to_face
 
     def training_step(self, train_batch, batch_idx):
 
-        opt = self.optimizers()
-
         V, F, YF, CN = train_batch
-        
-        x, X, PF = self((V, F, CN))
-        
-        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0) # YF=input, pix_to_face=index. shape of y = shape of pix_to_face
 
-        loss = self.loss(x.permute(0, 2, 1, 3, 4), y.permute(0, 2, 1, 3, 4))
-        
-        # for x_hat, y_hat in zip(x.permute(1, 0, 2, 3, 4), y.permute(1, 0, 2, 3, 4)): #Iterate over the time dimension
-        #     opt.zero_grad()            
-        #     loss = self.loss(x_hat, y_hat)
-        #     self.manual_backward(loss)
-        #     opt.step()
+        V = V.to(self.device, non_blocking=True)
+        F = F.to(self.device, non_blocking=True)
+        YF = YF.to(self.device, non_blocking=True)
+        CN = CN.to(self.device, non_blocking=True).to(torch.float32)
 
+        opt = self.optimizers()
+        
         batch_size = V.shape[0]
 
-        x = torch.argmax(x, dim=2, keepdim=True)
-        self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
-        self.log("train_acc", self.accuracy, batch_size=batch_size)
+        for i in range(self.hparams.train_sphere_samples):
+            camera_position = torch.normal(mean=0.0, std=0.1, size=(3,), device=self.device)
+            camera_position *= self.hparams.radius/torch.linalg.norm(camera_position)            
+            camera_position = torch.unsqueeze(camera_position, dim=0)
 
-        self.log('train_loss', loss, batch_size=batch_size)     
+            X, PF = self.render(V, F, CN, camera_position)
 
-        return loss
+            y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
+        
+            opt.zero_grad()
 
+            x = self.model.module(X)*(PF >= 0)
+            
+            loss = self.loss(x, y)
+            self.manual_backward(loss)
+            opt.step()
+        
+            self.log('train_loss', loss, batch_size=batch_size)
 
     def validation_step(self, val_batch, batch_idx):
         V, F, YF, CN = val_batch
-        
-        x, X, PF = self((V, F, CN))
-        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
 
-        loss = self.loss(x.permute(0, 2, 1, 3, 4), y.permute(0, 2, 1, 3, 4))
-        
+        V = V.to(self.device, non_blocking=True)
+        F = F.to(self.device, non_blocking=True)
+        YF = YF.to(self.device, non_blocking=True)
+        CN = CN.to(self.device, non_blocking=True).to(torch.float32)
+
         batch_size = V.shape[0]
-        self.log('val_loss', loss, batch_size=batch_size)
 
-        x = torch.argmax(x, dim=2, keepdim=True)
-        self.accuracy(x.reshape(-1, 1), y.reshape(-1, 1))
-        self.log("val_acc", self.accuracy, batch_size=batch_size)
+        val_loss = 0
+        val_accuracy = 0
+
+        for i in range(self.hparams.train_sphere_samples):
+            camera_position = torch.normal(mean=0.0, std=0.1, size=(3,), device=self.device)
+            camera_position *= self.hparams.radius/torch.linalg.norm(camera_position)            
+            camera_position = torch.unsqueeze(camera_position, dim=0)
+
+            X, PF = self.render(V, F, CN, camera_position)
+
+            y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
+
+            x = self.model.module(X)*(PF >= 0)
+            
+            val_loss += self.loss(x, y)
+
+            val_accuracy += self.accuracy(torch.argmax(x, dim=1, keepdim=True).reshape(-1, 1), y.reshape(-1, 1).to(torch.int32))
+        
+        self.log("val_acc", val_accuracy/self.hparams.train_sphere_samples, batch_size=batch_size, sync_dist=True)
+        self.log('val_loss', val_loss/self.hparams.train_sphere_samples, batch_size=batch_size, sync_dist=True)
