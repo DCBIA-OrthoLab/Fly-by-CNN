@@ -5,21 +5,14 @@
 import numpy   as np
 import pandas as pd
 import json
-from icecream import ic
+
 import sys
 import os
-import platform
-system = platform.system()
-if system == 'Windows':
-  code_path = '\\'.join(os.path.dirname(os.path.abspath(__file__)).split('\\')[:-1])
-else:
-  code_path = '/'.join(os.path.dirname(os.path.abspath(__file__)).split('/')[:-1])
-sys.path.append(code_path)
+
 import utils
-import post_process
-import vtk
+
 import random
-from timeit import default_timer as timer
+
 from datetime import datetime
 NOW = datetime.now().strftime("%d_%m_%Hh%M")
 from vtk.util.numpy_support import vtk_to_numpy, numpy_to_vtk, numpy_to_vtkIdTypeArray
@@ -36,16 +29,7 @@ from pytorch3d.renderer import (
 from pytorch3d.structures import Meshes
 
 import monai
-from monai.transforms import ToTensor
-from monai.transforms import (
-        AsDiscrete,
-        Compose,
-        LoadImage,
-        RandRotate90,
-        RandSpatialCrop,
-        ScaleIntensity,
-        EnsureType,
-)
+
 from torch.utils.tensorboard import SummaryWriter
 import torch.multiprocessing as mp
 import torch.distributed as dist
@@ -171,6 +155,7 @@ def main(rank, args, world_size):
                 image_size=image_size, 
                 blur_radius=0, 
                 faces_per_pixel=1,
+                max_faces_per_bin=100000
         )
         # We can add a point light in front of the object. 
 
@@ -244,8 +229,7 @@ def main(rank, args, world_size):
                     print(f'model name: {model_name}')              
             epoch_loss = 0
             step = 0
-            for batch, (V, F, YF, CN) in enumerate(train_dataloader):
-                # start = timer()
+            for batch, (V, F, YF, CN) in enumerate(train_dataloader):                
                 V = V.to(device, non_blocking=True)
                 F = F.to(device, non_blocking=True)
                 YF = YF.to(device, non_blocking=True)
@@ -266,9 +250,6 @@ def main(rank, args, world_size):
                 if rank == 0:
                     epoch_len = len(train_dataloader)
                     print(f"{batch+1}/{epoch_len}, train_loss: {loss.item():.4f}")
-                
-                # end = timer()
-                # print(end - start)
 
             # enablePrint()
             epoch_loss /= (step*world_size)
@@ -363,19 +344,23 @@ def pad_verts_faces(batch):
 
 
 def GetView(V,F,CN,YF,dist_cam,phong_renderer,device):
+    
+    camera_position = torch.normal(mean=0.0, std=0.1, size=(3,), device=device)
+    camera_position *= dist_cam/torch.linalg.norm(camera_position)            
+    camera_position = torch.unsqueeze(camera_position, dim=0)
 
-    array_coord = np.random.normal(0, 1, 3)
-    array_coord *= dist_cam/(np.linalg.norm(array_coord))
-    camera_position = ToTensor(dtype=torch.float32, device=device)([array_coord.tolist()])  
     R = look_at_rotation(camera_position, device=device)  # (1, 3, 3)
     T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
 
     textures = TexturesVertex(verts_features=CN)
     meshes = Meshes(verts=V, faces=F, textures=textures)
     batch_views = phong_renderer(meshes_world=meshes.clone(), R=R, T=T)
-    pix_to_face, zbuf, bary_coords, dists = phong_renderer.rasterizer(meshes.clone())
-    depth_map = zbuf
-    batch_views = torch.cat([batch_views[:,:,:,0:3], depth_map], dim=-1)
+
+    fragments = phong_renderer.rasterizer(meshes.clone())
+    pix_to_face = fragments.pix_to_face
+    zbuf = fragments.zbuf
+
+    batch_views = torch.cat([batch_views[:,:,:,0:3], zbuf], dim=-1)
     y_p = torch.take(YF, pix_to_face)*(pix_to_face >= 0) # YF=input, pix_to_face=index. shape of y_p=shape of pix_to_face
     batch_views = batch_views.permute(0,3,1,2)
     y_p = y_p.permute(0,3,1,2)

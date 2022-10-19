@@ -14,7 +14,6 @@ from pl_bolts.transforms.dataset_normalizations import (
 )
 
 import sys
-from icecream import ic
 
 import platform
 system = platform.system()
@@ -72,12 +71,11 @@ class TeethDataset(Dataset):
 
 
 class TeethDataModule(pl.LightningDataModule):
-    def __init__(self, df_train, df_val, df_test, mount_point="./", batch_size=256, num_workers=4, surf_column="surf", surf_property=None, train_transform=None, valid_transform=None, test_transform=None, drop_last=False):
+    def __init__(self, df_train, df_val, mount_point="./", batch_size=256, num_workers=4, surf_column="surf", surf_property=None, train_transform=None, valid_transform=None, test_transform=None, drop_last=False):
         super().__init__()
 
         self.df_train = df_train
-        self.df_val = df_val
-        self.df_test = df_test
+        self.df_val = df_val        
         self.mount_point = mount_point
         self.batch_size = batch_size
         self.num_workers = num_workers
