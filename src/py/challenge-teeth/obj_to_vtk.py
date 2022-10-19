@@ -1,5 +1,4 @@
 import pandas as pd
-from icecream import ic
 import os
 import vtk
 import json
@@ -85,7 +84,7 @@ def main(args):
 if __name__ == '__main__':
 
 
-    parser = argparse.ArgumentParser(description='Teeth challenge convert to VTK')
+    parser = argparse.ArgumentParser(description='Teeth challenge convert OBJ files to VTK. It adds the label information to each VTK file')
     parser.add_argument('--csv', help='CSV with columns surf,label,split', type=str, required=True)        
     parser.add_argument('--out', help='Output directory', type=str, default="./")
 
