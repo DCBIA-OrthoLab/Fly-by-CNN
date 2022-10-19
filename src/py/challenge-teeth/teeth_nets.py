@@ -83,7 +83,7 @@ class MonaiUNet(pl.LightningModule):
             image_size=image_size, 
             blur_radius=0, 
             faces_per_pixel=1,
-            max_faces_per_bin=100000
+            max_faces_per_bin=200000
         )        
         rasterizer = MeshRasterizer(
             cameras=cameras, 
