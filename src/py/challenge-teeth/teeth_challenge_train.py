@@ -40,7 +40,8 @@ def main(args):
     model = MonaiUNet(args, out_channels = 34, class_weights=class_weights, image_size=320, train_sphere_samples=args.train_sphere_samples)
 
     df_train = pd.read_csv(os.path.join(mount_point, args.csv_train))
-    df_val = pd.read_csv(os.path.join(mount_point, args.csv_valid))    
+    df_val = pd.read_csv(os.path.join(mount_point, args.csv_valid))
+    df_test = pd.read_csv(os.path.join(mount_point, args.csv_valid))
 
 
     teeth_data = TeethDataModule(df_train, df_val, 
@@ -49,7 +50,8 @@ def main(args):
                                 num_workers = args.num_workers,
                                 surf_column = 'surf', surf_property="UniversalID",
                                 train_transform = RandomRemoveTeethTransform(surf_property="UniversalID", random_rotation=True),
-                                valid_transform = UnitSurfTransform())
+                                valid_transform = UnitSurfTransform(),
+                                test_transform = UnitSurfTransform())
 
     early_stop_callback = EarlyStopping(monitor="val_loss", min_delta=0.00, patience=args.patience, verbose=True, mode="min")
 
@@ -71,13 +73,16 @@ def main(args):
     )
     trainer.fit(model, datamodule=teeth_data, ckpt_path=args.model)
 
+    trainer.test(ckpt_path="best")
+
 
 if __name__ == '__main__':
 
 
     parser = argparse.ArgumentParser(description='Teeth challenge Training')
     parser.add_argument('--csv_train', help='CSV with column surf', type=str, required=True)    
-    parser.add_argument('--csv_valid', help='CSV with column surf', type=str, required=True)        
+    parser.add_argument('--csv_valid', help='CSV with column surf', type=str, required=True)
+    parser.add_argument('--csv_test', help='CSV with column surf', type=str, required=True)        
     parser.add_argument('--lr', '--learning-rate', default=1e-4, type=float, help='Learning rate')
     parser.add_argument('--log_every_n_steps', help='Log every n steps', type=int, default=10)    
     parser.add_argument('--epochs', help='Max number of epochs', type=int, default=200)    

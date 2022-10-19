@@ -71,11 +71,12 @@ class TeethDataset(Dataset):
 
 
 class TeethDataModule(pl.LightningDataModule):
-    def __init__(self, df_train, df_val, mount_point="./", batch_size=256, num_workers=4, surf_column="surf", surf_property=None, train_transform=None, valid_transform=None, test_transform=None, drop_last=False):
+    def __init__(self, df_train, df_val, df_test, mount_point="./", batch_size=256, num_workers=4, surf_column="surf", surf_property=None, train_transform=None, valid_transform=None, test_transform=None, drop_last=False):
         super().__init__()
 
         self.df_train = df_train
-        self.df_val = df_val        
+        self.df_val = df_val   
+        self.df_test = df_test     
         self.mount_point = mount_point
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -97,6 +98,8 @@ class TeethDataModule(pl.LightningDataModule):
 
     def val_dataloader(self):
         return DataLoader(self.val_ds, batch_size=self.batch_size, num_workers=self.num_workers, persistent_workers=True, pin_memory=True, drop_last=self.drop_last, collate_fn=self.pad_verts_faces)
+    def test_dataloader(self):
+        return DataLoader(self.test_ds, batch_size=1, num_workers=self.num_workers, persistent_workers=True, pin_memory=True, collate_fn=self.pad_verts_faces)
 
     def pad_verts_faces(self, batch):
 
