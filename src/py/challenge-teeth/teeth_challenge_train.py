@@ -73,7 +73,7 @@ def main(args):
     )
     trainer.fit(model, datamodule=teeth_data, ckpt_path=args.model)
 
-    trainer.test(ckpt_path="best")
+    trainer.test(datamodule=teeth_data)
 
 
 if __name__ == '__main__':
