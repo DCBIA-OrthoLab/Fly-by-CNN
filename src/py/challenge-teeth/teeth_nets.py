@@ -95,8 +95,6 @@ class MonaiUNet(pl.LightningModule):
                 shader=HardPhongShader(cameras=cameras, lights=lights)
         )
 
-        self.automatic_optimization = False
-
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(self.parameters(), lr=self.args.lr)
         return optimizer
@@ -109,41 +107,44 @@ class MonaiUNet(pl.LightningModule):
 
         V, F, CN = x
         
-        X = []
-        PF = []
-
-        for camera_position in self.ico_verts:
-            images, pix_to_face = self.render(V, F, CN, camera_position.unsqueeze(0))
-            X.append(images.unsqueeze(1))
-            PF.append(pix_to_face.unsqueeze(1))
-
-        X = torch.cat(X, dim=1)
-        PF = torch.cat(PF, dim=1)
-
+        X, PF = self.render(V, F, CN)
         x = self.model(X)
         
-        return x*(PF >= 0), X, PF
+        return x, X, PF
 
-    def render(self, V, F, CN, camera_position):
+    def render(self, V, F, CN):
 
         textures = TexturesVertex(verts_features=CN)
         meshes = Meshes(verts=V, faces=F, textures=textures)        
 
-        R = look_at_rotation(camera_position, device=self.device)  # (1, 3, 3)
-        T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+        X = []
+        PF = []
+
+        for camera_position in self.ico_verts:
+
+            camera_position = camera_position.unsqueeze(0)
+
+            R = look_at_rotation(camera_position, device=self.device)  # (1, 3, 3)
+            T = -torch.bmm(R.transpose(1, 2), camera_position[:,:,None])[:, :, 0]   # (1, 3)
+
+            images = self.renderer(meshes_world=meshes.clone(), R=R, T=T)
         
-        images = self.renderer(meshes_world=meshes.clone(), R=R, T=T)
+            fragments = self.renderer.rasterizer(meshes.clone())
+            pix_to_face = fragments.pix_to_face
+            zbuf = fragments.zbuf
+
+            images = torch.cat([images[:,:,:,0:3], zbuf], dim=-1)
+            images = images.permute(0,3,1,2)
+
+            pix_to_face = pix_to_face.permute(0,3,1,2)
+            
+            X.append(images.unsqueeze(1))
+            PF.append(pix_to_face.unsqueeze(1))
         
-        fragments = self.renderer.rasterizer(meshes.clone())
-        pix_to_face = fragments.pix_to_face
-        zbuf = fragments.zbuf
+        X = torch.cat(X, dim=1)
+        PF = torch.cat(PF, dim=1)        
 
-        images = torch.cat([images[:,:,:,0:3], zbuf], dim=-1)
-        images = images.permute(0,3,1,2)
-
-        pix_to_face = pix_to_face.permute(0,3,1,2)
-
-        return images, pix_to_face
+        return X, PF
 
     def training_step(self, train_batch, batch_idx):
 
@@ -154,28 +155,23 @@ class MonaiUNet(pl.LightningModule):
         YF = YF.to(self.device, non_blocking=True)
         CN = CN.to(self.device, non_blocking=True).to(torch.float32)
 
-        opt = self.optimizers()
-        
-        batch_size = V.shape[0]
+        x, X, PF = self((V, F, CN))
 
-        for i in range(self.hparams.train_sphere_samples):
-            camera_position = torch.normal(mean=0.0, std=0.1, size=(3,), device=self.device)
-            camera_position *= self.hparams.radius/torch.linalg.norm(camera_position)            
-            camera_position = torch.unsqueeze(camera_position, dim=0)
+        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
 
-            X, PF = self.render(V, F, CN, camera_position)
-
-            y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
-        
-            opt.zero_grad()
-
-            x = self.model.module(X)*(PF >= 0)
+        x = x.permute(0, 2, 1, 3, 4) #batch, time, channels, H, W -> batch, channels, time, H, W
+        y = y.permute(0, 2, 1, 3, 4)
             
-            loss = self.loss(x, y)
-            self.manual_backward(loss)
-            opt.step()
-        
-            self.log('train_loss', loss, batch_size=batch_size)
+        loss = self.loss(x, y)
+
+        batch_size = V.shape[0]
+        self.log('train_loss', loss, batch_size=batch_size)
+        self.accuracy(torch.argmax(x, dim=1, keepdim=True).reshape(-1, 1), y.reshape(-1, 1).to(torch.int32))
+        self.log("train_acc", self.accuracy, batch_size=batch_size)
+
+        return loss
+
+
 
     def validation_step(self, val_batch, batch_idx):
         V, F, YF, CN = val_batch
@@ -185,28 +181,19 @@ class MonaiUNet(pl.LightningModule):
         YF = YF.to(self.device, non_blocking=True)
         CN = CN.to(self.device, non_blocking=True).to(torch.float32)
 
-        batch_size = V.shape[0]
+        x, X, PF = self((V, F, CN))
 
-        val_loss = 0
-        val_accuracy = 0
+        y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
 
-        for i in range(self.hparams.train_sphere_samples):
-            camera_position = torch.normal(mean=0.0, std=0.1, size=(3,), device=self.device)
-            camera_position *= self.hparams.radius/torch.linalg.norm(camera_position)            
-            camera_position = torch.unsqueeze(camera_position, dim=0)
-
-            X, PF = self.render(V, F, CN, camera_position)
-
-            y = torch.take(YF, PF).to(torch.int64)*(PF >= 0)
-
-            x = self.model.module(X)*(PF >= 0)
+        x = x.permute(0, 2, 1, 3, 4) #batch, time, channels, H, W -> batch, channels, time, H, W
+        y = y.permute(0, 2, 1, 3, 4)
             
-            val_loss += self.loss(x, y)
-
-            val_accuracy += self.accuracy(torch.argmax(x, dim=1, keepdim=True).reshape(-1, 1), y.reshape(-1, 1).to(torch.int32))
+        loss = self.loss(x, y)
         
-        self.log("val_acc", val_accuracy/self.hparams.train_sphere_samples, batch_size=batch_size, sync_dist=True)
-        self.log('val_loss', val_loss/self.hparams.train_sphere_samples, batch_size=batch_size, sync_dist=True)
+        batch_size = V.shape[0]
+        self.accuracy(torch.argmax(x, dim=1, keepdim=True).reshape(-1, 1), y.reshape(-1, 1).to(torch.int32))
+        self.log("val_acc", self.accuracy, batch_size=batch_size, sync_dist=True)
+        self.log('val_loss', loss, batch_size=batch_size, sync_dist=True)
 
     def test_step(self, batch, batch_idx):
 
