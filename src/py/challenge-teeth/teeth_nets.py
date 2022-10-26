@@ -76,6 +76,12 @@ class MonaiUNet(pl.LightningModule):
 
         ico_verts, ico_faces, ico_edges = utils.PolyDataToTensors(utils.CreateIcosahedron(radius=radius, sl=subdivision_level))
         ico_verts = ico_verts.to(torch.float32)
+
+        for idx, v in enumerate(ico_verts):
+            if (torch.abs(torch.sum(v)) == radius):
+                ico_verts[idx] = v + torch.normal(0.0, 1e-7, (3,))
+
+        
         self.register_buffer("ico_verts", ico_verts)
 
         cameras = FoVPerspectiveCameras()
