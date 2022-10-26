@@ -69,6 +69,10 @@ class TeethDataset(Dataset):
 
         return verts, faces, color_normals
 
+    def getSurf(self, idx):
+        surf_path = f'{self.mount_point}/{self.df.iloc[idx][self.surf_column]}'
+        return utils.ReadSurf(surf_path)
+
 
 class TeethDataModule(pl.LightningDataModule):
     def __init__(self, df_train, df_val, df_test, mount_point="./", batch_size=256, num_workers=4, surf_column="surf", surf_property=None, train_transform=None, valid_transform=None, test_transform=None, drop_last=False):
