@@ -57,11 +57,6 @@ def main(args):
             x, X, PF = model((V, F, CN))
             x = softmax(x*(PF>=0))
 
-            x_ = torch.argmax(x, dim=2).cpu().numpy()
-
-            output_fn = os.path.join(args.out, df["surf"][idx]).replace(".vtk", ".nrrd")
-            nrrd.write(output_fn, x_[0])
-
             P_faces = torch.zeros(out_channels, F.shape[1]).to(device)
             V_labels_prediction = torch.zeros(V.shape[1]).to(device).to(torch.int64)
 
