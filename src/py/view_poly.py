@@ -56,6 +56,7 @@ def main(args):
             surfActor = GetColoredActor(surf, property_name)
     else:
         surf = ReadSurf(args.surf)
+        surf = GetUnitSurf(surf)
         if args.property:
             surfActor = GetRandomColoredActor(surf, args.property)    
         else:
