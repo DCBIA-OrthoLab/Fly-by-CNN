@@ -1,7 +1,6 @@
 import os
 import re
 import numpy as np
-import itk
 import vtk
 from vtk.util.numpy_support import vtk_to_numpy
 from vtk.util.numpy_support import numpy_to_vtk
@@ -81,13 +80,14 @@ class MyInteractorStyle(vtk.vtkInteractorStyleTrackballCamera):
 
     def char_event(self, obj, event):
         key = self.GetInteractor().GetKeySym()
+        print(key)
         if key.isnumeric():
             self.value = int(key)
             print("Label is now:", self.value)
-        elif key == 'KP_Add':
+        elif key == 'KP_Add' or key == 'plus':
             self.value += 1
             print("Label is now:", self.value)
-        elif key == 'KP_Subtract':
+        elif key == 'KP_Subtract' or key == 'minus':
             self.value -= 1
             print("Label is now:", self.value)
         elif key == 'd':
@@ -130,7 +130,15 @@ def main(args):
     surf = ReadSurf(args.surf)
     # actor = GetColoredActor(surf, args.property)
     # actor = GetRandomColoredActor(surf, args.property)
-    actor = GetSeparateColoredActor(surf, args.property)
+    if surf.GetPointData().GetScalars(args.property) is None:
+        prop_array = vtk.vtkDoubleArray()
+        prop_array.SetName(args.property)
+        prop_array.SetNumberOfComponents(1)
+        prop_array.SetNumberOfTuples(surf.GetNumberOfPoints())
+        prop_array.FillComponent(0, 0)
+        surf.GetPointData().AddArray(prop_array)
+        surf.GetPointData().SetActiveScalars(args.property)
+    actor = GetSeparateColoredActor(surf, args.property, range_scalars=args.range)
     actor.GetProperty().SetInterpolationToFlat()
 
     colors = vtk.vtkNamedColors()
@@ -162,7 +170,8 @@ if __name__ == '__main__':
 
     input_group = parser.add_argument_group('Input parameters')
     input_group.add_argument('--surf', type=str, help='Target surface/mesh', required=True)
-    input_group.add_argument('--property', type=str, help='Input property file with same number of points as "surf"', default=None)
+    input_group.add_argument('--property', type=str, help='Scalar/property name in vtk file', required=True)
+    input_group.add_argument('--range', type=int, nargs="+", help='Range of scalars', default=None)
     input_group.add_argument('--neighbors', type=int, help='Neighborhood size', default=2)
 
     output_group = parser.add_argument_group('Output parameters')
